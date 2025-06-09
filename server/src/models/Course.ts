@@ -1,6 +1,30 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Document, Schema } from 'mongoose';
 
-const courseSchema = new Schema({
+export interface CourseDocument extends Document {
+  _id: mongoose.Types.ObjectId;
+  title: string;
+  description: string;
+  instructorId: mongoose.Types.ObjectId;
+  modules: mongoose.Types.ObjectId[];
+  objectives: string[];
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  estimatedDuration: number; // in hours
+  tags: string[];
+  isPublished: boolean;
+  enrollmentCount: number;
+  rating: number;
+  thumbnail?: string;
+  prerequisites: string[];
+  metadata: {
+    targetAudience: string[];
+    skillsGained: string[];
+    assessmentTypes: string[];
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const courseSchema = new Schema<CourseDocument>({
   title: {
     type: String,
     required: true,
@@ -12,7 +36,8 @@ const courseSchema = new Schema({
     type: String,
     required: true,
     maxlength: 2000,
-  },  instructor: {
+  },
+  instructorId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true,
@@ -93,19 +118,8 @@ const courseSchema = new Schema({
 
 // Indexes for performance and search
 courseSchema.index({ title: 'text', description: 'text', tags: 'text' });
-courseSchema.index({ instructor: 1, createdAt: -1 });
+courseSchema.index({ instructorId: 1, createdAt: -1 });
 courseSchema.index({ isPublished: 1, difficulty: 1 });
 courseSchema.index({ tags: 1, difficulty: 1 });
 
-// Virtual field for lessons
-courseSchema.virtual('lessons', {
-  ref: 'Lesson',
-  localField: '_id',
-  foreignField: 'courseId',
-});
-
-// Ensure virtual fields are included in JSON output
-courseSchema.set('toJSON', { virtuals: true });
-courseSchema.set('toObject', { virtuals: true });
-
-export const Course = mongoose.model('Course', courseSchema);
+export const Course = mongoose.model<CourseDocument>('Course', courseSchema);
