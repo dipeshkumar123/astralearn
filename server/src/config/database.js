@@ -1,29 +1,24 @@
 import mongoose from 'mongoose';
-import { config } from './environment';
-
-interface MongoConfig {
-  uri: string;
-  options: mongoose.ConnectOptions;
-}
+import { config } from './environment.js';
 
 class DatabaseManager {
-  private static instance: DatabaseManager;
-  private connection: mongoose.Connection | null = null;
+  static instance = null;
+  connection = null;
 
-  private constructor() {}
+  constructor() {}
 
-  public static getInstance(): DatabaseManager {
+  static getInstance() {
     if (!DatabaseManager.instance) {
       DatabaseManager.instance = new DatabaseManager();
     }
     return DatabaseManager.instance;
   }
 
-  public async connect(): Promise<void> {
+  async connect() {
     try {
-      const config = this.getConfig();
+      const dbConfig = this.getConfig();
       
-      await mongoose.connect(config.uri, config.options);
+      await mongoose.connect(dbConfig.uri, dbConfig.options);
       this.connection = mongoose.connection;
 
       console.log('✅ MongoDB connected successfully');
@@ -42,13 +37,14 @@ class DatabaseManager {
     }
   }
 
-  public async disconnect(): Promise<void> {
+  async disconnect() {
     if (this.connection) {
       await mongoose.disconnect();
       console.log('🔌 MongoDB disconnected');
     }
   }
-  private getConfig(): MongoConfig {
+
+  getConfig() {
     const uri = config.database.uri;
 
     if (!uri) {
@@ -70,7 +66,7 @@ class DatabaseManager {
     };
   }
 
-  private setupEventListeners(): void {
+  setupEventListeners() {
     if (!this.connection) return;
 
     this.connection.on('error', (error) => {
@@ -92,11 +88,11 @@ class DatabaseManager {
     });
   }
 
-  public getConnection(): mongoose.Connection | null {
+  getConnection() {
     return this.connection;
   }
 
-  public isConnected(): boolean {
+  isConnected() {
     return this.connection?.readyState === 1;
   }
 }

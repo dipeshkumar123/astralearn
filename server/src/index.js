@@ -3,8 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
-import { config } from './config/environment';
-import DatabaseManager from './config/database';
+import { config } from './config/environment.js';
+import DatabaseManager from './config/database.js';
+import apiRoutes from './routes/index.js';
 
 // Initialize Express app
 const app = express();
@@ -28,57 +29,67 @@ if (config.server.environment !== 'test') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  const dbManager = DatabaseManager.getInstance();
-  res.json({
-    status: 'OK',
-    environment: config.server.environment,
-    database: dbManager.isConnected() ? 'Connected' : 'Disconnected',
-    timestamp: new Date().toISOString(),
-  });
-});
+// API Routes
+app.use('/api', apiRoutes);
 
-// API routes placeholder
-app.get('/api', (req, res) => {
-  res.json({
-    message: 'AstraLearn API Server',
-    version: '1.0.0',
-    endpoints: {
-      health: '/health',
-      api: '/api',
-    },
-  });
+// Health endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const dbManager = DatabaseManager.getInstance();
+    const dbStatus = dbManager.isConnected() ? 'Connected' : 'Disconnected';
+    
+    res.json({
+      status: 'OK',
+      message: 'AstraLearn Server is healthy',
+      timestamp: new Date().toISOString(),
+      environment: config.server.environment,
+      database: dbStatus,
+      version: '1.0.0',
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Health check failed',
+      error: error.message,
+    });
+  }
 });
 
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
-    error: 'Route not found',
-    message: `Cannot ${req.method} ${req.originalUrl}`,
+    error: 'Not Found',
+    message: `Route ${req.originalUrl} not found`,
+    availableRoutes: {
+      health: 'GET /health',
+      api: 'GET /api/*',
+    },
   });
 });
 
-// Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('❌ Server error:', err);
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('❌ Unhandled error:', err);
   
-  const isDevelopment = config.server.environment === 'development';
+  if (res.headersSent) {
+    return next(err);
+  }
   
   res.status(err.status || 500).json({
-    error: err.message || 'Internal Server Error',
-    ...(isDevelopment && { stack: err.stack }),
+    error: 'Internal Server Error',
+    message: config.server.environment === 'development' ? err.message : 'Something went wrong',
+    ...(config.server.environment === 'development' && { stack: err.stack }),
   });
 });
 
-// Start server function
+// Server startup function
 async function startServer() {
   try {
-    // Connect to database
+    // Initialize database connection
     const dbManager = DatabaseManager.getInstance();
     await dbManager.connect();
 
-    // Start HTTP server
+    // Start server
     const server = app.listen(config.server.port, () => {
       console.log('🚀 AstraLearn Server Started');
       console.log(`📍 Environment: ${config.server.environment}`);

@@ -3,7 +3,7 @@
 /**
  * Format time duration in minutes to human readable format
  */
-export function formatDuration(minutes: number): string {
+export function formatDuration(minutes) {
   if (minutes < 60) {
     return `${minutes}m`;
   }
@@ -21,7 +21,7 @@ export function formatDuration(minutes: number): string {
 /**
  * Calculate progress percentage
  */
-export function calculateProgress(completed: number, total: number): number {
+export function calculateProgress(completed, total) {
   if (total === 0) return 0;
   return Math.round((completed / total) * 100);
 }
@@ -29,7 +29,7 @@ export function calculateProgress(completed: number, total: number): number {
 /**
  * Validate email format
  */
-export function isValidEmail(email: string): boolean {
+export function isValidEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
@@ -37,7 +37,7 @@ export function isValidEmail(email: string): boolean {
 /**
  * Generate random ID
  */
-export function generateId(prefix?: string): string {
+export function generateId(prefix) {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substr(2, 5);
   const id = timestamp + random;
@@ -47,12 +47,9 @@ export function generateId(prefix?: string): string {
 /**
  * Debounce function
  */
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
+export function debounce(func, wait) {
+  let timeout;
+  return (...args) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
@@ -61,6 +58,6 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Capitalize first letter of string
  */
-export function capitalize(str: string): string {
+export function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

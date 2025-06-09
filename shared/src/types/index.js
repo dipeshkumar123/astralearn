@@ -15,8 +15,6 @@ export const UserSchema = z.object({
   updatedAt: z.date(),
 });
 
-export type User = z.infer<typeof UserSchema>;
-
 // Course Management
 export const CourseSchema = z.object({
   id: z.string(),
@@ -32,8 +30,6 @@ export const CourseSchema = z.object({
   updatedAt: z.date(),
 });
 
-export type Course = z.infer<typeof CourseSchema>;
-
 // Module/Lesson Structure
 export const LessonSchema = z.object({
   id: z.string(),
@@ -48,8 +44,6 @@ export const LessonSchema = z.object({
   updatedAt: z.date(),
 });
 
-export type Lesson = z.infer<typeof LessonSchema>;
-
 // AI Context
 export const AIContextSchema = z.object({
   user: UserSchema.pick({ id: true, learningStyle: true, progress: true }),
@@ -62,21 +56,20 @@ export const AIContextSchema = z.object({
   }),
 });
 
-export type AIContext = z.infer<typeof AIContextSchema>;
-
 // API Response types
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
+export const ApiResponse = {
+  success: false,
+  data: undefined,
+  error: undefined,
+  message: undefined,
+};
 
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+export const PaginatedResponse = {
+  ...ApiResponse,
   pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
+    page: 0,
+    limit: 0,
+    total: 0,
+    pages: 0,
+  },
+};
