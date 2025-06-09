@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth.js';
 import { config } from '../config/environment.js';
 import aiService from '../services/aiService.js';
 import aiContextService from '../services/aiContextService.js';
+import aiOrchestrator from '../services/aiOrchestrator.js';
 
 const router = Router();
 
@@ -484,6 +485,333 @@ router.post('/demo',
         error: 'Internal server error',
         message: 'AI demo service temporarily unavailable',
         reply: 'I apologize, but the demo service is currently experiencing technical difficulties.',
+      });
+    }
+  }
+);
+
+// === PHASE 2 STEP 2: AI ORCHESTRATION LAYER ENDPOINTS ===
+
+// Orchestrated AI Chat - Enhanced with learning style adaptation
+router.post('/orchestrated/chat', 
+  authenticate,
+  [
+    body('content').notEmpty().trim(),
+    body('context').optional().isObject(),
+    body('courseId').optional().isString(),
+    body('lessonId').optional().isString(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array(),
+        });
+      }
+
+      const { content, context = {}, courseId, lessonId } = req.body;
+
+      // Use AI Orchestrator for enhanced, personalized responses
+      const orchestratedResponse = await aiOrchestrator.orchestrateRequest({
+        type: 'chat',
+        userId: req.user._id,
+        content,
+        context: { courseId, lessonId, ...context },
+        options: {},
+      });
+
+      res.json({
+        success: orchestratedResponse.success,
+        reply: orchestratedResponse.response?.reply || orchestratedResponse.fallbackResponse?.message,
+        response: orchestratedResponse.response,
+        metadata: orchestratedResponse.metadata,
+        personalizedSuggestions: orchestratedResponse.response?.personalizedSuggestions,
+        learningStyleEnhancements: {
+          visual: orchestratedResponse.response?.visualSuggestions,
+          auditory: orchestratedResponse.response?.auditorySuggestions,
+          kinesthetic: orchestratedResponse.response?.kinestheticSuggestions,
+          reading: orchestratedResponse.response?.readingSuggestions,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      console.error('Orchestrated AI Chat error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'AI chat service temporarily unavailable',
+      });
+    }
+  }
+);
+
+// Personalized Learning Recommendations
+router.get('/orchestrated/recommendations', 
+  authenticate,
+  async (req, res) => {
+    try {
+      const { courseId, lessonId } = req.query;
+
+      const orchestratedResponse = await aiOrchestrator.orchestrateRequest({
+        type: 'recommendation',
+        userId: req.user._id,
+        content: 'Generate personalized learning recommendations',
+        context: { courseId, lessonId },
+        options: {},
+      });
+
+      res.json({
+        success: orchestratedResponse.success,
+        recommendations: orchestratedResponse.response?.reply,
+        personalizedFor: orchestratedResponse.metadata?.learningStyleAdapted,
+        configUsed: orchestratedResponse.metadata?.configUsed,
+        contextQuality: orchestratedResponse.metadata?.contextQuality,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      console.error('AI Recommendations error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Recommendation service temporarily unavailable',
+      });
+    }
+  }
+);
+
+// Adaptive Study Plan Generation
+router.post('/orchestrated/study-plan', 
+  authenticate,
+  [
+    body('goals').isArray().withMessage('Goals must be an array'),
+    body('timeframe').optional().isString(),
+    body('courseId').optional().isString(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array(),
+        });
+      }
+
+      const { goals, timeframe = 'week', courseId } = req.body;
+
+      const orchestratedResponse = await aiOrchestrator.orchestrateRequest({
+        type: 'study_plan',
+        userId: req.user._id,
+        content: { goals, timeframe },
+        context: { courseId },
+        options: {},
+      });
+
+      res.json({
+        success: orchestratedResponse.success,
+        studyPlan: orchestratedResponse.response?.reply,
+        adaptedFor: {
+          learningStyle: orchestratedResponse.metadata?.learningStyleAdapted,
+          performanceLevel: orchestratedResponse.metadata?.configUsed?.performanceAdjusted,
+        },
+        personalizedSuggestions: orchestratedResponse.response?.personalizedSuggestions,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      console.error('AI Study Plan error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Study plan service temporarily unavailable',
+      });
+    }
+  }
+);
+
+// Adaptive Concept Explanation
+router.post('/orchestrated/explain', 
+  authenticate,
+  [
+    body('concept').notEmpty().trim(),
+    body('courseId').optional().isString(),
+    body('lessonId').optional().isString(),
+    body('difficulty').optional().isIn(['basic', 'intermediate', 'advanced']),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array(),
+        });
+      }
+
+      const { concept, courseId, lessonId, difficulty } = req.body;
+
+      const orchestratedResponse = await aiOrchestrator.orchestrateRequest({
+        type: 'explanation',
+        userId: req.user._id,
+        content: concept,
+        context: { courseId, lessonId, requestedDifficulty: difficulty },
+        options: {},
+      });
+
+      res.json({
+        success: orchestratedResponse.success,
+        explanation: orchestratedResponse.response?.reply,
+        concept,
+        adaptedFor: {
+          learningStyle: orchestratedResponse.metadata?.learningStyleAdapted,
+          difficulty: difficulty || 'adaptive',
+        },
+        learningStyleEnhancements: {
+          visual: orchestratedResponse.response?.visualSuggestions,
+          auditory: orchestratedResponse.response?.auditorySuggestions,
+          kinesthetic: orchestratedResponse.response?.kinestheticSuggestions,
+          reading: orchestratedResponse.response?.readingSuggestions,
+        },
+        contextQuality: orchestratedResponse.metadata?.contextQuality,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      console.error('AI Explanation error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Explanation service temporarily unavailable',
+      });
+    }
+  }
+);
+
+// Personalized Feedback on Assignments/Exercises
+router.post('/orchestrated/feedback', 
+  authenticate,
+  [
+    body('work').notEmpty().withMessage('Work content is required'),
+    body('assignmentType').optional().isString(),
+    body('courseId').optional().isString(),
+    body('lessonId').optional().isString(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array(),
+        });
+      }
+
+      const { work, assignmentType, courseId, lessonId } = req.body;
+
+      const orchestratedResponse = await aiOrchestrator.orchestrateRequest({
+        type: 'feedback',
+        userId: req.user._id,
+        content: { work, assignmentType },
+        context: { courseId, lessonId },
+        options: {},
+      });
+
+      res.json({
+        success: orchestratedResponse.success,
+        feedback: orchestratedResponse.response?.reply,
+        adaptedFor: {
+          learningStyle: orchestratedResponse.metadata?.learningStyleAdapted,
+          performanceLevel: orchestratedResponse.metadata?.configUsed?.performanceAdjusted,
+        },
+        personalizedSuggestions: orchestratedResponse.response?.personalizedSuggestions,
+        encouragementLevel: orchestratedResponse.metadata?.configUsed?.supportLevel,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      console.error('AI Feedback error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Feedback service temporarily unavailable',
+      });
+    }
+  }
+);
+
+// Learning Style Assessment with AI Analysis
+router.post('/orchestrated/assess-learning-style', 
+  authenticate,
+  [
+    body('responses').isArray().withMessage('Responses must be an array'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array(),
+        });
+      }
+
+      const { responses } = req.body;
+
+      const orchestratedResponse = await aiOrchestrator.orchestrateRequest({
+        type: 'assessment',
+        userId: req.user._id,
+        content: { assessmentType: 'learning_style', responses },
+        context: {},
+        options: {},
+      });
+
+      res.json({
+        success: orchestratedResponse.success,
+        analysis: orchestratedResponse.response?.reply,
+        detectedLearningStyle: orchestratedResponse.metadata?.configUsed?.personalizedFor,
+        confidence: orchestratedResponse.metadata?.contextQuality?.score || 0,
+        recommendations: orchestratedResponse.response?.personalizedSuggestions,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      console.error('AI Learning Style Assessment error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Learning style assessment temporarily unavailable',
+      });
+    }
+  }
+);
+
+// AI Orchestrator Health Check
+router.get('/orchestrated/health', 
+  authenticate,
+  async (req, res) => {
+    try {
+      // Test orchestrator with a simple request
+      const testResponse = await aiOrchestrator.orchestrateRequest({
+        type: 'chat',
+        userId: req.user._id,
+        content: 'Health check',
+        context: {},
+        options: {},
+      });
+
+      res.json({
+        orchestratorStatus: 'operational',
+        testRequestSuccessful: testResponse.success,
+        learningStyleConfigs: Object.keys(aiOrchestrator.learningStyleConfigs),
+        cacheSize: aiOrchestrator.responseCache.size,
+        performanceThresholds: aiOrchestrator.performanceThresholds,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      console.error('AI Orchestrator Health Check error:', error);
+      res.status(500).json({
+        orchestratorStatus: 'error',
+        error: error.message,
+        timestamp: new Date().toISOString(),
       });
     }
   }

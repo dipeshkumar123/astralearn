@@ -11,6 +11,7 @@ class PromptTemplates {
         base: this.createBaseSystemPrompt(),
         contextAware: this.createContextAwareSystemPrompt(),
         educational: this.createEducationalSystemPrompt(),
+        orchestrated: this.createOrchestratedSystemPrompt(),
       },
       
       // User interaction templates
@@ -27,6 +28,15 @@ class PromptTemplates {
         course: this.createCourseContextTemplate(),
         lesson: this.createLessonContextTemplate(),
         progress: this.createProgressContextTemplate(),
+      },
+
+      // Phase 2 Step 2: AI Orchestration Layer Templates
+      orchestration: {
+        learningStyle: this.createLearningStylePrompts(),
+        performance: this.createPerformanceAdaptationPrompts(),
+        recommendation: this.createRecommendationPrompts(),
+        studyPlan: this.createStudyPlanPrompts(),
+        feedback: this.createFeedbackPrompts(),
       },
     };
   }
@@ -110,6 +120,40 @@ ASSESSMENT SUPPORT:
 - Offer study strategies tailored to the content type
 
 Remember: Your goal is not just to answer questions, but to facilitate deep learning and understanding.`;
+  }
+
+  /**
+   * Orchestrated system prompt for enhanced personalization
+   */
+  createOrchestratedSystemPrompt() {
+    return `You are AstraLearn AI with advanced orchestration capabilities, designed to provide highly personalized, context-aware educational support.
+
+ORCHESTRATION FEATURES:
+- Learning style adaptation (visual, auditory, kinesthetic, reading/writing)
+- Performance-based response adjustment
+- Personalized recommendation generation
+- Context-aware conversation routing
+- Dynamic difficulty adjustment
+
+LEARNING STYLE ADAPTATIONS:
+- Visual learners: Include examples, diagrams, step-by-step breakdowns
+- Auditory learners: Use conversational tone, analogies, discussion suggestions
+- Kinesthetic learners: Focus on practical applications, hands-on exercises
+- Reading/Writing learners: Provide comprehensive explanations, additional resources
+
+PERFORMANCE ADJUSTMENTS:
+- Struggling learners: More encouragement, simplified explanations, extra support
+- Average learners: Balanced approach, moderate challenge level
+- Excelling learners: Advanced concepts, challenging questions, independent exploration
+
+PERSONALIZATION PRINCIPLES:
+- Always consider the user's learning style when crafting responses
+- Adjust tone and content based on recent performance trends
+- Provide learning style-specific suggestions and enhancements
+- Generate personalized recommendations based on individual patterns
+- Maintain consistency with the user's preferences and goals
+
+Remember: Your responses should feel naturally adapted to the individual user while maintaining educational excellence.`;
   }
 
   /**
@@ -538,6 +582,371 @@ ${interactionPrompt}`;
     if (!matches) return [];
     
     return matches.map(match => match.slice(1, -1));
+  }
+
+  // === PHASE 2 STEP 2: AI ORCHESTRATION LAYER PROMPT TEMPLATES ===
+
+  /**
+   * Orchestrated system prompt for enhanced personalization
+   */
+  createOrchestratedSystemPrompt() {
+    return `You are AstraLearn AI with advanced orchestration capabilities, designed to provide highly personalized, context-aware educational support.
+
+ORCHESTRATION FEATURES:
+- Learning style adaptation (visual, auditory, kinesthetic, reading/writing)
+- Performance-based response adjustment
+- Personalized recommendation generation
+- Context-aware conversation routing
+- Dynamic difficulty adjustment
+
+LEARNING STYLE ADAPTATIONS:
+- Visual learners: Include examples, diagrams, step-by-step breakdowns
+- Auditory learners: Use conversational tone, analogies, discussion suggestions
+- Kinesthetic learners: Focus on practical applications, hands-on exercises
+- Reading/Writing learners: Provide comprehensive explanations, additional resources
+
+PERFORMANCE ADJUSTMENTS:
+- Struggling learners: More encouragement, simplified explanations, extra support
+- Average learners: Balanced approach, moderate challenge level
+- Excelling learners: Advanced concepts, challenging questions, independent exploration
+
+PERSONALIZATION PRINCIPLES:
+- Always consider the user's learning style when crafting responses
+- Adjust tone and content based on recent performance trends
+- Provide learning style-specific suggestions and enhancements
+- Generate personalized recommendations based on individual patterns
+- Maintain consistency with the user's preferences and goals
+
+Remember: Your responses should feel naturally adapted to the individual user while maintaining educational excellence.`;
+  }
+
+  /**
+   * Learning style specific prompts
+   */
+  createLearningStylePrompts() {
+    return {
+      visual: {
+        template: `VISUAL LEARNER ADAPTATION:
+Adapt your response for a visual learner by:
+- Including concrete examples and analogies
+- Suggesting visual aids (diagrams, charts, mind maps)
+- Breaking down complex concepts into step-by-step visual sequences
+- Using spatial and structural descriptions
+- Recommending color-coding and visual organization techniques
+
+Content: {content}
+Context: {context}
+Learning Goal: {learning_goal}
+
+Provide your response with visual learning enhancements.`,
+        variables: ['content', 'context', 'learning_goal']
+      },
+
+      auditory: {
+        template: `AUDITORY LEARNER ADAPTATION:
+Adapt your response for an auditory learner by:
+- Using conversational and discussion-oriented language
+- Including verbal patterns and rhythmic explanations
+- Suggesting reading aloud and verbal practice
+- Providing analogies that relate to sounds or verbal concepts
+- Recommending discussion groups or verbal processing techniques
+
+Content: {content}
+Context: {context}
+Learning Goal: {learning_goal}
+
+Provide your response with auditory learning enhancements.`,
+        variables: ['content', 'context', 'learning_goal']
+      },
+
+      kinesthetic: {
+        template: `KINESTHETIC LEARNER ADAPTATION:
+Adapt your response for a kinesthetic learner by:
+- Focusing on practical, hands-on applications
+- Suggesting physical activities and movement-based learning
+- Including real-world examples and case studies
+- Recommending building, creating, or experimenting
+- Emphasizing learning through doing and experience
+
+Content: {content}
+Context: {context}
+Learning Goal: {learning_goal}
+
+Provide your response with kinesthetic learning enhancements.`,
+        variables: ['content', 'context', 'learning_goal']
+      },
+
+      reading: {
+        template: `READING/WRITING LEARNER ADAPTATION:
+Adapt your response for a reading/writing learner by:
+- Providing comprehensive, detailed explanations
+- Suggesting note-taking and summarization techniques
+- Including additional reading materials and references
+- Recommending written exercises and reflective writing
+- Organizing information in clear, logical written structures
+
+Content: {content}
+Context: {context}
+Learning Goal: {learning_goal}
+
+Provide your response with reading/writing learning enhancements.`,
+        variables: ['content', 'context', 'learning_goal']
+      }
+    };
+  }
+
+  /**
+   * Performance-based adaptation prompts
+   */
+  createPerformanceAdaptationPrompts() {
+    return {
+      struggling: {
+        template: `STRUGGLING LEARNER SUPPORT:
+The user is currently struggling with their learning (performance below 60%). Adapt your response by:
+- Providing extra encouragement and positive reinforcement
+- Breaking down concepts into smaller, manageable pieces
+- Offering additional practice opportunities and resources
+- Using simpler language and more detailed explanations
+- Suggesting foundational review and skill-building activities
+- Being patient and supportive in your tone
+
+User Performance Data: {performance_data}
+Recent Struggles: {struggling_areas}
+Learning Context: {context}
+Question/Request: {user_request}
+
+Provide a supportive, encouraging response that helps build confidence while addressing their learning needs.`,
+        variables: ['performance_data', 'struggling_areas', 'context', 'user_request']
+      },
+
+      excelling: {
+        template: `ADVANCED LEARNER CHALLENGE:
+The user is excelling in their learning (performance above 90%). Adapt your response by:
+- Providing more challenging and advanced concepts
+- Encouraging independent exploration and research
+- Offering extension activities and deeper applications
+- Using more sophisticated language and concepts
+- Suggesting leadership opportunities (teaching others, peer mentoring)
+- Challenging them to make connections across different areas
+
+User Performance Data: {performance_data}
+Areas of Excellence: {strong_areas}
+Learning Context: {context}
+Question/Request: {user_request}
+
+Provide a challenging, intellectually stimulating response that pushes their learning forward.`,
+        variables: ['performance_data', 'strong_areas', 'context', 'user_request']
+      },
+
+      average: {
+        template: `BALANCED LEARNER APPROACH:
+The user is performing at an average level (60-90% performance). Adapt your response by:
+- Providing a balanced mix of support and challenge
+- Offering opportunities for both reinforcement and advancement
+- Using moderate complexity in language and concepts
+- Suggesting varied practice activities
+- Encouraging steady progress and skill development
+- Maintaining an encouraging but appropriately challenging tone
+
+User Performance Data: {performance_data}
+Learning Patterns: {learning_patterns}
+Learning Context: {context}
+Question/Request: {user_request}
+
+Provide a balanced response that supports continued growth while building on their current strengths.`,
+        variables: ['performance_data', 'learning_patterns', 'context', 'user_request']
+      }
+    };
+  }
+
+  /**
+   * Recommendation generation prompts
+   */
+  createRecommendationPrompts() {
+    return {
+      personalized: {
+        template: `PERSONALIZED LEARNING RECOMMENDATIONS:
+Generate highly personalized learning recommendations based on the user's profile:
+
+USER PROFILE:
+- Learning Style: {learning_style}
+- Performance Level: {performance_level}
+- Recent Activity: {recent_activity}
+- Struggling Areas: {struggling_areas}
+- Strong Areas: {strong_areas}
+- Learning Preferences: {learning_preferences}
+
+COURSE CONTEXT:
+- Current Course: {course_title}
+- Current Lesson: {lesson_title}
+- Course Progress: {course_progress}%
+- Difficulty Level: {difficulty_level}
+
+ANALYTICS:
+- Recent Scores: {recent_scores}
+- Study Frequency: {study_frequency}
+- Time Spent: {time_spent}
+- Performance Trend: {performance_trend}
+
+Generate specific, actionable recommendations for:
+1. Next learning steps
+2. Study methods aligned with their learning style
+3. Resources to address struggling areas
+4. Ways to leverage their strengths
+5. Study schedule and time management suggestions
+
+Make recommendations practical, achievable, and tailored to their specific situation.`,
+        variables: [
+          'learning_style', 'performance_level', 'recent_activity', 'struggling_areas',
+          'strong_areas', 'learning_preferences', 'course_title', 'lesson_title',
+          'course_progress', 'difficulty_level', 'recent_scores', 'study_frequency',
+          'time_spent', 'performance_trend'
+        ]
+      }
+    };
+  }
+
+  /**
+   * Study plan generation prompts
+   */
+  createStudyPlanPrompts() {
+    return {
+      personalized: {
+        template: `PERSONALIZED STUDY PLAN GENERATION:
+Create a detailed, personalized study plan based on the user's profile and goals:
+
+USER PROFILE:
+- Learning Style: {learning_style}
+- Available Time: {available_time} minutes per session
+- Preferred Difficulty: {preferred_difficulty}
+- Performance Level: {performance_level}
+- Study Frequency: {study_frequency}
+
+LEARNING GOALS:
+{goals}
+
+CURRENT CONTEXT:
+- Course: {course_title}
+- Current Progress: {course_progress}%
+- Struggling Areas: {struggling_areas}
+- Strong Areas: {strong_areas}
+
+CONSTRAINTS:
+- Time Frame: {timeframe}
+- Session Duration: {session_duration} minutes
+- Preferred Study Times: {preferred_times}
+
+Create a study plan that includes:
+1. Daily/weekly schedule aligned with their learning style
+2. Specific activities for each study session
+3. Progress milestones and checkpoints
+4. Methods to address struggling areas
+5. Techniques to leverage their strengths
+6. Flexibility for different energy levels and time constraints
+7. Assessment and adjustment strategies
+
+Ensure the plan is realistic, sustainable, and adapted to their learning style and performance level.`,
+        variables: [
+          'learning_style', 'available_time', 'preferred_difficulty', 'performance_level',
+          'study_frequency', 'goals', 'course_title', 'course_progress', 'struggling_areas',
+          'strong_areas', 'timeframe', 'session_duration', 'preferred_times'
+        ]
+      }
+    };
+  }
+
+  /**
+   * Personalized feedback prompts
+   */
+  createFeedbackPrompts() {
+    return {
+      personalized: {
+        template: `PERSONALIZED LEARNING FEEDBACK:
+Provide personalized feedback on the user's work based on their learning profile:
+
+USER PROFILE:
+- Learning Style: {learning_style}
+- Performance Level: {performance_level}
+- Recent Performance Trend: {performance_trend}
+- Encouragement Level Needed: {encouragement_level}
+
+COURSE CONTEXT:
+- Course: {course_title}
+- Lesson: {lesson_title}
+- Learning Objectives: {learning_objectives}
+
+USER'S WORK:
+{user_work}
+
+ASSESSMENT CRITERIA:
+- Understanding of concepts
+- Application of knowledge
+- Quality of reasoning
+- Areas for improvement
+- Strengths demonstrated
+
+Provide feedback that:
+1. Acknowledges their learning style preferences
+2. Adjusts tone based on their performance level and trends
+3. Offers specific, actionable improvement suggestions
+4. Highlights strengths and progress made
+5. Connects feedback to course objectives
+6. Suggests next steps aligned with their learning style
+7. Provides appropriate level of encouragement
+
+Make the feedback constructive, specific, and motivating while being honest about areas needing improvement.`,
+        variables: [
+          'learning_style', 'performance_level', 'performance_trend', 'encouragement_level',
+          'course_title', 'lesson_title', 'learning_objectives', 'user_work'
+        ]
+      }
+    };
+  }
+
+  /**
+   * Enhanced prompt building for orchestration
+   */
+  buildOrchestratedPrompt(type, category, data = {}) {
+    const template = this.templates.orchestration?.[type]?.[category];
+    
+    if (!template) {
+      // Fallback to regular prompt building
+      return this.buildPrompt(type, category, data);
+    }
+
+    return this.interpolateTemplate(template.template, data);
+  }
+
+  /**
+   * Get orchestration-specific templates
+   */
+  getOrchestrationTemplates() {
+    return this.templates.orchestration || {};
+  }
+
+  /**
+   * Validate orchestration template data
+   */
+  validateOrchestrationData(type, category, data) {
+    const template = this.templates.orchestration?.[type]?.[category];
+    
+    if (!template) {
+      return { valid: false, error: `Template not found: orchestration.${type}.${category}` };
+    }
+
+    const requiredVars = template.variables || [];
+    const missingVars = requiredVars.filter(varName => !(varName in data));
+
+    if (missingVars.length > 0) {
+      return {
+        valid: false,
+        error: `Missing required variables: ${missingVars.join(', ')}`,
+        missing: missingVars,
+        required: requiredVars,
+      };
+    }
+
+    return { valid: true };
   }
 }
 
