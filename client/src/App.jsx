@@ -3,11 +3,20 @@ import './App.css'
 import AIAssistant from './components/ai/AIAssistant'
 import AIContextProvider from './contexts/AIContextProvider'
 import DemoLearningEnvironment from './components/demo/DemoLearningEnvironment'
+import CourseManagementDashboard from './components/course/CourseManagementDashboard'
+import AdaptiveLearningDashboard from './components/adaptive/AdaptiveLearningDashboard'
+import AuthProvider, { useAuth } from './components/auth/AuthProvider'
+import LoginForm from './components/auth/LoginForm'
+import RegisterForm from './components/auth/RegisterForm'
 
-function App() {
+// Main App Content Component
+function AppContent() {
   const [serverStatus, setServerStatus] = useState('checking');
   const [serverInfo, setServerInfo] = useState(null);
-  const [showDemo, setShowDemo] = useState(false);
+  const [currentView, setCurrentView] = useState('status');
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const { user, logout, isDemoMode } = useAuth();
 
   useEffect(() => {
     checkServerStatus();
@@ -24,13 +33,16 @@ function App() {
       setServerInfo(null);
     }
   };
-
-  return (
-    <AIContextProvider>
-      <div className="min-h-screen bg-gray-50">
-        {showDemo ? (
-          <DemoLearningEnvironment onBackToStatus={() => setShowDemo(false)} />
-        ) : (
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'demo':
+        return <DemoLearningEnvironment onBackToStatus={() => setCurrentView('status')} />;
+      case 'course-management':
+        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('status')} />;
+      case 'adaptive-learning':
+        return <AdaptiveLearningDashboard userId="demo-user" onBackToMain={() => setCurrentView('status')} />;
+      default:
+        return (
           <div className="flex items-center justify-center min-h-screen">
             <div className="max-w-md mx-auto text-center">
               <h1 className="text-4xl font-bold text-blue-600 mb-4">
@@ -74,34 +86,107 @@ function App() {
                     </>
                   )}
                 </div>
-                
-                <div className="space-y-3 mt-6">
+                  <div className="space-y-3 mt-6">
                   <button 
                     onClick={checkServerStatus}
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                   >
                     Refresh Status
                   </button>
-                  
+
+                  {/* Authentication Buttons */}
+                  {!isDemoMode && (
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => setShowLogin(true)}
+                        className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                      >
+                        Login
+                      </button>
+                      <button 
+                        onClick={() => setShowRegister(true)}
+                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                      >
+                        Register
+                      </button>
+                    </div>
+                  )}
+
                   {serverStatus === 'connected' && (
-                    <button 
-                      onClick={() => setShowDemo(true)}
-                      className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-md hover:from-purple-700 hover:to-blue-700 transition-all"
-                    >
-                      🚀 Try AI Assistant Demo
-                    </button>
+                    <>
+                      <button 
+                        onClick={() => setCurrentView('demo')}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-md hover:from-purple-700 hover:to-blue-700 transition-all"
+                      >
+                        🚀 Try AI Assistant Demo
+                      </button>
+                      <button 
+                        onClick={() => setCurrentView('course-management')}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-md hover:from-green-700 hover:to-teal-700 transition-all"
+                      >
+                        📚 Course Management Dashboard
+                      </button>
+                      
+                      <button 
+                        onClick={() => setCurrentView('adaptive-learning')}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-md hover:from-orange-700 hover:to-red-700 transition-all"
+                      >
+                        🧠 Adaptive Learning Dashboard
+                      </button>
+                    </>
                   )}
                 </div>
-              </div>
-              
-              <div className="mt-8 text-sm text-gray-500">
-                <p>Phase 2: AI Integration Complete</p>
+              </div>                <div className="mt-8 text-sm text-gray-500">
+                <p>Phase 3 Step 2: Adaptive Learning Engine</p>
                 <p>✅ User Profile Management</p>
                 <p>✅ AI Orchestration Layer</p>
                 <p>✅ Frontend AI Interface</p>
-              </div>
+                <p>✅ Course Management System</p>
+                <p>🔄 Adaptive Learning & Assessment</p>
+              </div></div>
+          </div>
+        );
+    }
+  };
+  return (
+    <AIContextProvider>
+      <div className="min-h-screen bg-gray-50">
+        {/* User Authentication Status */}
+        {user && (
+          <div className="bg-blue-600 text-white px-4 py-2 text-sm">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <span>Welcome, {user.name}! {isDemoMode && '(Demo Mode)'}</span>
+              <button
+                onClick={logout}
+                className="text-blue-200 hover:text-white underline"
+              >
+                Logout
+              </button>
             </div>
           </div>
+        )}
+
+        {renderCurrentView()}
+        
+        {/* Authentication Forms */}
+        {showLogin && (
+          <LoginForm
+            onClose={() => setShowLogin(false)}
+            switchToRegister={() => {
+              setShowLogin(false);
+              setShowRegister(true);
+            }}
+          />
+        )}
+
+        {showRegister && (
+          <RegisterForm
+            onClose={() => setShowRegister(false)}
+            switchToLogin={() => {
+              setShowRegister(false);
+              setShowLogin(true);
+            }}
+          />
         )}
         
         {/* AI Assistant - Always available */}
@@ -109,6 +194,14 @@ function App() {
       </div>
     </AIContextProvider>
   )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
 
 export default App
