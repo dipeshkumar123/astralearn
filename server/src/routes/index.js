@@ -7,6 +7,7 @@ import aiRoutes from './ai.js';
 import userRoutes from './users.js';
 import courseManagementRoutes from './courseManagement.js';
 import adaptiveLearningRoutes from './adaptiveLearning.js';
+import gamificationRoutes from './gamification.js';
 
 const router = Router();
 
@@ -19,6 +20,7 @@ router.use('/ai', aiRoutes);
 router.use('/users', userRoutes);
 router.use('/course-management', courseManagementRoutes);
 router.use('/adaptive-learning', adaptiveLearningRoutes);
+router.use('/gamification', gamificationRoutes);
 
 // Health check for API routes
 router.get('/health', (req, res) => {
@@ -33,6 +35,7 @@ router.get('/health', (req, res) => {
       users: '/api/users',
       courseManagement: '/api/course-management',
       adaptiveLearning: '/api/adaptive-learning',
+      gamification: '/api/gamification',
     },
   });
 });

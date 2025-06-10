@@ -1,0 +1,1851 @@
+import { 
+  Badge, 
+  UserGamification, 
+  PointsActivity, 
+  Leaderboard, 
+  Achievement 
+} from '../models/Gamification.js';
+import { User } from '../models/User.js';
+import mongoose from 'mongoose';
+
+/**
+ * Gamification Service for AstraLearn
+ * Handles points, badges, streaks, achievements, and leaderboards
+ */
+class GamificationService {
+  constructor() {
+    this.levelThresholds = [
+      0, 100, 250, 500, 1000, 2000, 3500, 5500, 8000, 12000, 17000, 25000, 35000, 50000, 75000
+    ];
+    
+    this.pointValues = {
+      lesson_complete: 10,
+      assessment_complete: 25,
+      daily_login: 5,
+      streak_bonus: 10,
+      collaboration: 15,
+      help_peer: 20,
+      create_content: 30,
+      challenge_complete: 50,
+      level_up: 100
+    };
+
+    this.streakBonusMultipliers = {
+      7: 1.2,   // 7-day streak: 20% bonus
+      14: 1.5,  // 14-day streak: 50% bonus
+      30: 2.0,  // 30-day streak: 100% bonus
+      60: 2.5,  // 60-day streak: 150% bonus
+      100: 3.0  // 100-day streak: 200% bonus
+    };
+
+    this.initializeDefaultData();
+  }
+
+  /**
+   * Initialize default badges and achievements
+   */
+  async initializeDefaultData() {
+    try {
+      await this.createDefaultBadges();
+      await this.createDefaultAchievements();
+    } catch (error) {
+      console.error('Error initializing gamification data:', error);
+    }
+  }
+
+  /**
+   * Award points to a user for a specific activity
+   */
+  async awardPoints(userId, activityType, metadata = {}) {
+    try {
+      let basePoints = this.pointValues[activityType] || 0;
+      let finalPoints = basePoints;
+
+      // Get user's gamification profile
+      let userGamification = await this.getUserGamificationProfile(userId);
+      
+      // Apply streak bonuses
+      const streakMultiplier = this.getStreakMultiplier(userGamification, activityType);
+      if (streakMultiplier > 1) {
+        finalPoints = Math.round(basePoints * streakMultiplier);
+        metadata.streakBonus = true;
+        metadata.multiplier = streakMultiplier;
+      }
+
+      // Apply custom multipliers
+      if (metadata.multiplier && !metadata.streakBonus) {
+        finalPoints = Math.round(basePoints * metadata.multiplier);
+      }
+
+      // Record points activity
+      const activity = new PointsActivity({
+        userId,
+        activityType,
+        points: finalPoints,
+        metadata,
+        description: this.generateActivityDescription(activityType, metadata)
+      });
+      await activity.save();
+
+      // Update user's gamification profile
+      userGamification = await this.updateUserPoints(userId, finalPoints, activityType);
+
+      // Check for level up
+      const levelUp = await this.checkLevelUp(userGamification);
+      if (levelUp.leveledUp) {
+        await this.awardPoints(userId, 'level_up', { 
+          oldLevel: levelUp.oldLevel, 
+          newLevel: levelUp.newLevel 
+        });
+      }
+
+      // Update streaks
+      await this.updateStreaks(userId, activityType);
+
+      // Check achievements
+      await this.checkAchievements(userId);
+
+      return {
+        success: true,
+        pointsAwarded: finalPoints,
+        totalPoints: userGamification.totalPoints,
+        level: userGamification.level,
+        levelUp: levelUp.leveledUp,
+        streakBonus: metadata.streakBonus || false
+      };
+
+    } catch (error) {
+      console.error('Error awarding points:', error);
+      throw new Error('Failed to award points');
+    }
+  }
+
+  /**
+   * Get user's complete gamification profile
+   */
+  async getUserGamificationProfile(userId) {
+    try {
+      let profile = await UserGamification.findOne({ userId });
+      
+      if (!profile) {
+        profile = new UserGamification({
+          userId,
+          totalPoints: 0,
+          level: 1,
+          experiencePoints: 0
+        });
+        await profile.save();
+      }
+
+      return profile;
+    } catch (error) {
+      console.error('Error getting user gamification profile:', error);
+      throw new Error('Failed to get user profile');
+    }
+  }
+
+  /**
+   * Get user's gamification dashboard with summary data
+   */
+  async getUserDashboard(userId) {
+    try {
+      // Get user profile
+      const profile = await this.getUserGamificationProfile(userId);
+      
+      // Get recent activities
+      const recentActivities = await PointsActivity.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+
+      // Get user's rank in global leaderboard
+      const globalRank = await this.getUserGlobalRank(userId);
+      
+      // Get available badges not yet earned
+      const earnedBadgeIds = profile.badges.map(b => b.badgeId);
+      const availableBadges = await Badge.find({ 
+        badgeId: { $nin: earnedBadgeIds },
+        isActive: true 
+      }).limit(5);
+
+      // Calculate progress to next level
+      const currentLevelThreshold = this.levelThresholds[profile.level - 1] || 0;
+      const nextLevelThreshold = this.levelThresholds[profile.level] || this.levelThresholds[this.levelThresholds.length - 1];
+      const progressToNextLevel = nextLevelThreshold > currentLevelThreshold 
+        ? ((profile.totalPoints - currentLevelThreshold) / (nextLevelThreshold - currentLevelThreshold)) * 100
+        : 100;
+
+      // Get weekly stats
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weeklyPoints = await PointsActivity.aggregate([
+        {
+          $match: {
+            userId: new mongoose.Types.ObjectId(userId),
+            createdAt: { $gte: weekStart }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalPoints: { $sum: '$points' },
+            activitiesCount: { $count: {} }
+          }
+        }
+      ]);
+
+      const dashboard = {
+        profile: {
+          totalPoints: profile.totalPoints,
+          level: profile.level,
+          experiencePoints: profile.experiencePoints,
+          pointsBreakdown: profile.pointsBreakdown,
+          progressToNextLevel: Math.min(progressToNextLevel, 100),
+          nextLevelThreshold
+        },
+        streaks: profile.streaks,
+        badges: {
+          earned: profile.badges,
+          available: availableBadges,
+          totalEarned: profile.badges.length
+        },
+        achievements: profile.achievements,
+        leaderboard: {
+          globalRank: globalRank,
+          totalUsers: await UserGamification.countDocuments()
+        },
+        recentActivities,
+        weeklyStats: {
+          pointsEarned: weeklyPoints[0]?.totalPoints || 0,
+          activitiesCompleted: weeklyPoints[0]?.activitiesCount || 0
+        },
+        statistics: profile.statistics
+      };
+
+      return dashboard;
+
+    } catch (error) {
+      console.error('Error getting user dashboard:', error);
+      throw new Error('Failed to get user dashboard');
+    }
+  }
+
+  /**
+   * Get user's global rank
+   */
+  async getUserGlobalRank(userId) {
+    try {
+      const userProfile = await UserGamification.findOne({ userId });
+      if (!userProfile) return null;
+
+      const rank = await UserGamification.countDocuments({
+        totalPoints: { $gt: userProfile.totalPoints }
+      }) + 1;
+
+      return rank;
+    } catch (error) {
+      console.error('Error getting user global rank:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update user's points and calculate level
+   */
+  async updateUserPoints(userId, points, activityType) {
+    try {
+      const profile = await UserGamification.findOne({ userId });
+      
+      profile.totalPoints += points;
+      profile.experiencePoints += points;
+
+      // Update points breakdown
+      const category = this.getCategoryForActivity(activityType);
+      if (profile.pointsBreakdown[category] !== undefined) {
+        profile.pointsBreakdown[category] += points;
+      }
+
+      // Calculate new level
+      const newLevel = this.calculateLevel(profile.totalPoints);
+      profile.level = newLevel;
+
+      await profile.save();
+      return profile;
+    } catch (error) {
+      console.error('Error updating user points:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate level based on total points
+   */
+  calculateLevel(totalPoints) {
+    for (let i = this.levelThresholds.length - 1; i >= 0; i--) {
+      if (totalPoints >= this.levelThresholds[i]) {
+        return i + 1;
+      }
+    }
+    return 1;
+  }
+
+  /**
+   * Check if user leveled up
+   */
+  async checkLevelUp(userGamification) {
+    const currentLevel = userGamification.level;
+    const newLevel = this.calculateLevel(userGamification.totalPoints);
+    
+    if (newLevel > currentLevel) {
+      userGamification.level = newLevel;
+      await userGamification.save();
+      
+      return {
+        leveledUp: true,
+        oldLevel: currentLevel,
+        newLevel: newLevel,
+        nextLevelPoints: this.levelThresholds[newLevel] || null
+      };
+    }
+
+    return {
+      leveledUp: false,
+      currentLevel,
+      nextLevelPoints: this.levelThresholds[currentLevel] || null,
+      pointsToNext: (this.levelThresholds[currentLevel] || 0) - userGamification.totalPoints
+    };
+  }
+
+  /**
+   * Update user streaks
+   */
+  async updateStreaks(userId, activityType) {
+    try {
+      const profile = await UserGamification.findOne({ userId });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const lastActivity = profile.streaks.lastActivity.date;
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // Update daily learning streak
+      if (['lesson_complete', 'assessment_complete'].includes(activityType)) {
+        if (!lastActivity || lastActivity < yesterday) {
+          // Streak broken, reset to 1
+          profile.streaks.current.dailyLearning = 1;
+        } else if (lastActivity.getTime() === yesterday.getTime()) {
+          // Continuing streak
+          profile.streaks.current.dailyLearning += 1;
+          
+          // Update longest streak if necessary
+          if (profile.streaks.current.dailyLearning > profile.streaks.longest.dailyLearning) {
+            profile.streaks.longest.dailyLearning = profile.streaks.current.dailyLearning;
+          }
+        }
+        // If lastActivity is today, don't increment (already counted)
+      }
+
+      // Update assessment streak
+      if (activityType === 'assessment_complete') {
+        profile.streaks.current.assessmentStreak += 1;
+        if (profile.streaks.current.assessmentStreak > profile.streaks.longest.assessmentStreak) {
+          profile.streaks.longest.assessmentStreak = profile.streaks.current.assessmentStreak;
+        }
+      }
+
+      // Update last activity
+      profile.streaks.lastActivity = {
+        date: today,
+        type: activityType
+      };
+
+      await profile.save();
+      return profile.streaks;
+    } catch (error) {
+      console.error('Error updating streaks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get streak multiplier for points
+   */
+  getStreakMultiplier(userGamification, activityType) {
+    if (!['lesson_complete', 'assessment_complete'].includes(activityType)) {
+      return 1;
+    }
+
+    const dailyStreak = userGamification.streaks?.current?.dailyLearning || 0;
+    
+    for (let threshold of Object.keys(this.streakBonusMultipliers).reverse()) {
+      if (dailyStreak >= parseInt(threshold)) {
+        return this.streakBonusMultipliers[threshold];
+      }
+    }
+    
+    return 1;
+  }
+
+  /**
+   * Award badge to user
+   */
+  async awardBadge(userId, badgeId, progress = { current: 1, required: 1 }) {
+    try {
+      const badge = await Badge.findOne({ badgeId, isActive: true });
+      if (!badge) {
+        throw new Error('Badge not found');
+      }
+
+      const profile = await UserGamification.findOne({ userId });
+      const existingBadge = profile.badges.find(b => b.badgeId === badgeId);
+
+      if (existingBadge) {
+        // Update progress if badge allows progression
+        existingBadge.progress = progress;
+      } else {
+        // Award new badge
+        profile.badges.push({
+          badgeId,
+          earnedAt: new Date(),
+          progress
+        });
+
+        // Award points for badge
+        if (badge.points > 0) {
+          await this.awardPoints(userId, 'badge_earned', { 
+            badgeId, 
+            badgeName: badge.name,
+            points: badge.points 
+          });
+        }
+      }
+
+      await profile.save();
+
+      return {
+        success: true,
+        badge: {
+          id: badge.badgeId,
+          name: badge.name,
+          description: badge.description,
+          category: badge.category,
+          rarity: badge.rarity,
+          points: badge.points
+        },
+        newBadge: !existingBadge
+      };
+
+    } catch (error) {
+      console.error('Error awarding badge:', error);
+      throw new Error('Failed to award badge');
+    }
+  }
+
+  /**
+   * Check and award achievements
+   */
+  async checkAchievements(userId) {
+    try {
+      const achievements = await Achievement.find({ isActive: true });
+      const profile = await UserGamification.findOne({ userId });
+      const user = await User.findById(userId);
+      
+      const newAchievements = [];
+
+      for (const achievement of achievements) {
+        const existingAchievement = profile.achievements.find(
+          a => a.achievementId === achievement.achievementId
+        );
+
+        if (!existingAchievement) {
+          const isEarned = await this.checkAchievementCriteria(achievement, user, profile);
+          
+          if (isEarned.earned) {
+            profile.achievements.push({
+              achievementId: achievement.achievementId,
+              unlockedAt: new Date(),
+              progress: isEarned.progress
+            });
+
+            // Award rewards
+            if (achievement.rewards.points > 0) {
+              await this.awardPoints(userId, 'achievement_complete', {
+                achievementId: achievement.achievementId,
+                achievementName: achievement.name,
+                points: achievement.rewards.points
+              });
+            }
+
+            // Award badges
+            for (const badgeId of achievement.rewards.badges || []) {
+              await this.awardBadge(userId, badgeId);
+            }
+
+            newAchievements.push(achievement);
+          }
+        }
+      }
+
+      if (newAchievements.length > 0) {
+        await profile.save();
+      }
+
+      return newAchievements;
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if achievement criteria is met
+   */
+  async checkAchievementCriteria(achievement, user, profile) {
+    try {
+      const { criteria } = achievement;
+      let currentValue = 0;
+
+      switch (criteria.metric) {
+        case 'lessons_completed':
+          currentValue = profile.statistics.totalLessonsCompleted;
+          break;
+        case 'assessments_completed':
+          currentValue = profile.statistics.totalAssessmentsCompleted;
+          break;
+        case 'daily_streak':
+          currentValue = profile.streaks.current.dailyLearning;
+          break;
+        case 'total_points':
+          currentValue = profile.totalPoints;
+          break;
+        case 'level':
+          currentValue = profile.level;
+          break;
+        case 'badges_earned':
+          currentValue = profile.badges.length;
+          break;
+        default:
+          return { earned: false, progress: { current: 0, target: criteria.target } };
+      }
+
+      const earned = currentValue >= criteria.target;
+      
+      return {
+        earned,
+        progress: {
+          current: currentValue,
+          target: criteria.target
+        }
+      };
+    } catch (error) {
+      console.error('Error checking achievement criteria:', error);
+      return { earned: false, progress: { current: 0, target: achievement.criteria.target } };
+    }
+  }
+
+  /**
+   * Get leaderboard
+   */
+  async getLeaderboard(type = 'global', options = {}) {
+    try {
+      const { courseId, limit = 50, timeframe } = options;
+      
+      let matchQuery = {};
+      let sortQuery = { totalPoints: -1 };
+
+      // Build aggregation pipeline
+      const pipeline = [
+        { $match: matchQuery },
+        { $sort: sortQuery },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        { $unwind: '$user' },
+        {
+          $project: {
+            userId: 1,
+            totalPoints: 1,
+            level: 1,
+            'user.firstName': 1,
+            'user.lastName': 1,
+            'user.username': 1,
+            'user.learningStyle': 1,
+            badges: { $size: '$badges' },
+            streaks: '$streaks.current'
+          }
+        }
+      ];
+
+      // Add time-based filtering if specified
+      if (timeframe) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - timeframe);
+        
+        // This would need additional logic to calculate points within timeframe
+        // For now, we'll use total points
+      }
+
+      const leaderboard = await UserGamification.aggregate(pipeline);
+
+      // Add rankings
+      const rankedLeaderboard = leaderboard.map((entry, index) => ({
+        rank: index + 1,
+        ...entry,
+        user: {
+          id: entry.userId,
+          name: `${entry.user.firstName} ${entry.user.lastName}`,
+          username: entry.user.username,
+          learningStyle: entry.user.learningStyle
+        }
+      }));
+
+      return {
+        success: true,
+        leaderboard: rankedLeaderboard,
+        type,
+        generatedAt: new Date().toISOString(),
+        totalEntries: leaderboard.length
+      };
+
+    } catch (error) {
+      console.error('Error getting leaderboard:', error);
+      throw new Error('Failed to get leaderboard');
+    }
+  }
+
+  /**
+   * Get user's dashboard data
+   */
+  async getUserDashboard(userId) {
+    try {
+      // Get user profile
+      const profile = await this.getUserGamificationProfile(userId);
+      
+      // Get recent activities
+      const recentActivities = await PointsActivity.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+
+      // Get user's rank in global leaderboard
+      const globalRank = await this.getUserGlobalRank(userId);
+      
+      // Get available badges not yet earned
+      const earnedBadgeIds = profile.badges.map(b => b.badgeId);
+      const availableBadges = await Badge.find({ 
+        badgeId: { $nin: earnedBadgeIds },
+        isActive: true 
+      }).limit(5);
+
+      // Calculate progress to next level
+      const currentLevelThreshold = this.levelThresholds[profile.level - 1] || 0;
+      const nextLevelThreshold = this.levelThresholds[profile.level] || this.levelThresholds[this.levelThresholds.length - 1];
+      const progressToNextLevel = nextLevelThreshold > currentLevelThreshold 
+        ? ((profile.totalPoints - currentLevelThreshold) / (nextLevelThreshold - currentLevelThreshold)) * 100
+        : 100;
+
+      // Get weekly stats
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weeklyPoints = await PointsActivity.aggregate([
+        {
+          $match: {
+            userId: new mongoose.Types.ObjectId(userId),
+            createdAt: { $gte: weekStart }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalPoints: { $sum: '$points' },
+            activitiesCount: { $count: {} }
+          }
+        }
+      ]);
+
+      const dashboard = {
+        profile: {
+          totalPoints: profile.totalPoints,
+          level: profile.level,
+          experiencePoints: profile.experiencePoints,
+          pointsBreakdown: profile.pointsBreakdown,
+          progressToNextLevel: Math.min(progressToNextLevel, 100),
+          nextLevelThreshold
+        },
+        streaks: profile.streaks,
+        badges: {
+          earned: profile.badges,
+          available: availableBadges,
+          totalEarned: profile.badges.length
+        },
+        achievements: profile.achievements,
+        leaderboard: {
+          globalRank: globalRank,
+          totalUsers: await UserGamification.countDocuments()
+        },
+        recentActivities,
+        weeklyStats: {
+          pointsEarned: weeklyPoints[0]?.totalPoints || 0,
+          activitiesCompleted: weeklyPoints[0]?.activitiesCount || 0
+        },
+        statistics: profile.statistics
+      };
+
+      return dashboard;
+
+    } catch (error) {
+      console.error('Error getting user dashboard:', error);
+      throw new Error('Failed to get user dashboard');
+    }
+  }
+
+  /**
+   * Get user's global rank
+   */
+  async getUserGlobalRank(userId) {
+    try {
+      const userProfile = await UserGamification.findOne({ userId });
+      if (!userProfile) return null;
+
+      const rank = await UserGamification.countDocuments({
+        totalPoints: { $gt: userProfile.totalPoints }
+      }) + 1;
+
+      return rank;
+    } catch (error) {
+      console.error('Error getting user global rank:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update user's points and calculate level
+   */
+  async updateUserPoints(userId, points, activityType) {
+    try {
+      const profile = await UserGamification.findOne({ userId });
+      
+      profile.totalPoints += points;
+      profile.experiencePoints += points;
+
+      // Update points breakdown
+      const category = this.getCategoryForActivity(activityType);
+      if (profile.pointsBreakdown[category] !== undefined) {
+        profile.pointsBreakdown[category] += points;
+      }
+
+      // Calculate new level
+      const newLevel = this.calculateLevel(profile.totalPoints);
+      profile.level = newLevel;
+
+      await profile.save();
+      return profile;
+    } catch (error) {
+      console.error('Error updating user points:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate level based on total points
+   */
+  calculateLevel(totalPoints) {
+    for (let i = this.levelThresholds.length - 1; i >= 0; i--) {
+      if (totalPoints >= this.levelThresholds[i]) {
+        return i + 1;
+      }
+    }
+    return 1;
+  }
+
+  /**
+   * Check if user leveled up
+   */
+  async checkLevelUp(userGamification) {
+    const currentLevel = userGamification.level;
+    const newLevel = this.calculateLevel(userGamification.totalPoints);
+    
+    if (newLevel > currentLevel) {
+      userGamification.level = newLevel;
+      await userGamification.save();
+      
+      return {
+        leveledUp: true,
+        oldLevel: currentLevel,
+        newLevel: newLevel,
+        nextLevelPoints: this.levelThresholds[newLevel] || null
+      };
+    }
+
+    return {
+      leveledUp: false,
+      currentLevel,
+      nextLevelPoints: this.levelThresholds[currentLevel] || null,
+      pointsToNext: (this.levelThresholds[currentLevel] || 0) - userGamification.totalPoints
+    };
+  }
+
+  /**
+   * Update user streaks
+   */
+  async updateStreaks(userId, activityType) {
+    try {
+      const profile = await UserGamification.findOne({ userId });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const lastActivity = profile.streaks.lastActivity.date;
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // Update daily learning streak
+      if (['lesson_complete', 'assessment_complete'].includes(activityType)) {
+        if (!lastActivity || lastActivity < yesterday) {
+          // Streak broken, reset to 1
+          profile.streaks.current.dailyLearning = 1;
+        } else if (lastActivity.getTime() === yesterday.getTime()) {
+          // Continuing streak
+          profile.streaks.current.dailyLearning += 1;
+          
+          // Update longest streak if necessary
+          if (profile.streaks.current.dailyLearning > profile.streaks.longest.dailyLearning) {
+            profile.streaks.longest.dailyLearning = profile.streaks.current.dailyLearning;
+          }
+        }
+        // If lastActivity is today, don't increment (already counted)
+      }
+
+      // Update assessment streak
+      if (activityType === 'assessment_complete') {
+        profile.streaks.current.assessmentStreak += 1;
+        if (profile.streaks.current.assessmentStreak > profile.streaks.longest.assessmentStreak) {
+          profile.streaks.longest.assessmentStreak = profile.streaks.current.assessmentStreak;
+        }
+      }
+
+      // Update last activity
+      profile.streaks.lastActivity = {
+        date: today,
+        type: activityType
+      };
+
+      await profile.save();
+      return profile.streaks;
+    } catch (error) {
+      console.error('Error updating streaks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get streak multiplier for points
+   */
+  getStreakMultiplier(userGamification, activityType) {
+    if (!['lesson_complete', 'assessment_complete'].includes(activityType)) {
+      return 1;
+    }
+
+    const dailyStreak = userGamification.streaks?.current?.dailyLearning || 0;
+    
+    for (let threshold of Object.keys(this.streakBonusMultipliers).reverse()) {
+      if (dailyStreak >= parseInt(threshold)) {
+        return this.streakBonusMultipliers[threshold];
+      }
+    }
+    
+    return 1;
+  }
+
+  /**
+   * Award badge to user
+   */
+  async awardBadge(userId, badgeId, progress = { current: 1, required: 1 }) {
+    try {
+      const badge = await Badge.findOne({ badgeId, isActive: true });
+      if (!badge) {
+        throw new Error('Badge not found');
+      }
+
+      const profile = await UserGamification.findOne({ userId });
+      const existingBadge = profile.badges.find(b => b.badgeId === badgeId);
+
+      if (existingBadge) {
+        // Update progress if badge allows progression
+        existingBadge.progress = progress;
+      } else {
+        // Award new badge
+        profile.badges.push({
+          badgeId,
+          earnedAt: new Date(),
+          progress
+        });
+
+        // Award points for badge
+        if (badge.points > 0) {
+          await this.awardPoints(userId, 'badge_earned', { 
+            badgeId, 
+            badgeName: badge.name,
+            points: badge.points 
+          });
+        }
+      }
+
+      await profile.save();
+
+      return {
+        success: true,
+        badge: {
+          id: badge.badgeId,
+          name: badge.name,
+          description: badge.description,
+          category: badge.category,
+          rarity: badge.rarity,
+          points: badge.points
+        },
+        newBadge: !existingBadge
+      };
+
+    } catch (error) {
+      console.error('Error awarding badge:', error);
+      throw new Error('Failed to award badge');
+    }
+  }
+
+  /**
+   * Check and award achievements
+   */
+  async checkAchievements(userId) {
+    try {
+      const achievements = await Achievement.find({ isActive: true });
+      const profile = await UserGamification.findOne({ userId });
+      const user = await User.findById(userId);
+      
+      const newAchievements = [];
+
+      for (const achievement of achievements) {
+        const existingAchievement = profile.achievements.find(
+          a => a.achievementId === achievement.achievementId
+        );
+
+        if (!existingAchievement) {
+          const isEarned = await this.checkAchievementCriteria(achievement, user, profile);
+          
+          if (isEarned.earned) {
+            profile.achievements.push({
+              achievementId: achievement.achievementId,
+              unlockedAt: new Date(),
+              progress: isEarned.progress
+            });
+
+            // Award rewards
+            if (achievement.rewards.points > 0) {
+              await this.awardPoints(userId, 'achievement_complete', {
+                achievementId: achievement.achievementId,
+                achievementName: achievement.name,
+                points: achievement.rewards.points
+              });
+            }
+
+            // Award badges
+            for (const badgeId of achievement.rewards.badges || []) {
+              await this.awardBadge(userId, badgeId);
+            }
+
+            newAchievements.push(achievement);
+          }
+        }
+      }
+
+      if (newAchievements.length > 0) {
+        await profile.save();
+      }
+
+      return newAchievements;
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if achievement criteria is met
+   */
+  async checkAchievementCriteria(achievement, user, profile) {
+    try {
+      const { criteria } = achievement;
+      let currentValue = 0;
+
+      switch (criteria.metric) {
+        case 'lessons_completed':
+          currentValue = profile.statistics.totalLessonsCompleted;
+          break;
+        case 'assessments_completed':
+          currentValue = profile.statistics.totalAssessmentsCompleted;
+          break;
+        case 'daily_streak':
+          currentValue = profile.streaks.current.dailyLearning;
+          break;
+        case 'total_points':
+          currentValue = profile.totalPoints;
+          break;
+        case 'level':
+          currentValue = profile.level;
+          break;
+        case 'badges_earned':
+          currentValue = profile.badges.length;
+          break;
+        default:
+          return { earned: false, progress: { current: 0, target: criteria.target } };
+      }
+
+      const earned = currentValue >= criteria.target;
+      
+      return {
+        earned,
+        progress: {
+          current: currentValue,
+          target: criteria.target
+        }
+      };
+    } catch (error) {
+      console.error('Error checking achievement criteria:', error);
+      return { earned: false, progress: { current: 0, target: achievement.criteria.target } };
+    }
+  }
+
+  /**
+   * Get leaderboard
+   */
+  async getLeaderboard(type = 'global', options = {}) {
+    try {
+      const { courseId, limit = 50, timeframe } = options;
+      
+      let matchQuery = {};
+      let sortQuery = { totalPoints: -1 };
+
+      // Build aggregation pipeline
+      const pipeline = [
+        { $match: matchQuery },
+        { $sort: sortQuery },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        { $unwind: '$user' },
+        {
+          $project: {
+            userId: 1,
+            totalPoints: 1,
+            level: 1,
+            'user.firstName': 1,
+            'user.lastName': 1,
+            'user.username': 1,
+            'user.learningStyle': 1,
+            badges: { $size: '$badges' },
+            streaks: '$streaks.current'
+          }
+        }
+      ];
+
+      // Add time-based filtering if specified
+      if (timeframe) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - timeframe);
+        
+        // This would need additional logic to calculate points within timeframe
+        // For now, we'll use total points
+      }
+
+      const leaderboard = await UserGamification.aggregate(pipeline);
+
+      // Add rankings
+      const rankedLeaderboard = leaderboard.map((entry, index) => ({
+        rank: index + 1,
+        ...entry,
+        user: {
+          id: entry.userId,
+          name: `${entry.user.firstName} ${entry.user.lastName}`,
+          username: entry.user.username,
+          learningStyle: entry.user.learningStyle
+        }
+      }));
+
+      return {
+        success: true,
+        leaderboard: rankedLeaderboard,
+        type,
+        generatedAt: new Date().toISOString(),
+        totalEntries: leaderboard.length
+      };
+
+    } catch (error) {
+      console.error('Error getting leaderboard:', error);
+      throw new Error('Failed to get leaderboard');
+    }
+  }
+
+  /**
+   * Get user's dashboard data
+   */
+  async getUserDashboard(userId) {
+    try {
+      // Get user profile
+      const profile = await this.getUserGamificationProfile(userId);
+      
+      // Get recent activities
+      const recentActivities = await PointsActivity.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+
+      // Get user's rank in global leaderboard
+      const globalRank = await this.getUserGlobalRank(userId);
+      
+      // Get available badges not yet earned
+      const earnedBadgeIds = profile.badges.map(b => b.badgeId);
+      const availableBadges = await Badge.find({ 
+        badgeId: { $nin: earnedBadgeIds },
+        isActive: true 
+      }).limit(5);
+
+      // Calculate progress to next level
+      const currentLevelThreshold = this.levelThresholds[profile.level - 1] || 0;
+      const nextLevelThreshold = this.levelThresholds[profile.level] || this.levelThresholds[this.levelThresholds.length - 1];
+      const progressToNextLevel = nextLevelThreshold > currentLevelThreshold 
+        ? ((profile.totalPoints - currentLevelThreshold) / (nextLevelThreshold - currentLevelThreshold)) * 100
+        : 100;
+
+      // Get weekly stats
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weeklyPoints = await PointsActivity.aggregate([
+        {
+          $match: {
+            userId: new mongoose.Types.ObjectId(userId),
+            createdAt: { $gte: weekStart }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalPoints: { $sum: '$points' },
+            activitiesCount: { $count: {} }
+          }
+        }
+      ]);
+
+      const dashboard = {
+        profile: {
+          totalPoints: profile.totalPoints,
+          level: profile.level,
+          experiencePoints: profile.experiencePoints,
+          pointsBreakdown: profile.pointsBreakdown,
+          progressToNextLevel: Math.min(progressToNextLevel, 100),
+          nextLevelThreshold
+        },
+        streaks: profile.streaks,
+        badges: {
+          earned: profile.badges,
+          available: availableBadges,
+          totalEarned: profile.badges.length
+        },
+        achievements: profile.achievements,
+        leaderboard: {
+          globalRank: globalRank,
+          totalUsers: await UserGamification.countDocuments()
+        },
+        recentActivities,
+        weeklyStats: {
+          pointsEarned: weeklyPoints[0]?.totalPoints || 0,
+          activitiesCompleted: weeklyPoints[0]?.activitiesCount || 0
+        },
+        statistics: profile.statistics
+      };
+
+      return dashboard;
+
+    } catch (error) {
+      console.error('Error getting user dashboard:', error);
+      throw new Error('Failed to get user dashboard');
+    }
+  }
+
+  /**
+   * Get user's global rank
+   */
+  async getUserGlobalRank(userId) {
+    try {
+      const userProfile = await UserGamification.findOne({ userId });
+      if (!userProfile) return null;
+
+      const rank = await UserGamification.countDocuments({
+        totalPoints: { $gt: userProfile.totalPoints }
+      }) + 1;
+
+      return rank;
+    } catch (error) {
+      console.error('Error getting user global rank:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update user's points and calculate level
+   */
+  async updateUserPoints(userId, points, activityType) {
+    try {
+      const profile = await UserGamification.findOne({ userId });
+      
+      profile.totalPoints += points;
+      profile.experiencePoints += points;
+
+      // Update points breakdown
+      const category = this.getCategoryForActivity(activityType);
+      if (profile.pointsBreakdown[category] !== undefined) {
+        profile.pointsBreakdown[category] += points;
+      }
+
+      // Calculate new level
+      const newLevel = this.calculateLevel(profile.totalPoints);
+      profile.level = newLevel;
+
+      await profile.save();
+      return profile;
+    } catch (error) {
+      console.error('Error updating user points:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate level based on total points
+   */
+  calculateLevel(totalPoints) {
+    for (let i = this.levelThresholds.length - 1; i >= 0; i--) {
+      if (totalPoints >= this.levelThresholds[i]) {
+        return i + 1;
+      }
+    }
+    return 1;
+  }
+
+  /**
+   * Check if user leveled up
+   */
+  async checkLevelUp(userGamification) {
+    const currentLevel = userGamification.level;
+    const newLevel = this.calculateLevel(userGamification.totalPoints);
+    
+    if (newLevel > currentLevel) {
+      userGamification.level = newLevel;
+      await userGamification.save();
+      
+      return {
+        leveledUp: true,
+        oldLevel: currentLevel,
+        newLevel: newLevel,
+        nextLevelPoints: this.levelThresholds[newLevel] || null
+      };
+    }
+
+    return {
+      leveledUp: false,
+      currentLevel,
+      nextLevelPoints: this.levelThresholds[currentLevel] || null,
+      pointsToNext: (this.levelThresholds[currentLevel] || 0) - userGamification.totalPoints
+    };
+  }
+
+  /**
+   * Update user streaks
+   */
+  async updateStreaks(userId, activityType) {
+    try {
+      const profile = await UserGamification.findOne({ userId });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const lastActivity = profile.streaks.lastActivity.date;
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // Update daily learning streak
+      if (['lesson_complete', 'assessment_complete'].includes(activityType)) {
+        if (!lastActivity || lastActivity < yesterday) {
+          // Streak broken, reset to 1
+          profile.streaks.current.dailyLearning = 1;
+        } else if (lastActivity.getTime() === yesterday.getTime()) {
+          // Continuing streak
+          profile.streaks.current.dailyLearning += 1;
+          
+          // Update longest streak if necessary
+          if (profile.streaks.current.dailyLearning > profile.streaks.longest.dailyLearning) {
+            profile.streaks.longest.dailyLearning = profile.streaks.current.dailyLearning;
+          }
+        }
+        // If lastActivity is today, don't increment (already counted)
+      }
+
+      // Update assessment streak
+      if (activityType === 'assessment_complete') {
+        profile.streaks.current.assessmentStreak += 1;
+        if (profile.streaks.current.assessmentStreak > profile.streaks.longest.assessmentStreak) {
+          profile.streaks.longest.assessmentStreak = profile.streaks.current.assessmentStreak;
+        }
+      }
+
+      // Update last activity
+      profile.streaks.lastActivity = {
+        date: today,
+        type: activityType
+      };
+
+      await profile.save();
+      return profile.streaks;
+    } catch (error) {
+      console.error('Error updating streaks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get streak multiplier for points
+   */
+  getStreakMultiplier(userGamification, activityType) {
+    if (!['lesson_complete', 'assessment_complete'].includes(activityType)) {
+      return 1;
+    }
+
+    const dailyStreak = userGamification.streaks?.current?.dailyLearning || 0;
+    
+    for (let threshold of Object.keys(this.streakBonusMultipliers).reverse()) {
+      if (dailyStreak >= parseInt(threshold)) {
+        return this.streakBonusMultipliers[threshold];
+      }
+    }
+    
+    return 1;
+  }
+
+  /**
+   * Award badge to user
+   */
+  async awardBadge(userId, badgeId, progress = { current: 1, required: 1 }) {
+    try {
+      const badge = await Badge.findOne({ badgeId, isActive: true });
+      if (!badge) {
+        throw new Error('Badge not found');
+      }
+
+      const profile = await UserGamification.findOne({ userId });
+      const existingBadge = profile.badges.find(b => b.badgeId === badgeId);
+
+      if (existingBadge) {
+        // Update progress if badge allows progression
+        existingBadge.progress = progress;
+      } else {
+        // Award new badge
+        profile.badges.push({
+          badgeId,
+          earnedAt: new Date(),
+          progress
+        });
+
+        // Award points for badge
+        if (badge.points > 0) {
+          await this.awardPoints(userId, 'badge_earned', { 
+            badgeId, 
+            badgeName: badge.name,
+            points: badge.points 
+          });
+        }
+      }
+
+      await profile.save();
+
+      return {
+        success: true,
+        badge: {
+          id: badge.badgeId,
+          name: badge.name,
+          description: badge.description,
+          category: badge.category,
+          rarity: badge.rarity,
+          points: badge.points
+        },
+        newBadge: !existingBadge
+      };
+
+    } catch (error) {
+      console.error('Error awarding badge:', error);
+      throw new Error('Failed to award badge');
+    }
+  }
+
+  /**
+   * Check and award achievements
+   */
+  async checkAchievements(userId) {
+    try {
+      const achievements = await Achievement.find({ isActive: true });
+      const profile = await UserGamification.findOne({ userId });
+      const user = await User.findById(userId);
+      
+      const newAchievements = [];
+
+      for (const achievement of achievements) {
+        const existingAchievement = profile.achievements.find(
+          a => a.achievementId === achievement.achievementId
+        );
+
+        if (!existingAchievement) {
+          const isEarned = await this.checkAchievementCriteria(achievement, user, profile);
+          
+          if (isEarned.earned) {
+            profile.achievements.push({
+              achievementId: achievement.achievementId,
+              unlockedAt: new Date(),
+              progress: isEarned.progress
+            });
+
+            // Award rewards
+            if (achievement.rewards.points > 0) {
+              await this.awardPoints(userId, 'achievement_complete', {
+                achievementId: achievement.achievementId,
+                achievementName: achievement.name,
+                points: achievement.rewards.points
+              });
+            }
+
+            // Award badges
+            for (const badgeId of achievement.rewards.badges || []) {
+              await this.awardBadge(userId, badgeId);
+            }
+
+            newAchievements.push(achievement);
+          }
+        }
+      }
+
+      if (newAchievements.length > 0) {
+        await profile.save();
+      }
+
+      return newAchievements;
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if achievement criteria is met
+   */
+  async checkAchievementCriteria(achievement, user, profile) {
+    try {
+      const { criteria } = achievement;
+      let currentValue = 0;
+
+      switch (criteria.metric) {
+        case 'lessons_completed':
+          currentValue = profile.statistics.totalLessonsCompleted;
+          break;
+        case 'assessments_completed':
+          currentValue = profile.statistics.totalAssessmentsCompleted;
+          break;
+        case 'daily_streak':
+          currentValue = profile.streaks.current.dailyLearning;
+          break;
+        case 'total_points':
+          currentValue = profile.totalPoints;
+          break;
+        case 'level':
+          currentValue = profile.level;
+          break;
+        case 'badges_earned':
+          currentValue = profile.badges.length;
+          break;
+        default:
+          return { earned: false, progress: { current: 0, target: criteria.target } };
+      }
+
+      const earned = currentValue >= criteria.target;
+      
+      return {
+        earned,
+        progress: {
+          current: currentValue,
+          target: criteria.target
+        }
+      };
+    } catch (error) {
+      console.error('Error checking achievement criteria:', error);
+      return { earned: false, progress: { current: 0, target: achievement.criteria.target } };
+    }
+  }
+
+  /**
+   * Get leaderboard
+   */
+  async getLeaderboard(type = 'global', options = {}) {
+    try {
+      const { courseId, limit = 50, timeframe } = options;
+      
+      let matchQuery = {};
+      let sortQuery = { totalPoints: -1 };
+
+      // Build aggregation pipeline
+      const pipeline = [
+        { $match: matchQuery },
+        { $sort: sortQuery },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        { $unwind: '$user' },
+        {
+          $project: {
+            userId: 1,
+            totalPoints: 1,
+            level: 1,
+            'user.firstName': 1,
+            'user.lastName': 1,
+            'user.username': 1,
+            'user.learningStyle': 1,
+            badges: { $size: '$badges' },
+            streaks: '$streaks.current'
+          }
+        }
+      ];
+
+      // Add time-based filtering if specified
+      if (timeframe) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - timeframe);
+        
+        // This would need additional logic to calculate points within timeframe
+        // For now, we'll use total points
+      }
+
+      const leaderboard = await UserGamification.aggregate(pipeline);
+
+      // Add rankings
+      const rankedLeaderboard = leaderboard.map((entry, index) => ({
+        rank: index + 1,
+        ...entry,
+        user: {
+          id: entry.userId,
+          name: `${entry.user.firstName} ${entry.user.lastName}`,
+          username: entry.user.username,
+          learningStyle: entry.user.learningStyle
+        }
+      }));
+
+      return {
+        success: true,
+        leaderboard: rankedLeaderboard,
+        type,
+        generatedAt: new Date().toISOString(),
+        totalEntries: leaderboard.length
+      };
+
+    } catch (error) {
+      console.error('Error getting leaderboard:', error);
+      throw new Error('Failed to get leaderboard');
+    }
+  }
+
+  /**
+   * Get user's dashboard data
+   */
+  async getUserDashboard(userId) {
+    try {
+      // Get user profile
+      const profile = await this.getUserGamificationProfile(userId);
+      
+      // Get recent activities
+      const recentActivities = await PointsActivity.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+
+      // Get user's rank in global leaderboard
+      const globalRank = await this.getUserGlobalRank(userId);
+      
+      // Get available badges not yet earned
+      const earnedBadgeIds = profile.badges.map(b => b.badgeId);
+      const availableBadges = await Badge.find({ 
+        badgeId: { $nin: earnedBadgeIds },
+        isActive: true 
+      }).limit(5);
+
+      // Calculate progress to next level
+      const currentLevelThreshold = this.levelThresholds[profile.level - 1] || 0;
+      const nextLevelThreshold = this.levelThresholds[profile.level] || this.levelThresholds[this.levelThresholds.length - 1];
+      const progressToNextLevel = nextLevelThreshold > currentLevelThreshold 
+        ? ((profile.totalPoints - currentLevelThreshold) / (nextLevelThreshold - currentLevelThreshold)) * 100
+        : 100;
+
+      // Get weekly stats
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weeklyPoints = await PointsActivity.aggregate([
+        {
+          $match: {
+            userId: new mongoose.Types.ObjectId(userId),
+            createdAt: { $gte: weekStart }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalPoints: { $sum: '$points' },
+            activitiesCount: { $count: {} }
+          }
+        }
+      ]);
+
+      const dashboard = {
+        profile: {
+          totalPoints: profile.totalPoints,
+          level: profile.level,
+          experiencePoints: profile.experiencePoints,
+          pointsBreakdown: profile.pointsBreakdown,
+          progressToNextLevel: Math.min(progressToNextLevel, 100),
+          nextLevelThreshold
+        },
+        streaks: profile.streaks,
+        badges: {
+          earned: profile.badges,
+          available: availableBadges,
+          totalEarned: profile.badges.length
+        },
+        achievements: profile.achievements,
+        leaderboard: {
+          globalRank: globalRank,
+          totalUsers: await UserGamification.countDocuments()
+        },
+        recentActivities,
+        weeklyStats: {
+          pointsEarned: weeklyPoints[0]?.totalPoints || 0,
+          activitiesCompleted: weeklyPoints[0]?.activitiesCount || 0
+        },
+        statistics: profile.statistics
+      };
+
+      return dashboard;
+
+    } catch (error) {
+      console.error('Error getting user dashboard:', error);
+      throw new Error('Failed to get user dashboard');
+    }
+  }
+
+  /**
+   * Get user's global rank
+   */
+  async getUserGlobalRank(userId) {
+    try {
+      const userProfile = await UserGamification.findOne({ userId });
+      if (!userProfile) return null;
+
+      const rank = await UserGamification.countDocuments({
+        totalPoints: { $gt: userProfile.totalPoints }
+      }) + 1;
+
+      return rank;
+    } catch (error) {
+      console.error('Error getting user global rank:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update user's points and calculate level
+   */
+  async updateUserPoints(userId, points, activityType) {
+    try {
+      const profile = await UserGamification.findOne({ userId });
+      
+      profile.totalPoints += points;
+      profile.experiencePoints += points;
+
+      // Update points breakdown
+      const category = this.getCategoryForActivity(activityType);
+      if (profile.pointsBreakdown[category] !== undefined) {
+        profile.pointsBreakdown[category] += points;
+      }
+
+      // Calculate new level
+      const newLevel = this.calculateLevel(profile.totalPoints);
+      profile.level = newLevel;
+
+      await profile.save();
+      return profile;
+    } catch (error) {
+      console.error('Error updating user points:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate level based on total points
+   */
+  calculateLevel(totalPoints) {
+    for (let i = this.levelThresholds.length - 1; i >= 0; i--) {
+      if (totalPoints >= this.levelThresholds[i]) {
+        return i + 1;
+      }
+    }
+    return 1;
+  }
+
+  /**
+   * Check if user leveled up
+   */
+  async checkLevelUp(userGamification) {
+    const currentLevel = userGamification.level;
+    const newLevel = this.calculateLevel(userGamification.totalPoints);
+    
+    if (newLevel > currentLevel) {
+      userGamification.level = newLevel;
+      await userGamification.save();
+      
+      return {
+        leveledUp: true,
+        oldLevel: currentLevel,
+        newLevel: newLevel,
+        nextLevelPoints: this.levelThresholds[newLevel] || null
+      };
+    }
+
+    return {
+      leveledUp: false,
+      currentLevel,
+      nextLevelPoints: this.levelThresholds[currentLevel] || null,
+      pointsToNext: (this.levelThresholds[currentLevel] || 0) - userGamification.totalPoints
+    };
+  }
+
+  /**
+   * Update user streaks
+   */
+  async updateStreaks(userId, activityType) {
+    try {
+      const profile = await UserGamification.findOne({ userId });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const lastActivity = profile.streaks.lastActivity.date;
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // Update daily learning streak
+      if (['lesson_complete', 'assessment_complete'].includes(activityType)) {
+        if (!lastActivity || lastActivity < yesterday) {
+          // Streak broken, reset to 1
+          profile.streaks.current.dailyLearning = 1;
+        } else if (lastActivity.getTime() === yesterday.getTime()) {
+          // Continuing streak
+          profile.streaks.current.dailyLearning += 1;
+          
+          // Update longest streak if necessary
+          if (profile.streaks.current.dailyLearning > profile.streaks.longest.dailyLearning) {
+            profile.streaks.longest.dailyLearning = profile.streaks.current.dailyLearning;
+          }
+        }
+        // If lastActivity is today, don't increment (already counted)
+      }
+
+      // Update assessment streak
+      if (activityType === 'assessment_complete') {
+        profile.streaks.current.assessmentStreak += 1;
+        if (profile.streaks.current.assessmentStreak > profile.streaks.longest.assessmentStreak) {
+          profile.streaks.longest.assessmentStreak = profile.streaks.current.assessmentStreak;
+        }
+      }
+
+      // Update last activity
+      profile.streaks.lastActivity = {
+        date: today,
+        type: activityType
+      };
+
+      await profile.save();
+      return profile.streaks;
+    } catch (error) {
+      console.error('Error updating streaks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get streak multiplier for points
+   */
+  getStreakMultiplier(userGamification, activityType) {
+    if (!['lesson_complete', 'assessment_complete'].includes(activityType)) {
+      return 1;
+    }
+
+    const dailyStreak = userGamification.streaks?.current?.dailyLearning || 0;
+    
+    for (let threshold of Object.keys(this.streakBonusMultipliers).reverse()) {
+      if (dailyStreak >= parseInt(threshold)) {
+        return this.streakBonusMultipliers[threshold];
+      }
+    }
+    
+    return 1;
+  }
+
+  /**
+   * Award badge to user
+   */
+  async awardBadge(userId, badgeId, progress = { current: 1, required: 1 }) {
+    try {
+      const badge = await Badge.findOne({ badgeId, isActive: true });
+      if (!badge) {
+        throw new Error('Badge not found');
+      }
+
+      const profile = await UserGamification.findOne({ userId });
+      const existingBadge = profile.badges.find(b => b.badgeId === badgeId);
+
+      if (existingBadge) {
+        // Update progress if badge allows progression
+        existingBadge.progress = progress;
+      } else {
+        // Award new badge
+        profile.badges.push({
+          badgeId,
+          earnedAt: new Date(),
+          progress
+        });
+
+        // Award points for badge
+        if
