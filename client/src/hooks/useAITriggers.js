@@ -1,5 +1,5 @@
 // Lesson-specific AI Triggers Hook
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useAIAssistantStore } from '../stores/aiAssistantStore';
 import { useAIContext } from '../contexts/AIContextProvider';
 
@@ -27,29 +27,44 @@ export const useAITriggers = ({
   const lastTriggerRef = useRef(null);
   const sessionStartTime = useRef(Date.now());
   const interactionCount = useRef(0);
+  const lastUserIdRef = useRef(null);
+  const lastCourseIdRef = useRef(null);
+  const lastLessonIdRef = useRef(null);
 
-  // Update contexts when props change
-  useEffect(() => {
-    if (userId) {
+  // Memoized update functions to prevent infinite loops
+  const updateUserContext = useCallback(() => {
+    if (userId && userId !== lastUserIdRef.current) {
       setUserContext(userId);
+      lastUserIdRef.current = userId;
     }
   }, [userId, setUserContext]);
 
-  useEffect(() => {
-    if (courseId) {
+  const updateCourseContext = useCallback(() => {
+    if (courseId && (courseId !== lastCourseIdRef.current || lessonId !== lastLessonIdRef.current)) {
       setCourseContext(courseId, lessonId, lessonContent);
+      lastCourseIdRef.current = courseId;
+      lastLessonIdRef.current = lessonId;
     }
   }, [courseId, lessonId, lessonContent, setCourseContext]);
 
+  // Update contexts when props change (with guards to prevent loops)
   useEffect(() => {
-    if (userProgress) {
+    updateUserContext();
+  }, [updateUserContext]);
+
+  useEffect(() => {
+    updateCourseContext();
+  }, [updateCourseContext]);
+
+  useEffect(() => {
+    if (userProgress && Object.keys(userProgress).length > 0) {
       setProgressContext(userProgress);
     }
-  }, [userProgress, setProgressContext]);
+  }, [JSON.stringify(userProgress), setProgressContext]); // Use JSON.stringify for deep comparison
 
-  // Track lesson engagement
+  // Track lesson engagement (only when lesson changes)
   useEffect(() => {
-    if (lessonId) {
+    if (lessonId && lessonId !== lastLessonIdRef.current) {
       addSessionData({
         sessionStartTime: sessionStartTime.current,
         lessonStartTime: Date.now(),

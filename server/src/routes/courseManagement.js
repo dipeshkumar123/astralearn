@@ -8,7 +8,7 @@ import multer from 'multer';
 import { body, validationResult, param, query } from 'express-validator';
 import { courseManagementService } from '../services/courseManagementService.js';
 import { contentEditorService } from '../services/contentEditorService.js';
-import { auth, authorize } from '../middleware/auth.js';
+import { flexibleAuthenticate, flexibleAuthorize } from '../middleware/devAuth.js';
 
 const router = express.Router();
 
@@ -42,8 +42,8 @@ const upload = multer({
 
 // Create complete course with hierarchy
 router.post('/', 
-  auth, 
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate, 
+  flexibleAuthorize(['instructor', 'admin']),
   [
     body('courseInfo.title').notEmpty().trim().isLength({ min: 3, max: 200 }),
     body('courseInfo.description').notEmpty().trim().isLength({ min: 10, max: 2000 }),
@@ -51,8 +51,7 @@ router.post('/',
     body('courseInfo.estimatedDuration').isNumeric().isInt({ min: 1 }),
     body('courseInfo.objectives').isArray({ min: 1 }),
     body('modules').optional().isArray()
-  ],
-  async (req, res) => {
+  ],  async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -84,7 +83,7 @@ router.post('/',
 
 // Get course with complete hierarchy
 router.get('/:id/hierarchy',
-  auth,
+  flexibleAuthenticate,
   [param('id').isMongoId()],
   async (req, res) => {
     try {
@@ -122,8 +121,8 @@ router.get('/:id/hierarchy',
 
 // Update course with version control
 router.put('/:id',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   [
     param('id').isMongoId(),
     body('versionNotes').optional().isString().isLength({ max: 500 })
@@ -170,8 +169,8 @@ router.put('/:id',
 
 // Reorder course content (modules/lessons)
 router.post('/:id/reorder',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   [
     param('id').isMongoId(),
     body('type').isIn(['modules', 'lessons']),
@@ -216,8 +215,8 @@ router.post('/:id/reorder',
 
 // Clone course
 router.post('/:id/clone',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   [
     param('id').isMongoId(),
     body('title').notEmpty().trim().isLength({ min: 3, max: 200 }),
@@ -259,8 +258,8 @@ router.post('/:id/clone',
 
 // Archive/Restore course
 router.post('/:id/archive',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   [
     param('id').isMongoId(),
     body('archive').isBoolean()
@@ -308,8 +307,8 @@ router.post('/:id/archive',
 
 // Save lesson content with rich text and media
 router.post('/lessons/:lessonId/content',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   upload.array('mediaFiles', 10),
   [
     param('lessonId').isMongoId(),
@@ -359,7 +358,7 @@ router.post('/lessons/:lessonId/content',
 
 // Get lesson content for editing
 router.get('/lessons/:lessonId/content',
-  auth,
+  flexibleAuthenticate,
   [param('lessonId').isMongoId()],
   async (req, res) => {
     try {
@@ -410,7 +409,7 @@ router.get('/lessons/:lessonId/content',
 
 // Advanced course search with filters
 router.get('/search',
-  auth,
+  flexibleAuthenticate,
   [
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 50 }),
@@ -449,8 +448,8 @@ router.get('/search',
 
 // Get course analytics and statistics
 router.get('/:id/analytics',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   [param('id').isMongoId()],
   async (req, res) => {
     try {
@@ -486,8 +485,8 @@ router.get('/:id/analytics',
 
 // Get content version history
 router.get('/lessons/:lessonId/versions',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   [param('lessonId').isMongoId()],
   async (req, res) => {
     try {
@@ -525,8 +524,8 @@ router.get('/lessons/:lessonId/versions',
 
 // Restore content from version
 router.post('/lessons/:lessonId/versions/:versionId/restore',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   [
     param('lessonId').isMongoId(),
     param('versionId').isMongoId()
@@ -602,8 +601,8 @@ router.get('/media/:lessonId/:filename',
 
 // Delete media file
 router.delete('/media/:lessonId/:filename',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   async (req, res) => {
     try {
       const { lessonId, filename } = req.params;
@@ -636,8 +635,8 @@ router.delete('/media/:lessonId/:filename',
 
 // Bulk update course settings
 router.post('/bulk/update',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   [
     body('courseIds').isArray({ min: 1 }),
     body('updates').isObject()
@@ -711,6 +710,14 @@ router.get('/health',
         statistics: {
           totalCourses: courseCount,
           timestamp: new Date()
+        },
+        endpoints: {
+          create: 'POST /',
+          search: 'GET /search',
+          getById: 'GET /:id',
+          update: 'PUT /:id',
+          delete: 'DELETE /:id',
+          uploadContent: 'POST /:id/content'
         }
       });
 

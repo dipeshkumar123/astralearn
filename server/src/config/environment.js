@@ -18,11 +18,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT secret must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT refresh secret must be at least 32 characters'),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
-
-  // Redis Configuration
-  REDIS_URL: z.string().default('redis://localhost:6379'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),  // Redis Configuration
+  REDIS_URL: z.string().optional(),
   REDIS_PASSWORD: z.string().optional(),
+  REDIS_ENABLED: z.string().transform(val => val === 'true').default('false'),
 
   // AI Configuration
   OPENAI_API_KEY: z.string().optional(),
@@ -86,10 +85,10 @@ export const config = {
     refreshSecret: env.JWT_REFRESH_SECRET,
     refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
   },
-
   redis: {
     url: env.REDIS_URL,
     password: env.REDIS_PASSWORD,
+    enabled: env.REDIS_ENABLED,
   },
 
   ai: {

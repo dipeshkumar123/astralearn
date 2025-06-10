@@ -43,13 +43,46 @@ router.get('/', async (req, res) => {
       pagination: {
         current: Number(page),
         total: Math.ceil(total / Number(limit)),
-        hasNext: skip + courses.length < total,
+    hasNext: skip + courses.length < total,
         hasPrev: Number(page) > 1,
       },
     });
   } catch (error) {
     console.error('Get courses error:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Health check endpoint - must be before /:id route
+router.get('/health', async (req, res) => {
+  try {
+    const Course = (await import('../models/Course.js')).Course;
+    const courseCount = await Course.countDocuments();
+    
+    res.json({
+      status: 'operational',
+      service: 'Courses API',
+      version: '3.1.0',
+      statistics: {
+        totalCourses: courseCount,
+        timestamp: new Date()
+      },
+      endpoints: {
+        list: 'GET /',
+        getById: 'GET /:id',
+        create: 'POST /',
+        update: 'PUT /:id',
+        delete: 'DELETE /:id'
+      }
+    });
+
+  } catch (error) {
+    console.error('Courses health check error:', error);
+    res.status(500).json({
+      status: 'error',
+      service: 'Courses API',
+      error: error.message
+    });
   }
 });
 
@@ -106,7 +139,7 @@ router.post('/', auth, authorize(['instructor', 'admin']), async (req, res) => {
       objectives,
       prerequisites,
       tags,
-      instructorId: req.user?.role === 'instructor' ? req.user._id : undefined,
+      instructor: req.user?.role === 'instructor' ? req.user._id : undefined,
     });
 
     await course.save();
@@ -129,10 +162,8 @@ router.put('/:id', auth, authorize(['instructor', 'admin']), async (req, res) =>
     
     if (!course) {
       return res.status(404).json({ message: 'Course not found' });
-    }
-
-    // Check ownership (instructors can only edit their own courses)
-    if (req.user?.role === 'instructor' && course.instructorId.toString() !== req.user._id.toString()) {
+    }    // Check ownership (instructors can only edit their own courses)
+    if (req.user?.role === 'instructor' && course.instructor.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -160,10 +191,8 @@ router.delete('/:id', auth, authorize(['instructor', 'admin']), async (req, res)
     
     if (!course) {
       return res.status(404).json({ message: 'Course not found' });
-    }
-
-    // Check ownership
-    if (req.user?.role === 'instructor' && course.instructorId.toString() !== req.user._id.toString()) {
+    }    // Check ownership
+    if (req.user?.role === 'instructor' && course.instructor.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Access denied' });
     }
 

@@ -1,5 +1,5 @@
 // Context Provider for AI Assistant
-import React, { createContext, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useCallback, useMemo } from 'react';
 import { useAIAssistantStore } from '../stores/aiAssistantStore';
 
 const AIContextContext = createContext({});
@@ -15,57 +15,54 @@ export const useAIContext = () => {
 export const AIContextProvider = ({ children }) => {
   const { updateContext } = useAIAssistantStore();
 
-  // Function to update AI context from anywhere in the app
-  const setContext = (newContext) => {
+  // Memoized functions to prevent recreation on every render
+  const setContext = useCallback((newContext) => {
     updateContext(newContext);
-  };
+  }, [updateContext]);
 
-  // Function to update user context
-  const setUserContext = (userId, userProfile = {}) => {
+  const setUserContext = useCallback((userId, userProfile = {}) => {
     updateContext({
       userId,
       userProfile,
       learningStyle: userProfile.learningStyleAssessment?.dominantStyle,
       preferences: userProfile.learningPreferences
     });
-  };
+  }, [updateContext]);
 
-  // Function to update course/lesson context
-  const setCourseContext = (courseId, lessonId = null, lessonData = {}) => {
+  const setCourseContext = useCallback((courseId, lessonId = null, lessonData = {}) => {
     updateContext({
       courseId,
       lessonId,
       lessonData,
       page: lessonId ? 'lesson' : 'course'
     });
-  };
+  }, [updateContext]);
 
-  // Function to update progress context
-  const setProgressContext = (progressData) => {
+  const setProgressContext = useCallback((progressData) => {
     updateContext({
       userProgress: progressData,
       lastActivity: new Date().toISOString()
     });
-  };
-
+  }, [updateContext]);
   // Function to update page context
-  const setPageContext = (page, data = {}) => {
+  const setPageContext = useCallback((page, data = {}) => {
     updateContext({
       page,
       pageData: data,
       timestamp: new Date().toISOString()
     });
-  };
+  }, [updateContext]);
 
   // Function to add session data
-  const addSessionData = (sessionData) => {
+  const addSessionData = useCallback((sessionData) => {
+    const currentState = useAIAssistantStore.getState();
     updateContext({
       sessionData: {
-        ...useAIAssistantStore.getState().currentContext.sessionData,
+        ...currentState.currentContext.sessionData,
         ...sessionData
       }
     });
-  };
+  }, [updateContext]);
 
   // Auto-update context based on URL changes
   useEffect(() => {
@@ -85,22 +82,20 @@ export const AIContextProvider = ({ children }) => {
     // Listen for navigation changes
     window.addEventListener('popstate', handleLocationChange);
     
-    // For SPAs, we might need to listen to navigation events
-    // This would depend on your routing setup
-    
     return () => {
       window.removeEventListener('popstate', handleLocationChange);
     };
-  }, []);
+  }, [setPageContext]); // Add setPageContext to dependencies
 
-  const contextValue = {
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
     setContext,
     setUserContext,
     setCourseContext,
     setProgressContext,
     setPageContext,
     addSessionData
-  };
+  }), [setContext, setUserContext, setCourseContext, setProgressContext, setPageContext, addSessionData]);
 
   return (
     <AIContextContext.Provider value={contextValue}>

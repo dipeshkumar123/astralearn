@@ -3,12 +3,24 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
+import { createServer } from 'http';
 import { config } from './config/environment.js';
 import DatabaseManager from './config/database.js';
 import apiRoutes from './routes/index.js';
 
+// Import Phase 3 Step 3 services
+import performanceMonitorService from './services/performanceMonitorService.js';
+import redisCacheService from './services/redisCacheService.js';
+import webSocketService from './services/webSocketService.js';
+
 // Initialize Express app
 const app = express();
+
+// Create HTTP server for WebSocket integration
+const httpServer = createServer(app);
+
+// Initialize Phase 3 Step 3 services
+console.log('🚀 Initializing Phase 3 Step 3: Production Optimization & Advanced Features...');
 
 // Security middleware
 app.use(helmet());
@@ -19,6 +31,9 @@ app.use(cors({
 
 // Compression middleware
 app.use(compression());
+
+// Performance monitoring middleware
+app.use(performanceMonitorService.trackRequest());
 
 // Logging middleware
 if (config.server.environment !== 'test') {
@@ -32,11 +47,16 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // API Routes
 app.use('/api', apiRoutes);
 
-// Health endpoint
+// Health endpoint with performance metrics
 app.get('/health', async (req, res) => {
   try {
     const dbManager = DatabaseManager.getInstance();
     const dbStatus = dbManager.isConnected() ? 'Connected' : 'Disconnected';
+    
+    // Get performance health summary
+    const performanceHealth = await performanceMonitorService.getHealthSummary();
+    const cacheHealth = await redisCacheService.healthCheck();
+    const wsHealth = webSocketService.healthCheck();
     
     res.json({
       status: 'OK',
@@ -44,7 +64,13 @@ app.get('/health', async (req, res) => {
       timestamp: new Date().toISOString(),
       environment: config.server.environment,
       database: dbStatus,
-      version: '1.0.0',
+      version: '3.3.0', // Updated version for Phase 3 Step 3
+      services: {
+        performance: performanceHealth.status,
+        cache: cacheHealth.status,
+        websocket: wsHealth.status
+      },
+      phase: 'Phase 3 Step 3: Production Optimization & Advanced Features'
     });
   } catch (error) {
     res.status(500).json({
@@ -89,13 +115,21 @@ async function startServer() {
     const dbManager = DatabaseManager.getInstance();
     await dbManager.connect();
 
+    // Initialize WebSocket service
+    webSocketService.initialize(httpServer);
+
     // Start server
-    const server = app.listen(config.server.port, () => {
+    const server = httpServer.listen(config.server.port, () => {
       console.log('🚀 AstraLearn Server Started');
       console.log(`📍 Environment: ${config.server.environment}`);
       console.log(`🌐 Server: http://localhost:${config.server.port}`);
       console.log(`📊 Health: http://localhost:${config.server.port}/health`);
       console.log(`🔗 API: http://localhost:${config.server.port}/api`);
+      console.log(`🌐 WebSocket: ws://localhost:${config.server.port}`);
+      console.log('✅ Phase 3 Step 3: Production Optimization & Advanced Features - ACTIVE');
+      console.log('📈 Performance Monitoring: Enabled');
+      console.log('💾 Redis Caching: ' + (redisCacheService.isAvailable() ? 'Enabled' : 'Disabled'));
+      console.log('🔄 Real-time Features: Enabled');
     });
 
     // Graceful shutdown
@@ -103,6 +137,7 @@ async function startServer() {
       console.log('🔄 SIGTERM received, shutting down gracefully');
       server.close(async () => {
         await dbManager.disconnect();
+        await redisCacheService.disconnect();
         process.exit(0);
       });
     });
@@ -116,4 +151,4 @@ async function startServer() {
 // Start the server if this file is run directly
 startServer();
 
-export { app, startServer };
+export { app, httpServer, startServer };

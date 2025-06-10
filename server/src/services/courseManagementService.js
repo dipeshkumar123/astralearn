@@ -14,16 +14,21 @@ class CourseManagementService {
   
   /**
    * Create a complete course with modules and lessons hierarchy
-   */
-  async createCourseHierarchy(courseData, userId) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+   */  async createCourseHierarchy(courseData, userId) {
+    // Check if we're in development and MongoDB doesn't support transactions
+    const useTransactions = process.env.NODE_ENV === 'production';
+    let session = null;
+    
+    if (useTransactions) {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    }
 
     try {
       // Create the main course
       const course = new Course({
         ...courseData.courseInfo,
-        instructorId: userId,
+        instructor: userId,
         metadata: {
           ...courseData.courseInfo.metadata,
           version: '1.0.0',
@@ -34,7 +39,7 @@ class CourseManagementService {
         }
       });
 
-      await course.save({ session });
+      await course.save(session ? { session } : {});
 
       // Create modules with nested lessons
       const moduleIds = [];
@@ -52,9 +57,7 @@ class CourseManagementService {
               createdBy: userId,
               lastEditedBy: userId
             }
-          });
-
-          await module.save({ session });
+          });          await module.save(session ? { session } : {});
           moduleIds.push(module._id);
 
           // Create lessons for this module
@@ -74,7 +77,7 @@ class CourseManagementService {
                 }
               });
 
-              await lesson.save({ session });
+              await lesson.save(session ? { session } : {});
             }
           }
         }
@@ -83,9 +86,11 @@ class CourseManagementService {
       // Update course with module references
       course.modules = moduleIds;
       course.metadata.totalModules = moduleIds.length;
-      await course.save({ session });
+      await course.save(session ? { session } : {});
 
-      await session.commitTransaction();
+      if (session) {
+        await session.commitTransaction();
+      }
 
       return {
         success: true,
@@ -94,10 +99,14 @@ class CourseManagementService {
       };
 
     } catch (error) {
-      await session.abortTransaction();
+      if (session) {
+        await session.abortTransaction();
+      }
       throw error;
     } finally {
-      session.endSession();
+      if (session) {
+        session.endSession();
+      }
     }
   }
 
@@ -107,10 +116,8 @@ class CourseManagementService {
   async getCourseWithHierarchy(courseId, includeContent = false) {
     const populateOptions = includeContent 
       ? 'title content objectives estimatedDuration difficulty position metadata'
-      : 'title objectives estimatedDuration difficulty position metadata';
-
-    const course = await Course.findById(courseId)
-      .populate('instructorId', 'firstName lastName email')
+      : 'title objectives estimatedDuration difficulty position metadata';    const course = await Course.findById(courseId)
+      .populate('instructor', 'firstName lastName email')
       .populate({
         path: 'modules',
         select: 'title description position objectives estimatedDuration difficulty metadata content',
@@ -146,10 +153,8 @@ class CourseManagementService {
       const course = await Course.findById(courseId).session(session);
       if (!course) {
         throw new Error('Course not found');
-      }
-
-      // Check permissions
-      if (course.instructorId.toString() !== userId.toString()) {
+      }      // Check permissions
+      if (course.instructor.toString() !== userId.toString()) {
         throw new Error('Unauthorized to edit this course');
       }
 
@@ -205,10 +210,8 @@ class CourseManagementService {
       const course = await Course.findById(courseId).session(session);
       if (!course) {
         throw new Error('Course not found');
-      }
-
-      // Check permissions
-      if (course.instructorId.toString() !== userId.toString()) {
+      }      // Check permissions
+      if (course.instructor.toString() !== userId.toString()) {
         throw new Error('Unauthorized to edit this course');
       }
 
@@ -264,7 +267,7 @@ class CourseManagementService {
         ...originalCourse,
         ...newCourseData,
         _id: undefined,
-        instructorId: userId,
+        instructor: userId,
         modules: [],
         enrollmentCount: 0,
         rating: 0,
@@ -350,10 +353,8 @@ class CourseManagementService {
     const course = await Course.findById(courseId);
     if (!course) {
       throw new Error('Course not found');
-    }
-
-    // Check permissions
-    if (course.instructorId.toString() !== userId.toString()) {
+    }    // Check permissions
+    if (course.instructor.toString() !== userId.toString()) {
       throw new Error('Unauthorized to archive this course');
     }
 
@@ -530,10 +531,9 @@ class CourseManagementService {
 
     // Build filter object
     const filter = { isActive: true };
-    
-    // Role-based filtering
+      // Role-based filtering
     if (userRole === 'instructor') {
-      filter.instructorId = userId;
+      filter.instructor = userId;
     } else if (userRole === 'student') {
       filter.isPublished = true;
     }
@@ -541,9 +541,8 @@ class CourseManagementService {
     if (difficulty) filter.difficulty = difficulty;
     if (isPublished !== undefined && userRole !== 'student') {
       filter.isPublished = isPublished === 'true';
-    }
-    if (category) filter['metadata.category'] = category;
-    if (instructorId) filter.instructorId = instructorId;
+    }    if (category) filter['metadata.category'] = category;
+    if (instructorId) filter.instructor = instructorId;
     
     if (tags) {
       const tagArray = tags.split(',').map(tag => tag.trim());
@@ -558,11 +557,9 @@ class CourseManagementService {
     // Pagination and sorting
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sortOptions = {};
-    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-    const [courses, totalCount] = await Promise.all([
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;    const [courses, totalCount] = await Promise.all([
       Course.find(filter)
-        .populate('instructorId', 'firstName lastName email')
+        .populate('instructor', 'firstName lastName email')
         .select('title description difficulty estimatedDuration tags isPublished enrollmentCount rating thumbnail metadata')
         .sort(sortOptions)
         .skip(skip)

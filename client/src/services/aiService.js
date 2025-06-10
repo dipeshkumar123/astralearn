@@ -33,12 +33,11 @@ api.interceptors.response.use(
   }
 );
 
-export class AIService {
-  // Orchestrated Chat - Context-aware conversation
+export class AIService {  // Orchestrated Chat - Context-aware conversation
   static async chat({ message, context = {} }) {
     try {
       const response = await api.post('/ai/orchestrated/chat', {
-        message,
+        content: message, // Backend expects 'content' not 'message'
         context,
         timestamp: new Date().toISOString()
       });

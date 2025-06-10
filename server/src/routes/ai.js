@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate } from '../middleware/auth.js';
+import { flexibleAuthenticate } from '../middleware/devAuth.js';
 import { config } from '../config/environment.js';
 import aiService from '../services/aiService.js';
 import aiContextService from '../services/aiContextService.js';
@@ -10,7 +11,7 @@ const router = Router();
 
 // AI Chat endpoint - context-aware AI system
 router.post('/chat', 
-  authenticate,
+  flexibleAuthenticate,
   [
     body('message').notEmpty().trim(),
     body('context').optional().isObject(),
@@ -98,7 +99,7 @@ router.post('/chat',
 
 // AI Explanation endpoint - get explanations for concepts
 router.post('/explain',
-  authenticate,
+  flexibleAuthenticate,
   [
     body('concept').notEmpty().trim(),
     body('context').optional().isObject(),
@@ -164,7 +165,7 @@ router.post('/explain',
 
 // AI Feedback endpoint - get feedback on assignments
 router.post('/feedback',
-  authenticate,
+  flexibleAuthenticate,
   [
     body('work').notEmpty(),
     body('topic').notEmpty().trim(),
@@ -235,7 +236,7 @@ router.post('/feedback',
 
 // AI Debug Help endpoint - help with debugging problems
 router.post('/debug',
-  authenticate,
+  flexibleAuthenticate,
   [
     body('problem').notEmpty().trim(),
     body('context').optional().isObject(),
@@ -301,7 +302,7 @@ router.post('/debug',
 
 // AI Service Test endpoint
 router.post('/test',
-  authenticate,
+  flexibleAuthenticate,
   async (req, res) => {
     try {
       const testResult = await aiService.testAI();
@@ -349,7 +350,7 @@ router.get('/health', async (req, res) => {
 
 // AI Context Analytics endpoint - get user's learning context and analytics
 router.get('/context/:userId?',
-  authenticate,
+  flexibleAuthenticate,
   async (req, res) => {
     try {
       const userId = req.params.userId || req.user._id;
@@ -384,7 +385,7 @@ router.get('/context/:userId?',
 
 // AI Context Test endpoint - test context gathering with specific course/lesson
 router.post('/context/test',
-  authenticate,
+  flexibleAuthenticate,
   [
     body('courseId').optional().isString(),
     body('lessonId').optional().isString(),
@@ -494,7 +495,7 @@ router.post('/demo',
 
 // Orchestrated AI Chat - Enhanced with learning style adaptation
 router.post('/orchestrated/chat', 
-  authenticate,
+  flexibleAuthenticate,
   [
     body('content').notEmpty().trim(),
     body('context').optional().isObject(),
@@ -549,7 +550,7 @@ router.post('/orchestrated/chat',
 
 // Personalized Learning Recommendations
 router.get('/orchestrated/recommendations', 
-  authenticate,
+  flexibleAuthenticate,
   async (req, res) => {
     try {
       const { courseId, lessonId } = req.query;
@@ -583,7 +584,7 @@ router.get('/orchestrated/recommendations',
 
 // Adaptive Study Plan Generation
 router.post('/orchestrated/study-plan', 
-  authenticate,
+  flexibleAuthenticate,
   [
     body('goals').isArray().withMessage('Goals must be an array'),
     body('timeframe').optional().isString(),
@@ -632,7 +633,7 @@ router.post('/orchestrated/study-plan',
 
 // Adaptive Concept Explanation
 router.post('/orchestrated/explain', 
-  authenticate,
+  flexibleAuthenticate,
   [
     body('concept').notEmpty().trim(),
     body('courseId').optional().isString(),
@@ -689,7 +690,7 @@ router.post('/orchestrated/explain',
 
 // Personalized Feedback on Assignments/Exercises
 router.post('/orchestrated/feedback', 
-  authenticate,
+  flexibleAuthenticate,
   [
     body('work').notEmpty().withMessage('Work content is required'),
     body('assignmentType').optional().isString(),
@@ -740,7 +741,7 @@ router.post('/orchestrated/feedback',
 
 // Learning Style Assessment with AI Analysis
 router.post('/orchestrated/assess-learning-style', 
-  authenticate,
+  flexibleAuthenticate,
   [
     body('responses').isArray().withMessage('Responses must be an array'),
   ],
@@ -785,7 +786,7 @@ router.post('/orchestrated/assess-learning-style',
 
 // AI Orchestrator Health Check
 router.get('/orchestrated/health', 
-  authenticate,
+  flexibleAuthenticate,
   async (req, res) => {
     try {
       // Test orchestrator with a simple request
