@@ -4,3 +4,4 @@ export * from './Course.js';
 export * from './Module.js';
 export * from './Lesson.js';
 export * from './UserProgress.js';
+export * from './Analytics.js';
