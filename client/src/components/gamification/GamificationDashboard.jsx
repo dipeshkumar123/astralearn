@@ -13,30 +13,39 @@ import {
   Zap,
   ChevronRight,
   Calendar,
-  Clock
+  Clock,
+  // Added social learning icons
+  MessageCircle,
+  UserPlus,
+  Heart,
+  BookOpen,
+  Video,
+  Share2
 } from 'lucide-react';
 
 /**
- * Gamification Dashboard Component
- * Displays user's points, badges, achievements, streaks, and leaderboard position
+ * Enhanced Gamification Dashboard Component with Social Features
+ * Displays user's points, badges, achievements, streaks, leaderboard position, and social stats
  */
 const GamificationDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
   const [userRank, setUserRank] = useState(null);
+  const [socialData, setSocialData] = useState(null); // Added social data state
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     fetchDashboardData();
+    fetchSocialData(); // Added social data fetch
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       
-      // Fetch dashboard data
-      const dashboardResponse = await fetch('/api/gamification/dashboard', {
+      // Fetch enhanced dashboard data with social features
+      const dashboardResponse = await fetch('/api/social-learning/dashboard/social', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -66,6 +75,23 @@ const GamificationDashboard = () => {
       console.error('Error fetching gamification data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Added social data fetch function
+  const fetchSocialData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+
+      // Fetch social recommendations
+      const socialResponse = await fetch('/api/gamification/recommendations/social', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const socialResult = await socialResponse.json();
+
+      setSocialData(socialResult.recommendations || {});
+    } catch (error) {
+      console.error('Error fetching social data:', error);
     }
   };
 
@@ -245,7 +271,9 @@ const GamificationDashboard = () => {
             { id: 'overview', label: 'Overview', icon: Trophy },
             { id: 'achievements', label: 'Achievements', icon: Target },
             { id: 'leaderboard', label: 'Leaderboard', icon: Users },
-            { id: 'activity', label: 'Activity', icon: Clock }
+            { id: 'activity', label: 'Activity', icon: Clock },
+            // Added social tab
+            { id: 'social', label: 'Social', icon: Users }
           ].map(tab => (
             <motion.button
               key={tab.id}
@@ -423,6 +451,179 @@ const GamificationDashboard = () => {
                       </div>
                     </motion.div>
                   ))}
+                </div>
+              </motion.div>
+            )}            {activeTab === 'social' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                {/* Social Stats Overview */}
+                <div className="bg-white rounded-xl p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <Users className="h-5 w-5 mr-2 text-blue-600" />
+                    Social Learning Stats
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {dashboardData?.socialStats?.studyGroupsJoined || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Study Groups</div>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">
+                        {dashboardData?.socialStats?.studyBuddyCount || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Study Buddies</div>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {dashboardData?.socialStats?.helpfulAnswers || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Helpful Answers</div>
+                    </div>
+                    <div className="text-center p-3 bg-orange-50 rounded-lg">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {dashboardData?.socialStats?.mentoringSessions || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Mentoring Sessions</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Study Buddy Recommendations */}
+                <div className="bg-white rounded-xl p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <UserPlus className="h-5 w-5 mr-2 text-purple-600" />
+                    Recommended Study Buddies
+                  </h3>
+                  <div className="space-y-3">
+                    {socialData?.studyBuddies?.slice(0, 3).map((user, index) => (
+                      <motion.div
+                        key={user.userId || index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-center justify-between p-3 rounded-lg bg-purple-50 border border-purple-200"
+                      >
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                            <UserPlus className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-900">{user.name || 'Study Buddy'}</p>
+                            <p className="text-xs text-gray-500">
+                              {user.subjects?.join(', ') || 'Mathematics, Physics'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+                            {user.compatibilityScore || 92}% match
+                          </span>
+                          <button className="px-3 py-1 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 transition-colors flex items-center">
+                            <Heart className="h-3 w-3 mr-1" />
+                            Connect
+                          </button>
+                        </div>
+                      </motion.div>
+                    )) || (
+                      <div className="text-center py-4 text-gray-500">
+                        <UserPlus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No recommendations available yet</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Study Group Recommendations */}
+                <div className="bg-white rounded-xl p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <BookOpen className="h-5 w-5 mr-2 text-green-600" />
+                    Recommended Study Groups
+                  </h3>
+                  <div className="space-y-3">
+                    {socialData?.studyGroups?.slice(0, 3).map((group, index) => (
+                      <motion.div
+                        key={group.groupId || index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200"
+                      >
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <Users className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-900">{group.name || 'Study Group'}</p>
+                            <p className="text-xs text-gray-500">{group.subject || 'General'} • {group.memberCount || 5} members</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                            {group.matchScore || 85}% match
+                          </span>
+                          <button className="px-3 py-1 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors">
+                            Join
+                          </button>
+                        </div>
+                      </motion.div>
+                    )) || (
+                      <div className="text-center py-4 text-gray-500">
+                        <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No recommendations available yet</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Recent Social Activities */}
+                <div className="bg-white rounded-xl p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <MessageCircle className="h-5 w-5 mr-2 text-blue-600" />
+                    Recent Social Activities
+                  </h3>
+                  <div className="space-y-3">
+                    {dashboardData?.recentActivities?.filter(activity => activity.isSocial)?.slice(0, 5).map((activity, index) => (
+                      <motion.div
+                        key={activity.id || index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-center justify-between p-3 border-l-4 border-blue-200 bg-blue-50 rounded-r-lg"
+                      >
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                            {activity.type === 'study_group_activity' && <Users className="h-4 w-4 text-blue-600" />}
+                            {activity.type === 'peer_help' && <Heart className="h-4 w-4 text-blue-600" />}
+                            {activity.type === 'forum_contribution' && <MessageCircle className="h-4 w-4 text-blue-600" />}
+                            {activity.type === 'social_interaction' && <Share2 className="h-4 w-4 text-blue-600" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{activity.description}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(activity.timestamp).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-blue-600">+{activity.points}</p>
+                          <div className="flex items-center text-xs text-blue-500">
+                            <Star className="h-3 w-3 mr-1" />
+                            <span>Social Points</span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )) || (
+                      <div className="text-center py-4 text-gray-500">
+                        <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No recent social activities</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )}

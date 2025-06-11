@@ -1,0 +1,824 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  MessageSquare,
+  Plus,
+  Search,
+  Filter,
+  ThumbsUp,
+  ThumbsDown,
+  MessageCircle,
+  Eye,
+  Clock,
+  User,
+  Star,
+  Flag,
+  Pin,
+  CheckCircle,
+  Award,
+  TrendingUp,
+  BookOpen,
+  Hash,
+  ChevronRight,
+  MoreVertical,
+  Reply,
+  Edit,
+  Trash2,
+  Share2
+} from 'lucide-react';
+
+// Import real-time integration service
+import realTimeIntegrationService from '../../services/realTimeIntegrationService';
+
+/**
+ * Discussion Forums Component
+ * Comprehensive Q&A and discussion platform for social learning
+ */
+const DiscussionForums = () => {
+  const [activeTab, setActiveTab] = useState('recent');
+  const [discussions, setDiscussions] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [typingUsers, setTypingUsers] = useState(new Map());
+  const [subscribedDiscussions, setSubscribedDiscussions] = useState(new Set());
+
+  useEffect(() => {
+    fetchDiscussions();
+    fetchCategories();
+    initializeRealTimeFeatures();
+    
+    return () => {
+      cleanupRealTimeFeatures();
+    };
+  }, []);
+
+  const fetchDiscussions = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+
+      const response = await fetch('/api/social-learning/discussions', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+
+      setDiscussions(data.discussions || []);
+    } catch (error) {
+      console.error('Error fetching discussions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const token = localStorage.getItem('token');
+
+      const response = await fetch('/api/social-learning/discussions/categories', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+
+      setCategories(data.categories || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const handleCreateDiscussion = async (discussionData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/social-learning/discussions/create', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(discussionData)
+      });
+
+      if (response.ok) {
+        setShowCreateModal(false);
+        fetchDiscussions();
+      }
+    } catch (error) {
+      console.error('Error creating discussion:', error);
+    }
+  };
+
+  const handleVote = async (discussionId, voteType) => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('/api/social-learning/discussions/vote', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ discussionId, voteType })
+      });
+
+      fetchDiscussions(); // Refresh discussions
+    } catch (error) {
+      console.error('Error voting:', error);
+    }
+  };
+
+  // ========== Real-time Discussion Methods ==========
+
+  const subscribeToDiscussion = (discussionId) => {
+    realTimeIntegrationService.subscribeToDiscussion(discussionId);
+    setSubscribedDiscussions(prev => new Set([...prev, discussionId]));
+    console.log(`💬 Subscribed to discussion: ${discussionId}`);
+  };
+
+  const unsubscribeFromDiscussion = (discussionId) => {
+    realTimeIntegrationService.unsubscribeFromDiscussion(discussionId);
+    setSubscribedDiscussions(prev => {
+      const updated = new Set(prev);
+      updated.delete(discussionId);
+      return updated;
+    });
+    console.log(`💬 Unsubscribed from discussion: ${discussionId}`);
+  };
+
+  const sendTypingIndicator = (discussionId, isTyping) => {
+    realTimeIntegrationService.sendDiscussionTypingIndicator(discussionId, isTyping);
+  };
+
+  const handleRealTimeVote = async (discussionId, voteType) => {
+    try {
+      // Send vote via real-time service
+      realTimeIntegrationService.voteOnDiscussion(discussionId, voteType);
+      
+      // Also persist via REST API
+      await handleVote(discussionId, voteType);
+      
+      console.log(`👍 Real-time vote: ${voteType} on discussion ${discussionId}`);
+    } catch (error) {
+      console.error('Error with real-time vote:', error);
+    }
+  };
+
+  const createDiscussionWithRealTime = async (discussionData) => {
+    try {
+      // Create via REST API first
+      await handleCreateDiscussion(discussionData);
+      
+      // The real-time event will be triggered by the server
+      console.log('💬 Discussion created with real-time features');
+    } catch (error) {
+      console.error('Error creating discussion with real-time features:', error);
+    }
+  };
+
+  const filteredDiscussions = discussions.filter(discussion => {
+    const matchesSearch = discussion.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         discussion.content.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || discussion.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const sortedDiscussions = [...filteredDiscussions].sort((a, b) => {
+    switch (activeTab) {
+      case 'recent':
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      case 'popular':
+        return (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes);
+      case 'unanswered':
+        return a.replyCount - b.replyCount;
+      default:
+        return 0;
+    }
+  });
+
+  const initializeRealTimeFeatures = () => {
+    // Setup real-time event listeners for discussions
+    realTimeIntegrationService.on('newDiscussionPost', (data) => {
+      setDiscussions(prev => [data.discussion, ...prev]);
+      console.log('💬 New discussion post:', data);
+    });
+
+    realTimeIntegrationService.on('newDiscussionReply', (data) => {
+      setDiscussions(prev => prev.map(discussion => 
+        discussion.id === data.discussionId 
+          ? { 
+              ...discussion, 
+              replies: [...(discussion.replies || []), data.reply],
+              replyCount: (discussion.replyCount || 0) + 1
+            }
+          : discussion
+      ));
+      console.log('💭 New discussion reply:', data);
+    });
+
+    realTimeIntegrationService.on('discussionVoteUpdate', (data) => {
+      setDiscussions(prev => prev.map(discussion => 
+        discussion.id === data.discussionId 
+          ? { 
+              ...discussion, 
+              upvotes: data.upvotes,
+              downvotes: data.downvotes,
+              userVote: data.userVote
+            }
+          : discussion
+      ));
+      console.log('👍 Discussion vote updated:', data);
+    });
+
+    realTimeIntegrationService.on('discussionStatusChanged', (data) => {
+      setDiscussions(prev => prev.map(discussion => 
+        discussion.id === data.discussionId 
+          ? { ...discussion, status: data.status, statusChangedBy: data.changedBy }
+          : discussion
+      ));
+      console.log('📌 Discussion status changed:', data);
+    });
+
+    realTimeIntegrationService.on('discussionTypingIndicator', (data) => {
+      setTypingUsers(prev => {
+        const updated = new Map(prev);
+        if (data.isTyping) {
+          const typingList = updated.get(data.discussionId) || [];
+          if (!typingList.find(u => u.id === data.user.id)) {
+            updated.set(data.discussionId, [...typingList, data.user]);
+          }
+        } else {
+          const typingList = updated.get(data.discussionId) || [];
+          updated.set(data.discussionId, typingList.filter(u => u.id !== data.user.id));
+        }
+        return updated;
+      });
+    });
+
+    console.log('🔄 Discussion forums real-time features initialized');
+  };
+
+  const cleanupRealTimeFeatures = () => {
+    // Unsubscribe from all discussions
+    subscribedDiscussions.forEach(discussionId => {
+      realTimeIntegrationService.unsubscribeFromDiscussion(discussionId);
+    });
+
+    // Remove event listeners
+    realTimeIntegrationService.off('newDiscussionPost');
+    realTimeIntegrationService.off('newDiscussionReply');
+    realTimeIntegrationService.off('discussionVoteUpdate');
+    realTimeIntegrationService.off('discussionStatusChanged');
+    realTimeIntegrationService.off('discussionTypingIndicator');    console.log('🧹 Discussion forums real-time features cleaned up');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="space-y-4">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="bg-white rounded-xl p-6 shadow-sm animate-pulse">
+                <div className="flex space-x-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const tabs = [
+    { id: 'recent', label: 'Recent', icon: Clock },
+    { id: 'popular', label: 'Popular', icon: TrendingUp },
+    { id: 'unanswered', label: 'Unanswered', icon: MessageCircle },
+    { id: 'my-posts', label: 'My Posts', icon: User }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            💬 Discussion Forums
+          </h1>
+          <p className="text-gray-600">
+            Ask questions, share knowledge, and engage with the learning community
+          </p>
+        </motion.div>
+
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white rounded-xl p-6 shadow-sm"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Discussions</p>
+                <p className="text-3xl font-bold text-blue-600">{discussions.length}</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <MessageSquare className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-xl p-6 shadow-sm"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Answered</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {discussions.filter(d => d.replyCount > 0).length}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-xl p-6 shadow-sm"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">My Contributions</p>
+                <p className="text-3xl font-bold text-purple-600">12</p>
+              </div>
+              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Award className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-xl p-6 shadow-sm"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Reputation</p>
+                <p className="text-3xl font-bold text-orange-600">248</p>
+              </div>
+              <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Star className="h-6 w-6 text-orange-600" />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+            <div className="flex-1 flex gap-4 w-full lg:w-auto">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search discussions..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Discussion
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex space-x-1 mb-6 bg-white rounded-lg p-1 shadow-sm">
+          {tabs.map(tab => (
+            <motion.button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-green-100 text-green-700'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <tab.icon className="h-4 w-4 mr-2" />
+              {tab.label}
+              {tab.id === 'unanswered' && (
+                <span className="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                  {discussions.filter(d => d.replyCount === 0).length}
+                </span>
+              )}
+            </motion.button>
+          ))}
+        </div>
+
+        {/* Discussions List */}
+        <div className="space-y-4">
+          {sortedDiscussions.length === 0 ? (
+            <div className="bg-white rounded-xl p-8 shadow-sm text-center">
+              <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Discussions Found</h3>
+              <p className="text-gray-600 mb-6">Be the first to start a discussion!</p>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Start Discussion
+              </button>
+            </div>
+          ) : (
+            sortedDiscussions.map((discussion, index) => (
+              <DiscussionCard
+                key={discussion.discussionId}
+                discussion={discussion}
+                index={index}
+                onVote={handleVote}
+                typingUsers={typingUsers.get(discussion.discussionId) || []}
+              />
+            ))
+          }
+        </div>
+
+        {/* Create Discussion Modal */}
+        <AnimatePresence>
+          {showCreateModal && (
+            <CreateDiscussionModal
+              onClose={() => setShowCreateModal(false)}
+              onSubmit={handleCreateDiscussion}
+              categories={categories}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+// Discussion Card Component
+const DiscussionCard = ({ discussion, index, onVote, typingUsers }) => {
+  const [showActions, setShowActions] = useState(false);
+
+  const getStatusIcon = () => {
+    if (discussion.isPinned) return <Pin className="h-4 w-4 text-blue-600" />;
+    if (discussion.hasAcceptedAnswer) return <CheckCircle className="h-4 w-4 text-green-600" />;
+    if (discussion.replyCount === 0) return <MessageCircle className="h-4 w-4 text-orange-600" />;
+    return null;
+  };
+
+  const getStatusColor = () => {
+    if (discussion.isPinned) return 'border-l-blue-500';
+    if (discussion.hasAcceptedAnswer) return 'border-l-green-500';
+    if (discussion.replyCount === 0) return 'border-l-orange-500';
+    return 'border-l-gray-300';
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className={`bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow border-l-4 ${getStatusColor()}`}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center space-x-2 mb-2">
+            {getStatusIcon()}
+            <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer">
+              {discussion.title}
+            </h3>
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+              {discussion.category}
+            </span>
+            {discussion.tags?.map(tag => (
+              <span key={tag} className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">
+                <Hash className="h-3 w-3 inline mr-1" />
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          <p className="text-gray-600 mb-4 line-clamp-2">{discussion.content}</p>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4 text-sm text-gray-500">
+              <div className="flex items-center">
+                <User className="h-4 w-4 mr-1" />
+                <span>{discussion.author?.name || 'Anonymous'}</span>
+              </div>
+              <div className="flex items-center">
+                <Clock className="h-4 w-4 mr-1" />
+                <span>{new Date(discussion.createdAt).toLocaleDateString()}</span>
+              </div>
+              <div className="flex items-center">
+                <Eye className="h-4 w-4 mr-1" />
+                <span>{discussion.viewCount || 0}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              {/* Voting */}
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={() => onVote(discussion.discussionId, 'upvote')}
+                  className={`p-1 rounded hover:bg-green-50 transition-colors ${
+                    discussion.userVote === 'upvote' ? 'text-green-600' : 'text-gray-400'
+                  }`}
+                >
+                  <ThumbsUp className="h-4 w-4" />
+                </button>
+                <span className="text-sm font-medium text-gray-700">
+                  {(discussion.upvotes || 0) - (discussion.downvotes || 0)}
+                </span>
+                <button
+                  onClick={() => onVote(discussion.discussionId, 'downvote')}
+                  className={`p-1 rounded hover:bg-red-50 transition-colors ${
+                    discussion.userVote === 'downvote' ? 'text-red-600' : 'text-gray-400'
+                  }`}
+                >
+                  <ThumbsDown className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Replies */}
+              <div className="flex items-center space-x-1 text-gray-500">
+                <MessageCircle className="h-4 w-4" />
+                <span className="text-sm">{discussion.replyCount || 0}</span>
+              </div>
+
+              {/* Actions */}
+              <AnimatePresence>
+                {showActions && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="flex items-center space-x-1"
+                  >
+                    <button className="p-1 text-gray-400 hover:text-blue-600 transition-colors">
+                      <Reply className="h-4 w-4" />
+                    </button>
+                    <button className="p-1 text-gray-400 hover:text-green-600 transition-colors">
+                      <Share2 className="h-4 w-4" />
+                    </button>
+                    <button className="p-1 text-gray-400 hover:text-red-600 transition-colors">
+                      <Flag className="h-4 w-4" />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+
+        {/* Typing Indicators */}
+        {typingUsers.length > 0 && (
+          <div className="mt-2">
+            <span className="text-xs text-gray-500">
+              {typingUsers.slice(0, 2).map(user => user.name).join(', ')}
+              {typingUsers.length > 2 && ' and more'} {typingUsers.length > 1 ? 'are' : 'is'} typing...
+            </span>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+// Create Discussion Modal Component
+const CreateDiscussionModal = ({ onClose, onSubmit, categories }) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    category: '',
+    tags: [],
+    type: 'question'
+  });
+  
+  const [tagInput, setTagInput] = useState('');
+  const [errors, setErrors] = useState({});
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    const newErrors = {};
+    if (!formData.title.trim()) newErrors.title = 'Title is required';
+    if (!formData.content.trim()) newErrors.content = 'Content is required';
+    if (!formData.category) newErrors.category = 'Category is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    onSubmit(formData);
+  };
+
+  const addTag = () => {
+    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
+      setFormData({
+        ...formData,
+        tags: [...formData.tags, tagInput.trim()]
+      });
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (tagToRemove) => {
+    setFormData({
+      ...formData,
+      tags: formData.tags.filter(tag => tag !== tagToRemove)
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Start New Discussion</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Title *
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.title ? 'border-red-300' : 'border-gray-300'
+              }`}
+              placeholder="What's your question or topic?"
+            />
+            {errors.title && <p className="text-red-600 text-sm mt-1">{errors.title}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category *
+              </label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.category ? 'border-red-300' : 'border-gray-300'
+                }`}
+              >
+                <option value="">Select category...</option>
+                {categories.map(category => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+              {errors.category && <p className="text-red-600 text-sm mt-1">{errors.category}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Type
+              </label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="question">Question</option>
+                <option value="discussion">Discussion</option>
+                <option value="announcement">Announcement</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Content *
+            </label>
+            <textarea
+              value={formData.content}
+              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+              rows={6}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.content ? 'border-red-300' : 'border-gray-300'
+              }`}
+              placeholder="Describe your question or share your thoughts..."
+            />
+            {errors.content && <p className="text-red-600 text-sm mt-1">{errors.content}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tags
+            </label>
+            <div className="flex items-center space-x-2 mb-2">
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Add tags..."
+              />
+              <button
+                type="button"
+                onClick={addTag}
+                className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Add
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {formData.tags.map(tag => (
+                <span
+                  key={tag}
+                  className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full flex items-center"
+                >
+                  <Hash className="h-3 w-3 mr-1" />
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="ml-1 text-blue-600 hover:text-blue-800"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Post Discussion
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+export default DiscussionForums;
