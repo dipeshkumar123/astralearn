@@ -1,9 +1,10 @@
-// Advanced Gamification service for AstraLearn - Phase 4 Step 2
-console.log('=== Loading Advanced GamificationService v4 - Phase 4 Step 2 ===');
+// Advanced Gamification service for AstraLearn - Phase 4 Step 3
+console.log('=== Loading Advanced GamificationService v4.3 - Phase 4 Step 3 Complete ===');
 
 import { UserGamification, PointsActivity, Achievement, Badge, Leaderboard } from '../models/Gamification.js';
 import { User } from '../models/User.js';
 import challengeService from './challengeService.js';
+import achievementService from './achievementService.js';
 
 class GamificationService {
   constructor() {
@@ -311,7 +312,6 @@ class GamificationService {
       throw error;
     }
   }
-
   async awardPoints(userId, activityType, metadata = {}) {
     try {
       console.log(`Awarding points: ${userId}, ${activityType}`, metadata);
@@ -368,6 +368,21 @@ class GamificationService {
       
       // Record activity
       await this.recordPointsActivity(userId, activityType, totalPoints, metadata);
+
+      // 🏆 Check for achievements after awarding points
+      let newAchievements = [];
+      try {
+        newAchievements = await achievementService.checkAchievements(userId, activityType, {
+          ...metadata,
+          pointsAwarded: totalPoints,
+          newLevel: newLevel,
+          leveledUp: leveledUp
+        });
+        console.log(`Checked achievements for ${userId}: found ${newAchievements.length} new achievements`);
+      } catch (achievementError) {
+        console.error('Error checking achievements:', achievementError);
+        // Don't block points awarding if achievement checking fails
+      }
       
       return {
         pointsAwarded: totalPoints,
@@ -379,7 +394,8 @@ class GamificationService {
         newLevel,
         leveledUp,
         currentStreak: profile.streaks.current.dailyLearning,
-        streakMultiplier
+        streakMultiplier,
+        newAchievements: newAchievements
       };
     } catch (error) {
       console.error('Error in awardPoints:', error);
@@ -560,9 +576,15 @@ class GamificationService {
       return [];
     }
   }
-
   // Placeholder methods for features to be implemented
-  async getAchievementsInProgress(userId) { return []; }
+  async getAchievementsInProgress(userId) { 
+    try {
+      return await achievementService.getAchievementsInProgress(userId);
+    } catch (error) {
+      console.error('Error getting achievements in progress:', error);
+      return [];
+    }
+  }
   async getCollaborativeMilestones(userId) { return []; }
   async getUserGlobalRank(userId) { return { rank: 'N/A' }; }
   async getUserSocialRank(userId) { return { rank: 'N/A' }; }
@@ -581,6 +603,362 @@ class GamificationService {
   async recommendMentorshipOpportunities(userId) { return []; }
   async recommendCollaborativeChallenges(userId) { return []; }
   async getSocialActivitiesSuggestions(userId) { return []; }
+  
+  // New method: Get streak data and history
+  async getStreakData(userId) {
+    try {
+      const profile = await this.getUserGamificationProfile(userId);
+      
+      // Get streak history for last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const streakHistory = await PointsActivity.find({
+        userId,
+        createdAt: { $gte: thirtyDaysAgo },
+        activityType: { $in: ['lesson_complete', 'assessment_complete', 'daily_login'] }
+      }).sort({ createdAt: 1 });
+      
+      // Calculate daily completion status
+      const dailyActivity = this.calculateDailyActivity(streakHistory);
+      
+      // Calculate streak multipliers
+      const currentStreak = profile.streaks.current.dailyLearning;
+      const multipliers = this.calculateStreakMultipliers(currentStreak);
+      
+      // Get streak milestones
+      const milestones = this.getStreakMilestones(currentStreak);
+      
+      return {
+        current: profile.streaks.current,
+        longest: profile.streaks.longest,
+        multipliers,
+        milestones,
+        history: dailyActivity,
+        statistics: {
+          totalDays: dailyActivity.length,
+          completedDays: dailyActivity.filter(d => d.completed).length,
+          currentWeekStreak: this.calculateWeekStreak(dailyActivity.slice(-7)),
+          monthlyConsistency: this.calculateMonthlyConsistency(dailyActivity)
+        }
+      };
+    } catch (error) {
+      console.error('Error getting streak data:', error);
+      throw new Error('Could not retrieve streak data');
+    }
+  }
+
+  // Calculate daily activity from point history
+  calculateDailyActivity(activities) {
+    const dailyMap = new Map();
+    const today = new Date();
+    
+    // Initialize last 30 days
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0];
+      dailyMap.set(dateKey, {
+        date: dateKey,
+        completed: false,
+        activities: 0,
+        points: 0
+      });
+    }
+    
+    // Fill with actual activity data
+    activities.forEach(activity => {
+      const dateKey = activity.createdAt.toISOString().split('T')[0];
+      if (dailyMap.has(dateKey)) {
+        const day = dailyMap.get(dateKey);
+        day.activities++;
+        day.points += activity.points;
+        day.completed = true;
+      }
+    });
+    
+    return Array.from(dailyMap.values());
+  }
+
+  // Calculate streak multipliers based on current streak
+  calculateStreakMultipliers(currentStreak) {
+    let pointsMultiplier = 1.0;
+    let xpMultiplier = 1.0;
+    let badgeProgressMultiplier = 1.0;
+    
+    if (currentStreak >= 7) {
+      pointsMultiplier = 1.2;
+      xpMultiplier = 1.1;
+    }
+    if (currentStreak >= 14) {
+      pointsMultiplier = 1.4;
+      xpMultiplier = 1.2;
+      badgeProgressMultiplier = 1.1;
+    }
+    if (currentStreak >= 30) {
+      pointsMultiplier = 1.6;
+      xpMultiplier = 1.3;
+      badgeProgressMultiplier = 1.2;
+    }
+    
+    return {
+      pointsMultiplier,
+      xpMultiplier,
+      badgeProgressMultiplier
+    };
+  }
+
+  // Get streak milestone information
+  getStreakMilestones(currentStreak) {
+    const milestones = [
+      { days: 3, reward: 'Bronze Streak Badge', achieved: currentStreak >= 3 },
+      { days: 7, reward: 'Silver Streak Badge', achieved: currentStreak >= 7 },
+      { days: 14, reward: 'Gold Streak Badge', achieved: currentStreak >= 14 },
+      { days: 30, reward: 'Platinum Streak Badge', achieved: currentStreak >= 30 },
+      { days: 60, reward: 'Diamond Streak Badge', achieved: currentStreak >= 60 },
+      { days: 100, reward: 'Legendary Streak Badge', achieved: currentStreak >= 100 }
+    ];
+    
+    return milestones;
+  }
+
+  // Calculate week streak from daily activity
+  calculateWeekStreak(weekData) {
+    return weekData.filter(day => day.completed).length;
+  }
+
+  // Calculate monthly consistency percentage
+  calculateMonthlyConsistency(monthData) {
+    const completedDays = monthData.filter(day => day.completed).length;
+    return Math.round((completedDays / monthData.length) * 100);
+  }
+
+  // New method: Get daily goals for user
+  async getDailyGoals(userId) {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Get today's activity
+      const todayActivities = await PointsActivity.find({
+        userId,
+        createdAt: {
+          $gte: new Date(today),
+          $lt: new Date(new Date(today).getTime() + 24 * 60 * 60 * 1000)
+        }
+      });
+      
+      // Calculate progress for each goal
+      const lessonCount = todayActivities.filter(a => a.activityType === 'lesson_complete').length;
+      const studyTime = todayActivities.reduce((sum, a) => sum + (a.metadata?.duration || 0), 0);
+      const quizCount = todayActivities.filter(a => a.activityType === 'assessment_complete').length;
+      
+      const goals = [
+        {
+          id: 'learn_30min',
+          title: 'Learn for 30 minutes',
+          description: 'Spend at least 30 minutes learning today',
+          progress: Math.min(studyTime, 30),
+          target: 30,
+          unit: 'minutes',
+          completed: studyTime >= 30,
+          points: 50,
+          type: 'time'
+        },
+        {
+          id: 'complete_lesson',
+          title: 'Complete 1 lesson',
+          description: 'Finish at least one lesson today',
+          progress: Math.min(lessonCount, 1),
+          target: 1,
+          unit: 'lessons',
+          completed: lessonCount >= 1,
+          points: 25,
+          type: 'count'
+        },
+        {
+          id: 'answer_quiz',
+          title: 'Answer 5 quiz questions',
+          description: 'Answer at least 5 quiz questions correctly',
+          progress: Math.min(quizCount * 5, 5), // Assume 5 questions per quiz
+          target: 5,
+          unit: 'questions',
+          completed: quizCount >= 1,
+          points: 30,
+          type: 'count'
+        }
+      ];
+      
+      return goals;
+    } catch (error) {
+      console.error('Error getting daily goals:', error);
+      throw new Error('Could not retrieve daily goals');
+    }
+  }
+
+  // New method: Create and manage challenges
+  async createChallenge(challengeData, creatorId) {
+    try {
+      const { Challenge } = await import('../models/Gamification.js');
+      
+      const challenge = new Challenge({
+        ...challengeData,
+        createdBy: creatorId,
+        participants: [creatorId],
+        isActive: true,
+        createdAt: new Date()
+      });
+      
+      await challenge.save();
+      
+      // Award points for creating challenge
+      await this.awardPoints(creatorId, 'challenge_create', {
+        challengeId: challenge._id,
+        description: `Created challenge: ${challenge.title}`
+      });
+      
+      return challenge;
+    } catch (error) {
+      console.error('Error creating challenge:', error);
+      throw new Error('Could not create challenge');
+    }
+  }
+
+  // New method: Join a challenge
+  async joinChallenge(challengeId, userId) {
+    try {
+      const { Challenge } = await import('../models/Gamification.js');
+      
+      const challenge = await Challenge.findById(challengeId);
+      if (!challenge) {
+        throw new Error('Challenge not found');
+      }
+      
+      if (challenge.participants.includes(userId)) {
+        throw new Error('Already participating in this challenge');
+      }
+      
+      challenge.participants.push(userId);
+      await challenge.save();
+      
+      // Award points for joining challenge
+      await this.awardPoints(userId, 'challenge_join', {
+        challengeId: challenge._id,
+        description: `Joined challenge: ${challenge.title}`
+      });
+      
+      return challenge;
+    } catch (error) {
+      console.error('Error joining challenge:', error);
+      throw new Error('Could not join challenge');
+    }
+  }
+
+  // New method: Get available challenges
+  async getAvailableChallenges(userId, options = {}) {
+    try {
+      const { Challenge } = await import('../models/Gamification.js');
+      const { limit = 10, type = null, difficulty = null } = options;
+      
+      let query = {
+        isActive: true,
+        startDate: { $lte: new Date() },
+        endDate: { $gte: new Date() },
+        participants: { $nin: [userId] } // Not already joined
+      };
+      
+      if (type) query.type = type;
+      if (difficulty) query.difficulty = difficulty;
+      
+      const challenges = await Challenge.find(query)
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate('createdBy', 'name username');
+      
+      return challenges;
+    } catch (error) {
+      console.error('Error getting available challenges:', error);
+      throw new Error('Could not retrieve available challenges');
+    }
+  }
+
+  // New method: Get active challenges for user
+  async getActiveChallenges(userId, options = {}) {
+    try {
+      const { Challenge } = await import('../models/Gamification.js');
+      const { limit = 10 } = options;
+      
+      const challenges = await Challenge.find({
+        participants: userId,
+        isActive: true,
+        startDate: { $lte: new Date() },
+        endDate: { $gte: new Date() }
+      })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate('createdBy', 'name username');
+      
+      // Add progress information for each challenge
+      const challengesWithProgress = await Promise.all(
+        challenges.map(async (challenge) => {
+          const progress = await this.calculateChallengeProgress(challenge._id, userId);
+          return {
+            ...challenge.toObject(),
+            progress,
+            timeRemaining: this.calculateTimeRemaining(challenge.endDate)
+          };
+        })
+      );
+      
+      return challengesWithProgress;
+    } catch (error) {
+      console.error('Error getting active challenges:', error);
+      throw new Error('Could not retrieve active challenges');
+    }
+  }
+
+  // Calculate challenge progress for a user
+  async calculateChallengeProgress(challengeId, userId) {
+    try {
+      const { Challenge } = await import('../models/Gamification.js');
+      const challenge = await Challenge.findById(challengeId);
+      
+      if (!challenge) return { current: 0, target: 1, percentage: 0 };
+      
+      // Get user's activities since challenge start
+      const activities = await PointsActivity.find({
+        userId,
+        createdAt: { $gte: challenge.startDate },
+        activityType: { $in: challenge.requiredActivities || [] }
+      });
+      
+      const current = activities.length;
+      const target = challenge.targetCount || 1;
+      const percentage = Math.min((current / target) * 100, 100);
+      
+      return { current, target, percentage };
+    } catch (error) {
+      console.error('Error calculating challenge progress:', error);
+      return { current: 0, target: 1, percentage: 0 };
+    }
+  }
+
+  // Calculate time remaining for challenge
+  calculateTimeRemaining(endDate) {
+    const now = new Date();
+    const end = new Date(endDate);
+    const timeDiff = end - now;
+    
+    if (timeDiff <= 0) return 'Expired';
+    
+    const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    
+    if (days > 0) {
+      return `${days} day${days > 1 ? 's' : ''} ${hours} hour${hours > 1 ? 's' : ''}`;
+    } else {
+      return `${hours} hour${hours > 1 ? 's' : ''}`;
+    }
+  }
 }
 
 const gamificationService = new GamificationService();

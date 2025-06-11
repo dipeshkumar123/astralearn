@@ -5,6 +5,8 @@ import AIContextProvider from './contexts/AIContextProvider'
 import DemoLearningEnvironment from './components/demo/DemoLearningEnvironment'
 import CourseManagementDashboard from './components/course/CourseManagementDashboard'
 import AdaptiveLearningDashboard from './components/adaptive/AdaptiveLearningDashboard'
+import GamificationDashboard from './components/gamification/GamificationDashboard'
+import SocialDashboard from './components/social/SocialDashboard'
 import AuthProvider, { useAuth } from './components/auth/AuthProvider'
 import LoginForm from './components/auth/LoginForm'
 import RegisterForm from './components/auth/RegisterForm'
@@ -32,8 +34,7 @@ function AppContent() {
       setServerStatus('disconnected');
       setServerInfo(null);
     }
-  };
-  const renderCurrentView = () => {
+  };  const renderCurrentView = () => {
     switch (currentView) {
       case 'demo':
         return <DemoLearningEnvironment onBackToStatus={() => setCurrentView('status')} />;
@@ -41,6 +42,10 @@ function AppContent() {
         return <CourseManagementDashboard onBackToStatus={() => setCurrentView('status')} />;
       case 'adaptive-learning':
         return <AdaptiveLearningDashboard userId="demo-user" onBackToMain={() => setCurrentView('status')} />;
+      case 'gamification':
+        return <GamificationDashboard onBackToMain={() => setCurrentView('status')} />;
+      case 'social-learning':
+        return <SocialDashboard onBackToMain={() => setCurrentView('status')} />;
       default:
         return (
           <div className="flex items-center justify-center min-h-screen">
@@ -126,23 +131,38 @@ function AppContent() {
                       >
                         📚 Course Management Dashboard
                       </button>
-                      
-                      <button 
+                        <button 
                         onClick={() => setCurrentView('adaptive-learning')}
                         className="w-full px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-md hover:from-orange-700 hover:to-red-700 transition-all"
                       >
                         🧠 Adaptive Learning Dashboard
                       </button>
+                      
+                      <button 
+                        onClick={() => setCurrentView('gamification')}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 transition-all"
+                      >
+                        🎮 Gamification Dashboard
+                      </button>
+                      
+                      <button 
+                        onClick={() => setCurrentView('social-learning')}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-md hover:from-blue-700 hover:to-cyan-700 transition-all"
+                      >
+                        🤝 Social Learning Hub
+                      </button>
                     </>
                   )}
                 </div>
-              </div>                <div className="mt-8 text-sm text-gray-500">
-                <p>Phase 3 Step 2: Adaptive Learning Engine</p>
+              </div>              <div className="mt-8 text-sm text-gray-500">
+                <p>Phase 4 Step 3: Gamification & Social Learning</p>
                 <p>✅ User Profile Management</p>
                 <p>✅ AI Orchestration Layer</p>
                 <p>✅ Frontend AI Interface</p>
                 <p>✅ Course Management System</p>
-                <p>🔄 Adaptive Learning & Assessment</p>
+                <p>✅ Adaptive Learning & Assessment</p>
+                <p>✅ Real-time Integration System</p>
+                <p>🔄 Gamification & Achievement System</p>
               </div></div>
           </div>
         );

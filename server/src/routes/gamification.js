@@ -593,4 +593,502 @@ router.get('/health', (req, res) => {
   });
 });
 
+// =============================
+// STREAK MANAGEMENT ENDPOINTS
+// =============================
+
+// Get user's streak data and history
+router.get('/streaks',
+  flexibleAuthenticate,
+  async (req, res) => {
+    try {
+      const streakData = await gamificationService.getStreakData(req.user._id);
+      
+      res.json({
+        success: true,
+        streaks: streakData,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Get streak data error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not retrieve streak data'
+      });
+    }
+  }
+);
+
+// Get streak history for specific date range
+router.get('/streaks/history',
+  flexibleAuthenticate,
+  [
+    query('days').optional().isInt({ min: 1, max: 365 }).withMessage('Days must be between 1 and 365'),
+    query('startDate').optional().isISO8601().withMessage('Invalid start date'),
+    query('endDate').optional().isISO8601().withMessage('Invalid end date')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation error',
+          details: errors.array()
+        });
+      }
+
+      const { days = 30 } = req.query;
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - parseInt(days));
+      
+      const { PointsActivity } = await import('../models/Gamification.js');
+      
+      const activities = await PointsActivity.find({
+        userId: req.user._id,
+        createdAt: { $gte: startDate, $lte: endDate },
+        activityType: { $in: ['lesson_complete', 'assessment_complete', 'daily_login'] }
+      }).sort({ createdAt: 1 });
+      
+      const dailyActivity = gamificationService.calculateDailyActivity(activities);
+      
+      res.json({
+        success: true,
+        history: dailyActivity,
+        period: { startDate, endDate, days: parseInt(days) },
+        summary: {
+          totalDays: dailyActivity.length,
+          activeDays: dailyActivity.filter(d => d.completed).length,
+          consistency: Math.round((dailyActivity.filter(d => d.completed).length / dailyActivity.length) * 100)
+        }
+      });
+    } catch (error) {
+      console.error('Get streak history error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not retrieve streak history'
+      });
+    }
+  }
+);
+
+// Update daily streak (called when user completes activities)
+router.post('/streaks/update',
+  flexibleAuthenticate,
+  async (req, res) => {
+    try {
+      const profile = await gamificationService.getUserGamificationProfile(req.user._id);
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check if user already has activity today
+      const { PointsActivity } = await import('../models/Gamification.js');
+      const todayActivity = await PointsActivity.findOne({
+        userId: req.user._id,
+        createdAt: {
+          $gte: new Date(today),
+          $lt: new Date(new Date(today).getTime() + 24 * 60 * 60 * 1000)
+        }
+      });
+      
+      if (todayActivity) {
+        return res.json({
+          success: true,
+          message: 'Streak already updated for today',
+          currentStreak: profile.streaks.current.dailyLearning
+        });
+      }
+      
+      // Update streak
+      const updatedProfile = await gamificationService.updateDailyStreak(req.user._id);
+      
+      res.json({
+        success: true,
+        message: 'Streak updated successfully',
+        currentStreak: updatedProfile.streaks.current.dailyLearning,
+        multiplier: gamificationService.calculateStreakMultipliers(updatedProfile.streaks.current.dailyLearning)
+      });
+    } catch (error) {
+      console.error('Update streak error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not update streak'
+      });
+    }
+  }
+);
+
+// =============================
+// DAILY GOALS ENDPOINTS
+// =============================
+
+// Get user's daily goals
+router.get('/goals/daily',
+  flexibleAuthenticate,
+  async (req, res) => {
+    try {
+      const goals = await gamificationService.getDailyGoals(req.user._id);
+      
+      res.json({
+        success: true,
+        goals,
+        date: new Date().toISOString().split('T')[0],
+        summary: {
+          total: goals.length,
+          completed: goals.filter(g => g.completed).length,
+          totalPoints: goals.reduce((sum, g) => sum + (g.completed ? g.points : 0), 0),
+          possiblePoints: goals.reduce((sum, g) => sum + g.points, 0)
+        }
+      });
+    } catch (error) {
+      console.error('Get daily goals error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not retrieve daily goals'
+      });
+    }
+  }
+);
+
+// Complete a daily goal
+router.post('/goals/daily/:goalId/complete',
+  flexibleAuthenticate,
+  [
+    param('goalId').notEmpty().withMessage('Goal ID required'),
+    body('metadata').optional().isObject()
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation error',
+          details: errors.array()
+        });
+      }
+
+      const { goalId } = req.params;
+      const { metadata = {} } = req.body;
+      
+      // Get goals to find the specific one
+      const goals = await gamificationService.getDailyGoals(req.user._id);
+      const goal = goals.find(g => g.id === goalId);
+      
+      if (!goal) {
+        return res.status(404).json({
+          error: 'Goal not found',
+          message: 'Daily goal not found'
+        });
+      }
+      
+      if (goal.completed) {
+        return res.json({
+          success: true,
+          message: 'Goal already completed',
+          goal
+        });
+      }
+      
+      // Award points for completing goal
+      const result = await gamificationService.awardPoints(req.user._id, 'daily_goal_complete', {
+        goalId,
+        goalTitle: goal.title,
+        goalPoints: goal.points,
+        ...metadata
+      });
+      
+      res.json({
+        success: true,
+        message: 'Daily goal completed',
+        goal: { ...goal, completed: true },
+        pointsAwarded: result.pointsAwarded,
+        newAchievements: result.newAchievements
+      });
+    } catch (error) {
+      console.error('Complete daily goal error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not complete daily goal'
+      });
+    }
+  }
+);
+
+// =============================
+// CHALLENGE SYSTEM ENDPOINTS
+// =============================
+
+// Get available challenges
+router.get('/challenges',
+  flexibleAuthenticate,
+  [
+    query('type').optional().isIn(['daily', 'weekly', 'special', 'milestone'])
+      .withMessage('Invalid challenge type'),
+    query('difficulty').optional().isIn(['easy', 'medium', 'hard', 'expert'])
+      .withMessage('Invalid difficulty level'),
+    query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation error',
+          details: errors.array()
+        });
+      }
+
+      const { type, difficulty, limit = 10 } = req.query;
+      
+      const challenges = await gamificationService.getAvailableChallenges(req.user._id, {
+        type,
+        difficulty,
+        limit: parseInt(limit)
+      });
+      
+      res.json({
+        success: true,
+        challenges,
+        total: challenges.length
+      });
+    } catch (error) {
+      console.error('Get challenges error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not retrieve challenges'
+      });
+    }
+  }
+);
+
+// Get user's active challenges
+router.get('/challenges/active',
+  flexibleAuthenticate,
+  [
+    query('limit').optional().isInt({ min: 1, max: 20 }).withMessage('Limit must be between 1 and 20')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation error',
+          details: errors.array()
+        });
+      }
+
+      const { limit = 10 } = req.query;
+      
+      const challenges = await gamificationService.getActiveChallenges(req.user._id, {
+        limit: parseInt(limit)
+      });
+      
+      res.json({
+        success: true,
+        challenges,
+        total: challenges.length
+      });
+    } catch (error) {
+      console.error('Get active challenges error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not retrieve active challenges'
+      });
+    }
+  }
+);
+
+// Join a challenge
+router.post('/challenges/:challengeId/join',
+  flexibleAuthenticate,
+  [
+    param('challengeId').isMongoId().withMessage('Valid challenge ID required')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation error',
+          details: errors.array()
+        });
+      }
+
+      const { challengeId } = req.params;
+      
+      const challenge = await gamificationService.joinChallenge(challengeId, req.user._id);
+      
+      res.json({
+        success: true,
+        message: 'Successfully joined challenge',
+        challenge,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Join challenge error:', error);
+      
+      if (error.message === 'Challenge not found') {
+        return res.status(404).json({
+          error: 'Challenge not found',
+          message: 'The specified challenge does not exist'
+        });
+      }
+      
+      if (error.message === 'Already participating in this challenge') {
+        return res.status(400).json({
+          error: 'Already participating',
+          message: 'You are already participating in this challenge'
+        });
+      }
+      
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not join challenge'
+      });
+    }
+  }
+);
+
+// Create a new challenge (admin or instructor only)
+router.post('/challenges/create',
+  flexibleAuthenticate,
+  flexibleAuthorize(['admin', 'instructor']),
+  [
+    body('title').notEmpty().withMessage('Challenge title required'),
+    body('description').notEmpty().withMessage('Challenge description required'),
+    body('type').isIn(['daily', 'weekly', 'special', 'milestone']).withMessage('Valid challenge type required'),
+    body('difficulty').isIn(['easy', 'medium', 'hard', 'expert']).withMessage('Valid difficulty required'),
+    body('duration').notEmpty().withMessage('Duration required'),
+    body('rewards').isArray().withMessage('Rewards array required'),
+    body('requirements').isArray().withMessage('Requirements array required'),
+    body('startDate').optional().isISO8601().withMessage('Invalid start date'),
+    body('endDate').optional().isISO8601().withMessage('Invalid end date')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation error',
+          details: errors.array()
+        });
+      }
+
+      const challengeData = req.body;
+      const challenge = await gamificationService.createChallenge(challengeData, req.user._id);
+      
+      res.json({
+        success: true,
+        message: 'Challenge created successfully',
+        challenge,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Create challenge error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not create challenge'
+      });
+    }
+  }
+);
+
+// Get completed challenges
+router.get('/challenges/completed',
+  flexibleAuthenticate,
+  [
+    query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation error',
+          details: errors.array()
+        });
+      }
+
+      const { limit = 20 } = req.query;
+      
+      const { Challenge } = await import('../models/Gamification.js');
+      
+      const completedChallenges = await Challenge.find({
+        participants: req.user._id,
+        isCompleted: true
+      })
+        .sort({ completedAt: -1 })
+        .limit(parseInt(limit))
+        .populate('createdBy', 'name username');
+      
+      res.json({
+        success: true,
+        challenges: completedChallenges,
+        total: completedChallenges.length
+      });
+    } catch (error) {
+      console.error('Get completed challenges error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not retrieve completed challenges'
+      });
+    }
+  }
+);
+
+// Get weekly challenge
+router.get('/challenges/weekly',
+  flexibleAuthenticate,
+  async (req, res) => {
+    try {
+      const { Challenge } = await import('../models/Gamification.js');
+      
+      // Get current week's challenge
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      const weeklyChallenge = await Challenge.findOne({
+        type: 'weekly',
+        isActive: true,
+        startDate: { $gte: weekStart },
+        endDate: { $lte: weekEnd }
+      });
+      
+      if (!weeklyChallenge) {
+        return res.json({
+          success: true,
+          challenge: null,
+          message: 'No weekly challenge available'
+        });
+      }
+      
+      // Calculate user's progress if participating
+      let progress = null;
+      if (weeklyChallenge.participants.includes(req.user._id)) {
+        progress = await gamificationService.calculateChallengeProgress(weeklyChallenge._id, req.user._id);
+      }
+      
+      res.json({
+        success: true,
+        challenge: {
+          ...weeklyChallenge.toObject(),
+          progress,
+          timeRemaining: gamificationService.calculateTimeRemaining(weeklyChallenge.endDate),
+          isParticipating: weeklyChallenge.participants.includes(req.user._id)
+        }
+      });
+    } catch (error) {
+      console.error('Get weekly challenge error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not retrieve weekly challenge'
+      });
+    }
+  }
+);
+
 export default router;
