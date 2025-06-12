@@ -113,10 +113,11 @@ async function startServer() {
   try {
     // Initialize database connection
     const dbManager = DatabaseManager.getInstance();
-    await dbManager.connect();
-
-    // Initialize WebSocket service
+    await dbManager.connect();    // Initialize WebSocket service
     webSocketService.initialize(httpServer);
+    
+    // Initialize instructor monitoring WebSocket events (Phase 5 Step 2)
+    webSocketService.initializeInstructorMonitoring();
 
     // Start server
     const server = httpServer.listen(config.server.port, () => {

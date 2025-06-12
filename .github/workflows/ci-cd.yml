@@ -196,14 +196,237 @@ jobs:
       uses: codecov/codecov-action@v3
       with:
         files: ./server/coverage/lcov.info
-        flags: backend
-        name: backend-coverage
+        flags: backend        name: backend-coverage
+
+  # Phase 6: AI Validation Testing
+  ai-validation:
+    name: AI Validation Tests
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: astralearn_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd testSuite && npm ci
+
+    - name: Setup test environment
+      run: |
+        cp .env.test.example .env.test || echo "No .env.test.example found"
+
+    - name: Run AI validation tests
+      env:
+        NODE_ENV: test
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: astralearn_test
+        DB_USER: postgres
+        DB_PASSWORD: testpassword
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        AI_API_KEY: ${{ secrets.TEST_AI_API_KEY }}
+      run: |
+        cd testSuite && npm run test -- tests/aiValidation.test.js
+
+    - name: Upload AI validation reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: ai-validation-reports
+        path: testSuite/reports/
+
+  # Phase 6: Learning Path Simulation Testing
+  learning-path-simulation:
+    name: Learning Path Tests
+    runs-on: ubuntu-latest
+    needs: test
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: astralearn_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd testSuite && npm ci
+
+    - name: Run learning path simulation tests
+      env:
+        NODE_ENV: test
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: astralearn_test
+        DB_USER: postgres
+        DB_PASSWORD: testpassword
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+      run: |
+        cd testSuite && npm run test -- tests/learningPathSimulation.test.js
+
+    - name: Upload learning path reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: learning-path-reports
+        path: testSuite/reports/
+
+  # Phase 6: Performance Testing
+  performance-testing:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd testSuite && npm ci
+
+    - name: Start application stack
+      run: |
+        docker-compose -f docker-compose.prod.yml up -d postgres redis
+        sleep 30
+
+    - name: Run performance tests
+      run: |
+        cd testSuite && node performance/performanceTester.js
+
+    - name: Upload performance reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-reports
+        path: testSuite/reports/
+
+    - name: Check performance thresholds
+      run: |
+        cd testSuite && npm run check:performance-thresholds
+
+  # Phase 6: Security Testing
+  security-testing:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd testSuite && npm ci
+
+    - name: Start application for security testing
+      run: |
+        docker-compose -f docker-compose.prod.yml up -d
+        sleep 60
+
+    - name: Run OWASP security tests
+      run: |
+        cd testSuite && node security/securityTester.js
+
+    - name: Run container security scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'astralearn-backend:latest'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload security scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+      continue-on-error: true
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: testSuite/reports/
 
   # Build Docker Images
   build:
     name: Build Docker Images
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, ai-validation, learning-path-simulation, performance-testing, security-testing]
     if: github.event_name != 'pull_request'
 
     strategy:

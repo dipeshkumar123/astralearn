@@ -1263,6 +1263,559 @@ class WebSocketService {
       timestamp: new Date().toISOString()
     };
   }
+
+  // ===========================
+  // PHASE 5 STEP 2 - INSTRUCTOR MONITORING WEBSOCKET EVENTS
+  // ===========================
+  /**
+   * Initialize Instructor Monitoring WebSocket Events
+   * Real-time class monitoring and analytics for instructors
+   */
+  initializeInstructorMonitoring() {
+    if (!this.io) return;
+
+    // Instructor namespace for real-time monitoring
+    const instructorNamespace = this.io.of('/instructor');
+
+    // Authentication middleware for instructor namespace
+    instructorNamespace.use(async (socket, next) => {
+      try {
+        const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+        
+        if (!token) {
+          return next(new Error('Authentication required'));
+        }
+
+        // Verify JWT token
+        const decoded = jwt.verify(token, config.jwt.secret);
+        const user = await this.getUserById(decoded.userId || decoded.id);
+        
+        if (!user) {
+          return next(new Error('User not found'));
+        }
+
+        // Verify instructor role
+        if (user.role !== 'instructor' && user.role !== 'admin') {
+          return next(new Error('Instructor access required'));
+        }
+
+        socket.userId = user.id;
+        socket.userRole = user.role;
+        socket.userData = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avatar: user.avatar
+        };
+
+        next();
+      } catch (error) {
+        console.error('Instructor WebSocket authentication error:', error);
+        next(new Error('Authentication failed'));
+      }
+    });
+
+    instructorNamespace.on('connection', (socket) => {
+      console.log(`Instructor connected: ${socket.userId}`);
+
+      // Join instructor to their monitoring room
+      socket.join(`instructor_${socket.userId}`);
+
+      // Handle real-time class monitoring
+      this.handleInstructorClassMonitoring(socket);
+
+      // Handle engagement monitoring
+      this.handleEngagementMonitoring(socket);
+
+      // Handle learning gap alerts
+      this.handleLearningGapAlerts(socket);
+
+      // Handle intervention tracking
+      this.handleInterventionTracking(socket);
+
+      socket.on('disconnect', () => {
+        console.log(`Instructor disconnected: ${socket.userId}`);
+        this.cleanupInstructorSession(socket);
+      });
+    });
+  }
+
+  /**
+   * Handle Real-time Class Monitoring Events
+   */
+  handleInstructorClassMonitoring(socket) {
+    // Start monitoring a specific class
+    socket.on('start_class_monitoring', async (data) => {
+      try {
+        const { courseId, sessionId } = data;
+        
+        // Validate instructor has access to course
+        if (!await this.validateInstructorCourseAccess(socket.userId, courseId)) {
+          socket.emit('monitoring_error', { error: 'Access denied to course' });
+          return;
+        }
+
+        // Join class monitoring room
+        const monitoringRoom = `class_monitor_${courseId}`;
+        socket.join(monitoringRoom);
+
+        // Store monitoring session
+        await redisCacheService.set(
+          `instructor_monitoring_${socket.userId}_${courseId}`,
+          { sessionId, startTime: new Date().toISOString() },
+          600 // 10 minutes TTL
+        );
+
+        socket.emit('monitoring_started', { courseId, sessionId });
+
+        // Start sending real-time updates
+        this.startRealTimeClassUpdates(socket, courseId, sessionId);
+
+      } catch (error) {
+        console.error('Class monitoring start error:', error);
+        socket.emit('monitoring_error', { error: 'Failed to start monitoring' });
+      }
+    });
+
+    // Stop monitoring a class
+    socket.on('stop_class_monitoring', async (data) => {
+      try {
+        const { courseId } = data;
+        const monitoringRoom = `class_monitor_${courseId}`;
+        
+        socket.leave(monitoringRoom);
+        
+        // Clean up monitoring session
+        await redisCacheService.delete(`instructor_monitoring_${socket.userId}_${courseId}`);
+        
+        socket.emit('monitoring_stopped', { courseId });
+
+      } catch (error) {
+        console.error('Class monitoring stop error:', error);
+        socket.emit('monitoring_error', { error: 'Failed to stop monitoring' });
+      }
+    });
+
+    // Request live class metrics
+    socket.on('request_live_metrics', async (data) => {
+      try {
+        const { courseId } = data;
+        
+        // Get real-time class metrics
+        const metrics = await this.getLiveClassMetrics(courseId);
+        
+        socket.emit('live_metrics_update', {
+          courseId,
+          metrics,
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (error) {
+        console.error('Live metrics request error:', error);
+        socket.emit('monitoring_error', { error: 'Failed to get live metrics' });
+      }
+    });
+  }
+
+  /**
+   * Handle Engagement Monitoring Events
+   */
+  handleEngagementMonitoring(socket) {
+    // Start engagement monitoring
+    socket.on('start_engagement_monitoring', async (data) => {
+      try {
+        const { courseId, studentIds = [] } = data;
+        
+        const engagementRoom = `engagement_${courseId}`;
+        socket.join(engagementRoom);
+
+        // Store engagement monitoring session
+        await redisCacheService.set(
+          `engagement_monitoring_${socket.userId}_${courseId}`,
+          { studentIds, startTime: new Date().toISOString() },
+          600
+        );
+
+        socket.emit('engagement_monitoring_started', { courseId, studentCount: studentIds.length });
+
+        // Start sending engagement updates
+        this.startEngagementUpdates(socket, courseId, studentIds);
+
+      } catch (error) {
+        console.error('Engagement monitoring start error:', error);
+        socket.emit('monitoring_error', { error: 'Failed to start engagement monitoring' });
+      }
+    });
+
+    // Update engagement thresholds
+    socket.on('update_engagement_thresholds', async (data) => {
+      try {
+        const { courseId, thresholds } = data;
+        
+        // Store updated thresholds
+        await redisCacheService.set(
+          `engagement_thresholds_${courseId}`,
+          thresholds,
+          3600 // 1 hour TTL
+        );
+
+        socket.emit('thresholds_updated', { courseId, thresholds });
+
+      } catch (error) {
+        console.error('Engagement thresholds update error:', error);
+        socket.emit('monitoring_error', { error: 'Failed to update thresholds' });
+      }
+    });
+  }
+
+  /**
+   * Handle Learning Gap Alert Events
+   */
+  handleLearningGapAlerts(socket) {
+    // Subscribe to gap detection alerts
+    socket.on('subscribe_gap_alerts', async (data) => {
+      try {
+        const { courseId, alertTypes = ['critical', 'warning'] } = data;
+        
+        const alertRoom = `gap_alerts_${courseId}`;
+        socket.join(alertRoom);
+
+        // Store alert subscription
+        await redisCacheService.set(
+          `gap_alerts_${socket.userId}_${courseId}`,
+          { alertTypes, subscribedAt: new Date().toISOString() },
+          3600
+        );
+
+        socket.emit('gap_alerts_subscribed', { courseId, alertTypes });
+
+      } catch (error) {
+        console.error('Gap alerts subscription error:', error);
+        socket.emit('monitoring_error', { error: 'Failed to subscribe to gap alerts' });
+      }
+    });
+
+    // Acknowledge gap alert
+    socket.on('acknowledge_gap_alert', async (data) => {
+      try {
+        const { alertId, courseId, studentId } = data;
+        
+        // Mark alert as acknowledged
+        await redisCacheService.set(
+          `gap_alert_ack_${alertId}`,
+          { 
+            acknowledgedBy: socket.userId, 
+            acknowledgedAt: new Date().toISOString(),
+            courseId,
+            studentId
+          },
+          86400 // 24 hours TTL
+        );
+
+        socket.emit('gap_alert_acknowledged', { alertId });
+
+        // Notify other instructors in the course
+        socket.to(`gap_alerts_${courseId}`).emit('gap_alert_acknowledged_by_peer', {
+          alertId,
+          acknowledgedBy: socket.userId
+        });
+
+      } catch (error) {
+        console.error('Gap alert acknowledgment error:', error);
+        socket.emit('monitoring_error', { error: 'Failed to acknowledge alert' });
+      }
+    });
+  }
+
+  /**
+   * Handle Intervention Tracking Events
+   */
+  handleInterventionTracking(socket) {
+    // Start intervention
+    socket.on('start_intervention', async (data) => {
+      try {
+        const { interventionId, studentId, courseId, strategy } = data;
+        
+        // Store intervention start
+        await redisCacheService.set(
+          `intervention_${interventionId}`,
+          {
+            instructorId: socket.userId,
+            studentId,
+            courseId,
+            strategy,
+            startedAt: new Date().toISOString(),
+            status: 'active'
+          },
+          86400 // 24 hours TTL
+        );
+
+        socket.emit('intervention_started', { interventionId, studentId });
+
+        // Join intervention tracking room
+        socket.join(`intervention_${interventionId}`);
+
+      } catch (error) {
+        console.error('Intervention start error:', error);
+        socket.emit('monitoring_error', { error: 'Failed to start intervention' });
+      }
+    });
+
+    // Update intervention progress
+    socket.on('update_intervention', async (data) => {
+      try {
+        const { interventionId, progress, notes } = data;
+        
+        // Get existing intervention data
+        const interventionData = await redisCacheService.get(`intervention_${interventionId}`);
+        
+        if (interventionData) {
+          interventionData.progress = progress;
+          interventionData.notes = notes;
+          interventionData.lastUpdated = new Date().toISOString();
+          
+          await redisCacheService.set(`intervention_${interventionId}`, interventionData, 86400);
+          
+          socket.emit('intervention_updated', { interventionId, progress });
+
+          // Notify intervention room
+          socket.to(`intervention_${interventionId}`).emit('intervention_progress_update', {
+            interventionId,
+            progress,
+            updatedBy: socket.userId
+          });
+        }
+
+      } catch (error) {
+        console.error('Intervention update error:', error);
+        socket.emit('monitoring_error', { error: 'Failed to update intervention' });
+      }
+    });
+  }
+
+  /**
+   * Start Real-time Class Updates
+   */
+  async startRealTimeClassUpdates(socket, courseId, sessionId) {
+    const updateInterval = setInterval(async () => {
+      try {
+        // Check if monitoring is still active
+        const monitoringSession = await redisCacheService.get(
+          `instructor_monitoring_${socket.userId}_${courseId}`
+        );
+        
+        if (!monitoringSession) {
+          clearInterval(updateInterval);
+          return;
+        }
+
+        // Get live metrics
+        const metrics = await this.getLiveClassMetrics(courseId);
+        
+        socket.emit('realtime_class_update', {
+          courseId,
+          sessionId,
+          metrics,
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (error) {
+        console.error('Real-time update error:', error);
+        clearInterval(updateInterval);
+      }
+    }, 5000); // Update every 5 seconds
+
+    // Store interval for cleanup
+    socket.updateInterval = updateInterval;
+  }
+
+  /**
+   * Start Engagement Updates
+   */
+  async startEngagementUpdates(socket, courseId, studentIds) {
+    const updateInterval = setInterval(async () => {
+      try {
+        // Check if engagement monitoring is still active
+        const engagementSession = await redisCacheService.get(
+          `engagement_monitoring_${socket.userId}_${courseId}`
+        );
+        
+        if (!engagementSession) {
+          clearInterval(updateInterval);
+          return;
+        }
+
+        // Get live engagement data
+        const engagementData = await this.getLiveEngagementData(courseId, studentIds);
+        
+        socket.emit('engagement_update', {
+          courseId,
+          engagementData,
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (error) {
+        console.error('Engagement update error:', error);
+        clearInterval(updateInterval);
+      }
+    }, 3000); // Update every 3 seconds
+
+    // Store interval for cleanup
+    socket.engagementInterval = updateInterval;
+  }
+
+  /**
+   * Get Live Class Metrics
+   */
+  async getLiveClassMetrics(courseId) {
+    try {
+      // This would integrate with classMonitoringService
+      const metrics = {
+        activeStudents: await this.getActiveStudentCount(courseId),
+        averageEngagement: await this.getAverageEngagement(courseId),
+        completionRate: await this.getCurrentCompletionRate(courseId),
+        questionsAsked: await this.getQuestionsAsked(courseId),
+        lastActivity: new Date().toISOString()
+      };
+
+      return metrics;
+    } catch (error) {
+      console.error('Live metrics error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get Live Engagement Data
+   */
+  async getLiveEngagementData(courseId, studentIds) {
+    try {
+      // This would integrate with classMonitoringService
+      const engagementData = {
+        courseId,
+        studentEngagement: studentIds.map(studentId => ({
+          studentId,
+          engagementScore: Math.random() * 100, // Placeholder
+          lastActive: new Date().toISOString(),
+          currentActivity: 'reading'
+        })),
+        overallEngagement: Math.random() * 100,
+        engagementTrend: 'increasing'
+      };
+
+      return engagementData;
+    } catch (error) {
+      console.error('Live engagement data error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Broadcast Learning Gap Alert
+   */
+  async broadcastLearningGapAlert(courseId, alert) {
+    try {
+      const alertRoom = `gap_alerts_${courseId}`;
+      
+      this.io.of('/instructor').to(alertRoom).emit('learning_gap_alert', {
+        ...alert,
+        timestamp: new Date().toISOString()
+      });
+
+      // Store alert for persistence
+      await redisCacheService.set(
+        `gap_alert_${alert.id}`,
+        alert,
+        86400 // 24 hours TTL
+      );
+
+    } catch (error) {
+      console.error('Gap alert broadcast error:', error);
+    }
+  }
+
+  /**
+   * Broadcast Intervention Recommendation
+   */
+  async broadcastInterventionRecommendation(courseId, recommendation) {
+    try {
+      const monitoringRoom = `class_monitor_${courseId}`;
+      
+      this.io.of('/instructor').to(monitoringRoom).emit('intervention_recommendation', {
+        ...recommendation,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Intervention recommendation broadcast error:', error);
+    }
+  }
+
+  /**
+   * Cleanup Instructor Session
+   */
+  async cleanupInstructorSession(socket) {
+    try {
+      // Clear update intervals
+      if (socket.updateInterval) {
+        clearInterval(socket.updateInterval);
+      }
+      if (socket.engagementInterval) {
+        clearInterval(socket.engagementInterval);
+      }
+
+      // Remove monitoring sessions
+      const keys = await redisCacheService.getKeys(`*monitoring_${socket.userId}_*`);
+      for (const key of keys) {
+        await redisCacheService.delete(key);
+      }
+
+    } catch (error) {
+      console.error('Instructor session cleanup error:', error);
+    }
+  }
+
+  /**
+   * Helper Methods for Live Data
+   */
+  async getActiveStudentCount(courseId) {
+    // Placeholder - would integrate with actual monitoring service
+    return Math.floor(Math.random() * 50) + 10;
+  }
+
+  async getAverageEngagement(courseId) {
+    // Placeholder - would integrate with actual monitoring service
+    return Math.random() * 100;
+  }
+
+  async getCurrentCompletionRate(courseId) {
+    // Placeholder - would integrate with actual monitoring service
+    return Math.random() * 100;
+  }
+
+  async getQuestionsAsked(courseId) {
+    // Placeholder - would integrate with actual monitoring service
+    return Math.floor(Math.random() * 20);
+  }
+
+  async validateInstructorCourseAccess(instructorId, courseId) {
+    // Placeholder - would validate instructor has access to course
+    return true;
+  }
+
+  /**
+   * Health check for WebSocket service
+   */
+  healthCheck() {
+    return {
+      status: this.io ? 'healthy' : 'unhealthy',
+      connections: this.sessionStats.currentConnections,
+      rooms: this.activeRooms.size,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    };
+  }
 }
 
 // Create singleton instance

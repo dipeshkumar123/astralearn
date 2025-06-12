@@ -1,0 +1,230 @@
+# Environment-specific configuration for different deployment stages
+# Phase 6: Multi-environment deployment support
+
+environments:
+  production:
+    namespace: astralearn
+    domain: astralearn.com
+    replicas:
+      backend: 3
+      frontend: 2
+    resources:
+      backend:
+        requests:
+          memory: "512Mi"
+          cpu: "250m"
+        limits:
+          memory: "2Gi"
+          cpu: "1000m"
+      frontend:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+    database:
+      postgresql:
+        storage: "50Gi"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      redis:
+        storage: "10Gi"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+    monitoring:
+      enabled: true
+      retention: "30d"
+      prometheus:
+        storage: "20Gi"
+      grafana:
+        storage: "5Gi"
+      loki:
+        storage: "50Gi"
+    security:
+      ssl_enabled: true
+      network_policies: true
+      pod_security_policies: true
+    autoscaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 10
+      target_cpu: 70
+      target_memory: 80
+
+  staging:
+    namespace: astralearn-staging
+    domain: staging.astralearn.com
+    replicas:
+      backend: 2
+      frontend: 1
+    resources:
+      backend:
+        requests:
+          memory: "256Mi"
+          cpu: "125m"
+        limits:
+          memory: "1Gi"
+          cpu: "500m"
+      frontend:
+        requests:
+          memory: "64Mi"
+          cpu: "50m"
+        limits:
+          memory: "256Mi"
+          cpu: "250m"
+    database:
+      postgresql:
+        storage: "20Gi"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "125m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      redis:
+        storage: "5Gi"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+    monitoring:
+      enabled: true
+      retention: "7d"
+      prometheus:
+        storage: "10Gi"
+      grafana:
+        storage: "2Gi"
+      loki:
+        storage: "20Gi"
+    security:
+      ssl_enabled: true
+      network_policies: false
+      pod_security_policies: false
+    autoscaling:
+      enabled: false
+      min_replicas: 2
+      max_replicas: 5
+      target_cpu: 75
+      target_memory: 85
+
+  development:
+    namespace: astralearn-dev
+    domain: dev.astralearn.com
+    replicas:
+      backend: 1
+      frontend: 1
+    resources:
+      backend:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "250m"
+      frontend:
+        requests:
+          memory: "32Mi"
+          cpu: "25m"
+        limits:
+          memory: "128Mi"
+          cpu: "125m"
+    database:
+      postgresql:
+        storage: "10Gi"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+      redis:
+        storage: "2Gi"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "25m"
+          limits:
+            memory: "256Mi"
+            cpu: "125m"
+    monitoring:
+      enabled: false
+      retention: "3d"
+    security:
+      ssl_enabled: false
+      network_policies: false
+      pod_security_policies: false
+    autoscaling:
+      enabled: false
+      min_replicas: 1
+      max_replicas: 2
+      target_cpu: 80
+      target_memory: 90
+
+# Common configuration across all environments
+common:
+  images:
+    backend: "astralearn/backend:latest"
+    frontend: "astralearn/frontend:latest"
+    postgresql: "postgres:15-alpine"
+    redis: "redis:7-alpine"
+    nginx: "nginx:1.24-alpine"
+  
+  health_checks:
+    backend:
+      liveness:
+        path: "/api/health"
+        initial_delay: 30
+        period: 10
+        timeout: 5
+        failure_threshold: 3
+      readiness:
+        path: "/api/ready"
+        initial_delay: 15
+        period: 5
+        timeout: 3
+        failure_threshold: 3
+    
+    frontend:
+      liveness:
+        path: "/health"
+        initial_delay: 30
+        period: 10
+        timeout: 5
+        failure_threshold: 3
+      readiness:
+        path: "/health"
+        initial_delay: 5
+        period: 5
+        timeout: 3
+        failure_threshold: 3
+  
+  storage_classes:
+    fast_ssd: "fast-ssd"
+    standard: "standard"
+  
+  labels:
+    app: "astralearn"
+    version: "2.0.0"
+    phase: "phase-6"
+    managed_by: "kubernetes"
+  
+  annotations:
+    prometheus_scrape: "true"
+    prometheus_port: "9090"
+    prometheus_path: "/metrics"

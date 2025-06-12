@@ -1,17 +1,22 @@
 /**
- * Instructor Analytics Component - Phase 5 Step 1
- * Analytics dashboard specifically designed for instructors and educators
+ * Instructor Analytics Component - Phase 5 Step 2
+ * Advanced analytics dashboard specifically designed for instructors and educators
  * 
  * Features:
- * - Class performance overview and insights
+ * - Class performance monitoring with real-time insights
+ * - Engagement heatmaps visualization
+ * - Learning gap detection and analysis
+ * - Intelligent intervention suggestion system
  * - Individual learner analytics and interventions
- * - Content effectiveness analysis
+ * - Content effectiveness analysis with predictive insights
  * - Assessment optimization recommendations
- * - At-risk student identification
+ * - At-risk student identification with automated alerts
+ * - Real-time collaboration analytics
+ * - Predictive performance modeling
  */
 
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LineChart, 
   Line, 
@@ -34,7 +39,9 @@ import {
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
-  Radar
+  Radar,
+  ComposedChart,
+  ReferenceLine
 } from 'recharts';
 import { 
   Users, 
@@ -56,7 +63,26 @@ import {
   Filter,
   Download,
   Bell,
-  Settings
+  Settings,
+  Activity,
+  BarChart3,
+  Zap,
+  Search,
+  Map,
+  Lightbulb,
+  AlertCircle,
+  TrendingUp as Analytics,
+  Users as ClassIcon,
+  HeatMap,
+  GraduationCap,
+  PieChart as ChartIcon,
+  Shield,
+  Cpu,
+  Database,
+  RefreshCw,
+  PlayCircle,
+  PauseCircle,
+  MoreVertical
 } from 'lucide-react';
 
 const InstructorAnalytics = () => {

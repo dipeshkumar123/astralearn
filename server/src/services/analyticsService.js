@@ -12,9 +12,9 @@
 
 import { UserProgress, User, Course, Lesson } from '../models/index.js';
 import { UserGamification } from '../models/Gamification.js';
-import learningAnalyticsService from './learningAnalyticsService.js';
+import { learningAnalyticsService } from './learningAnalyticsService.js';
 import gamificationService from './gamificationService.js';
-import adaptiveLearningService from './adaptiveLearningService.js';
+import { adaptiveLearningService } from './adaptiveLearningService.js';
 
 class AnalyticsService {
   constructor() {

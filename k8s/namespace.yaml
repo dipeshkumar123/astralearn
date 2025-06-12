@@ -1,0 +1,31 @@
+# AstraLearn Kubernetes Namespace Configuration
+# Phase 6: Production Deployment
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: astralearn
+  labels:
+    name: astralearn
+    environment: production
+    version: "2.0.0"
+    phase: "phase-6"
+    monitoring: "enabled"
+    security: "enhanced"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: astralearn-monitoring
+  labels:
+    name: astralearn-monitoring
+    environment: production
+    purpose: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: astralearn-staging
+  labels:
+    name: astralearn-staging
+    environment: staging
+    version: "2.0.0"

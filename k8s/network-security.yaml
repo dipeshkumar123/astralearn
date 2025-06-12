@@ -1,0 +1,347 @@
+# Advanced Network Policies for AstraLearn
+# Phase 6: Enhanced security and network segmentation
+
+# Default deny all policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: astralearn
+  labels:
+    app: astralearn
+    security: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+# Backend network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: astralearn-backend-netpol
+  namespace: astralearn
+  labels:
+    app: astralearn-backend
+    security: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: astralearn-backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from frontend
+  - from:
+    - podSelector:
+        matchLabels:
+          app: astralearn-frontend
+    ports:
+    - protocol: TCP
+      port: 3001
+  # Allow traffic from monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: astralearn-monitoring
+    ports:
+    - protocol: TCP
+      port: 9090  # Metrics port
+  # Allow traffic from ingress
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3001
+  egress:
+  # Allow traffic to database
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow traffic to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow HTTPS outbound (for AI services, etc.)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow HTTP outbound
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+
+---
+# Database network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgresql-netpol
+  namespace: astralearn
+  labels:
+    app: postgresql
+    security: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: postgresql
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from backend
+  - from:
+    - podSelector:
+        matchLabels:
+          app: astralearn-backend
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow traffic from monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: astralearn-monitoring
+    ports:
+    - protocol: TCP
+      port: 5432
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# Redis network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-netpol
+  namespace: astralearn
+  labels:
+    app: redis
+    security: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from backend
+  - from:
+    - podSelector:
+        matchLabels:
+          app: astralearn-backend
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow traffic from monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: astralearn-monitoring
+    ports:
+    - protocol: TCP
+      port: 6379
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# Monitoring namespace network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-netpol
+  namespace: astralearn-monitoring
+  labels:
+    app: monitoring
+    security: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from ingress
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000  # Grafana
+    - protocol: TCP
+      port: 9090  # Prometheus
+    - protocol: TCP
+      port: 3100  # Loki
+  # Allow inter-monitoring communication
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: astralearn-monitoring
+  egress:
+  # Allow scraping from application namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: astralearn
+  # Allow Kubernetes API access
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# Pod Security Policy for backend
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: astralearn-backend-psp
+  labels:
+    app: astralearn-backend
+    security: pod-security-policy
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+
+---
+# Pod Security Policy for database
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: astralearn-database-psp
+  labels:
+    app: postgresql
+    security: pod-security-policy
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+
+---
+# Pod Security Policy for frontend
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: astralearn-frontend-psp
+  labels:
+    app: astralearn-frontend
+    security: pod-security-policy
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - NET_BIND_SERVICE  # Required for nginx to bind to port 80/443
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+  runAsUser:
+    rule: 'RunAsAny'  # nginx needs to run as specific user
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+
+---
+# Role for using backend PSP
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: astralearn-backend-psp-user
+  namespace: astralearn
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - astralearn-backend-psp
+
+---
+# Role binding for backend PSP
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: astralearn-backend-psp-binding
+  namespace: astralearn
+roleRef:
+  kind: Role
+  name: astralearn-backend-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: astralearn
