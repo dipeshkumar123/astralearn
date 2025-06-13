@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import authRoutes from './auth-test.js';
+import authRoutes from './auth.js';
 import courseRoutes from './courses.js';
 import moduleRoutes from './modules.js';
 // import lessonRoutes from './lessons.js';

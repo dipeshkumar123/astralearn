@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import webSocketService from '../../services/webSocketService.js';
 
 const AuthContext = createContext();
 
@@ -13,12 +14,14 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
+  const [loading, setLoading] = useState(true);  useEffect(() => {
     if (token) {
       // Validate token and get user info
       validateToken();
+      // Only initialize WebSocket connection with real token (not demo token)
+      if (token !== 'demo_token_for_development') {
+        webSocketService.connectWithAuth(token);
+      }
     } else {
       setLoading(false);
     }
@@ -45,23 +48,26 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const login = async (email, password) => {
+  };  const login = async (identifier, password) => {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ identifier, password })
       });
 
       if (response.ok) {
         const data = await response.json();
-        setToken(data.token);
+        setToken(data.tokens.accessToken);
         setUser(data.user);
-        localStorage.setItem('token', data.token);
+        localStorage.setItem('token', data.tokens.accessToken);
+        localStorage.setItem('refreshToken', data.tokens.refreshToken);
+        
+        // Initialize WebSocket connection with authentication
+        webSocketService.connectWithAuth(data.tokens.accessToken);
+        
         return { success: true };
       } else {
         const error = await response.json();
@@ -70,9 +76,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       return { success: false, error: 'Login failed. Please try again.' };
     }
-  };
-
-  const register = async (userData) => {
+  };  const register = async (userData) => {
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
@@ -84,9 +88,14 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         const data = await response.json();
-        setToken(data.token);
+        setToken(data.tokens.accessToken);
         setUser(data.user);
-        localStorage.setItem('token', data.token);
+        localStorage.setItem('token', data.tokens.accessToken);
+        localStorage.setItem('refreshToken', data.tokens.refreshToken);
+        
+        // Initialize WebSocket connection with authentication
+        webSocketService.connectWithAuth(data.tokens.accessToken);
+        
         return { success: true };
       } else {
         const error = await response.json();
@@ -95,20 +104,24 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       return { success: false, error: 'Registration failed. Please try again.' };
     }
-  };
-
-  const logout = () => {
+  };  const logout = () => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    
+    // Disconnect WebSocket on logout
+    webSocketService.disconnect();
   };
-
   const getMockUser = () => ({
     id: 'user_12345',
-    name: 'Demo Student',
+    firstName: 'Demo',
+    lastName: 'Student',
+    username: 'demo_student',
     email: 'demo@astralearn.com',
+    role: 'student',
     learningStyle: 'visual',
-    level: 'intermediate',
+    progress: 45,
     enrolledCourses: ['javascript-fundamentals', 'react-advanced'],
     preferences: {
       learningStyle: 'visual',

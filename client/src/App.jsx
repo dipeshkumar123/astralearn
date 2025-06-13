@@ -171,11 +171,10 @@ function AppContent() {
   return (
     <AIContextProvider>
       <div className="min-h-screen bg-gray-50">
-        {/* User Authentication Status */}
-        {user && (
+        {/* User Authentication Status */}        {user && (
           <div className="bg-blue-600 text-white px-4 py-2 text-sm">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
-              <span>Welcome, {user.name}! {isDemoMode && '(Demo Mode)'}</span>
+              <span>Welcome, {user.firstName} {user.lastName}! {isDemoMode && '(Demo Mode)'}</span>
               <button
                 onClick={logout}
                 className="text-blue-200 hover:text-white underline"

@@ -116,8 +116,12 @@ async function startServer() {
     await dbManager.connect();    // Initialize WebSocket service
     webSocketService.initialize(httpServer);
     
-    // Initialize instructor monitoring WebSocket events (Phase 5 Step 2)
-    webSocketService.initializeInstructorMonitoring();
+    // Initialize instructor monitoring WebSocket events (Phase 5 Step 2) - Temporarily disabled
+    try {
+      webSocketService.initializeInstructorMonitoring();
+    } catch (error) {
+      console.log('⚠️ Instructor monitoring initialization skipped:', error.message);
+    }
 
     // Start server
     const server = httpServer.listen(config.server.port, () => {

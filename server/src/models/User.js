@@ -241,8 +241,8 @@ userSchema.methods.updateLearningStyleFromAssessment = function() {
 };
 
 // Method to generate auth tokens
-userSchema.methods.generateAuthTokens = function() {
-  const JWTManager = require('../utils/jwt.js').default;
+userSchema.methods.generateAuthTokens = async function() {
+  const { default: JWTManager } = await import('../utils/jwt.js');
   const jwtManager = JWTManager.getInstance();
   return jwtManager.generateAuthTokens(this);
 };

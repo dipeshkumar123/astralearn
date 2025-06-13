@@ -22,20 +22,38 @@ class WebSocketService {
     this.eventListeners = new Map();
     this.collaborationSessions = new Map();
     this.userPresence = new Map();
+    this.authToken = null;
+    this.pendingConnection = false;
     
-    this.initialize();
+    // Don't auto-initialize, wait for authentication
   }
 
   /**
-   * Initialize WebSocket connection
+   * Initialize WebSocket connection with authentication
    */
-  initialize() {
+  initialize(authToken = null) {
     try {
       console.log('🔌 Initializing WebSocket Service...');
+      
+      // Store the authentication token
+      this.authToken = authToken || this.getStoredToken();
+      
+      if (!this.authToken) {
+        console.log('⚠️ No authentication token available, WebSocket connection delayed');
+        return;
+      }
+
+      // Disconnect existing connection if any
+      if (this.socket) {
+        this.socket.disconnect();
+      }
       
       const serverUrl = import.meta.env.VITE_WEBSOCKET_URL || 'http://localhost:5000';
       
       this.socket = io(serverUrl, {
+        auth: {
+          token: this.authToken
+        },
         autoConnect: true,
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
@@ -48,6 +66,44 @@ class WebSocketService {
       
     } catch (error) {
       console.error('❌ WebSocket initialization failed:', error);
+    }
+  }
+  /**
+   * Get stored authentication token
+   */
+  getStoredToken() {
+    const token = localStorage.getItem('token');
+    // Don't return demo token for WebSocket authentication
+    if (token === 'demo_token_for_development') {
+      return null;
+    }
+    return token;
+  }
+
+  /**
+   * Connect with authentication token
+   */
+  connectWithAuth(token) {
+    console.log('🔐 Connecting WebSocket with authentication token');
+    this.authToken = token;
+    this.initialize(token);
+  }
+
+  /**
+   * Update authentication token and reconnect if needed
+   */
+  updateAuthToken(token) {
+    if (this.authToken !== token) {
+      console.log('🔄 Updating WebSocket authentication token');
+      this.authToken = token;
+      
+      if (token) {
+        // Reconnect with new token
+        this.initialize(token);
+      } else {
+        // Disconnect if no token
+        this.disconnect();
+      }
     }
   }
 
@@ -67,10 +123,17 @@ class WebSocketService {
       console.log('🔌 WebSocket disconnected:', reason);
       this.isConnected = false;
       this.onDisconnected(reason);
-    });
-
-    this.socket.on('connect_error', (error) => {
-      console.error('❌ WebSocket connection error:', error);
+    });    this.socket.on('connect_error', (error) => {
+      console.error('❌ WebSocket connection error:', error.message);
+      
+      // Handle specific authentication errors
+      if (error.message.includes('Authentication')) {
+        console.log('🔐 WebSocket authentication failed - token may be invalid or expired');
+        // Don't retry connection with bad auth
+        this.authToken = null;
+        localStorage.removeItem('token');
+      }
+      
       this.onConnectionError(error);
     });
 

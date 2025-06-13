@@ -64,22 +64,25 @@ const CourseManagementDashboard = ({ onBackToStatus }) => {
         search: searchTerm,
         ...filters,
         page: 1,
-        limit: 20
-      });      const response = await fetch(`/api/course-management/search?${queryParams}`, {
+        limit: 20      });
+      
+      const response = await fetch(`/api/course-management/search?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || 'demo-token'}`
         }
-      });if (response.ok) {
+      });
+      
+      if (response.ok) {
         const data = await response.json();
         setCourses(data.courses || []);
       } else {
         console.error('Course fetch failed:', response.status, response.statusText);
         // Handle 404 or other errors gracefully
-        if (response.status === 404) {
-          console.log('Course management API not available, using mock data');
+        if (response.status === 404) {          console.log('Course management API not available, using mock data');
           setCourses([]); // Set empty array for now
         }
-      }    } catch (error) {
+      }
+    } catch (error) {
       console.error('Failed to fetch courses:', error);
       // Set fallback mock data for development
       setCourses([

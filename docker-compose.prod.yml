@@ -17,6 +17,9 @@ volumes:
     driver: local
   uploads-data:
     driver: local
+  prometheus-data:
+  loki-data:
+  grafana-data:
 
 services:
   # Database
@@ -240,10 +243,6 @@ services:
     depends_on:
       - prometheus
       - loki
-    security_opt:
-      - no-new-privileges:true
-
-volumes:
   prometheus-data:
   loki-data:
   grafana-data:

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthProvider';
 
-const LoginForm = ({ onClose, switchToRegister }) => {
-  const [formData, setFormData] = useState({
-    email: '',
+const LoginForm = ({ onClose, switchToRegister }) => {  const [formData, setFormData] = useState({
+    identifier: '',
     password: ''
   });
   const [error, setError] = useState('');
@@ -15,7 +14,7 @@ const LoginForm = ({ onClose, switchToRegister }) => {
     setLoading(true);
     setError('');
 
-    const result = await login(formData.email, formData.password);
+    const result = await login(formData.identifier, formData.password);
     
     if (result.success) {
       onClose();
@@ -30,15 +29,16 @@ const LoginForm = ({ onClose, switchToRegister }) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
-    });
-  };
-
-  const handleDemoLogin = () => {
+    });  };
+  const handleDemoLogin = async () => {
     // Use demo credentials for testing
-    setFormData({
-      email: 'demo@astralearn.com',
-      password: 'demo123'
-    });
+    const result = await login('demo@astralearn.com', 'demo123');
+    
+    if (result.success) {
+      onClose();
+    } else {
+      setError('Demo login failed. Please try again.');
+    }
   };
 
   return (
@@ -62,16 +62,15 @@ const LoginForm = ({ onClose, switchToRegister }) => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
+        <form onSubmit={handleSubmit}>          <div className="mb-4">
+            <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-2">
+              Email or Username
             </label>
             <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
+              type="text"
+              id="identifier"
+              name="identifier"
+              value={formData.identifier}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required

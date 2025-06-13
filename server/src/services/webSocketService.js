@@ -88,15 +88,58 @@ class WebSocketService {
           email: user.email,
           role: user.role,
           avatar: user.avatar
-        };
-
-        next();
+        };        next();
       } catch (error) {
         console.error('WebSocket authentication error:', error);
         next(new Error('Authentication failed'));
       }
     });
 
+    // Rate limiting middleware
+    this.io.use((socket, next) => {
+      socket.use((event, next) => {
+        if (this.checkRateLimit(socket.userId, event[0])) {
+          next();
+        } else {
+          next(new Error('Rate limit exceeded'));
+        }
+      });
+      next();
+    });
+  }
+
+  /**
+   * Rate limiting middleware
+   */
+  checkRateLimit(userId, eventType) {
+    const now = Date.now();
+    const userLimits = this.rateLimits.get(userId) || {};
+    const eventLimits = userLimits[eventType] || { count: 0, windowStart: now };
+
+    // Reset window if needed
+    if (now - eventLimits.windowStart > this.rateLimit.window) {
+      eventLimits.count = 0;
+      eventLimits.windowStart = now;
+    }
+
+    // Check if limit exceeded
+    if (eventLimits.count >= this.rateLimit.maxEvents) {
+      console.warn(`⚠️ Rate limit exceeded for user ${userId}, event ${eventType}`);
+      return false;
+    }
+
+    // Increment counter
+    eventLimits.count++;
+    userLimits[eventType] = eventLimits;
+    this.rateLimits.set(userId, userLimits);
+
+    return true;
+  }
+
+  /**
+   * Rate limiting middleware for socket events
+   */
+  setupRateLimitingMiddleware() {
     // Rate limiting middleware
     this.io.use((socket, next) => {
       socket.use((event, next) => {
@@ -1188,16 +1231,111 @@ class WebSocketService {
       }
     }, 5 * 60 * 1000);
   }
+  /**
+   * Utility methods for room and user management
+   */
+  broadcastUserStatus(userId, status) {
+    // Broadcast user status to relevant rooms
+    this.io.emit('user:status_update', {
+      userId,
+      status,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log(`📡 Broadcasting user status: ${userId} is ${status}`);
+  }
+
+  updateUserRoom(userId, roomName) {
+    const userConnection = this.connectedUsers.get(userId);
+    if (userConnection) {
+      userConnection.currentRoom = roomName;
+    }
+  }
+
+  updateUserActivity(userId) {
+    const userConnection = this.connectedUsers.get(userId);
+    if (userConnection) {
+      userConnection.lastActivity = new Date();
+    }
+  }
+
+  getRoomParticipants(roomName) {
+    const participants = [];
+    for (const [userId, connection] of this.connectedUsers.entries()) {
+      if (connection.currentRoom === roomName) {
+        participants.push(connection.user);
+      }
+    }
+    return participants;
+  }
+
+  broadcastToRoom(roomName, eventName, data) {
+    this.io.to(roomName).emit(eventName, {
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  sendToUser(userId, eventName, data) {
+    this.io.to(`user:${userId}`).emit(eventName, {
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  generateId() {
+    return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  sendWhiteboardState(socket, sessionId) {
+    // Send current whiteboard state to the user
+    socket.emit('whiteboard:state', {
+      sessionId,
+      state: { elements: [] }, // Placeholder
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  sendCurrentTypingIndicators(socket, discussionId) {
+    // Send current typing indicators for the discussion
+    socket.emit('discussion:typing_indicators', {
+      discussionId,
+      typingUsers: [], // Placeholder
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  sendRecentSocialActivity(socket, userId) {
+    // Send recent social activity to the user
+    socket.emit('social:recent_activity', {
+      userId,
+      activities: [], // Placeholder
+      timestamp: new Date().toISOString()
+    });
+  }
 
   /**
    * Database operations (integrate with existing services)
-   */
-  async getUserById(userId) {
+   */async getUserById(userId) {
     // Integrate with existing user service
     try {
-      // This would use your existing User model
-      const User = (await import('../models/User.js')).default;
-      return await User.findById(userId).select('name email role avatar');
+      // Import the User model properly
+      const { User } = await import('../models/User.js');
+      const user = await User.findById(userId).select('firstName lastName email role username');
+      
+      if (user) {
+        // Format the user data to match expected structure
+        return {
+          id: user._id.toString(),
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          role: user.role,
+          username: user.username,
+          avatar: user.avatar || null
+        };
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error fetching user:', error);
       return null;

@@ -113,18 +113,23 @@ const CoursePreview = ({
     
     setProgress(newProgress);
   };
-
   const calculateOverallProgress = () => {
+    if (!course || !course.modules || !Array.isArray(course.modules)) {
+      return 0;
+    }
+
     let totalLessons = 0;
     let completedLessons = 0;
 
-    course?.modules?.forEach((module, moduleIndex) => {
-      module.lessons?.forEach((lesson, lessonIndex) => {
-        totalLessons++;
-        if (progress[moduleIndex]?.[lessonIndex]?.completed) {
-          completedLessons++;
-        }
-      });
+    course.modules.forEach((module, moduleIndex) => {
+      if (module && module.lessons && Array.isArray(module.lessons)) {
+        module.lessons.forEach((lesson, lessonIndex) => {
+          totalLessons++;
+          if (progress[moduleIndex]?.[lessonIndex]?.completed) {
+            completedLessons++;
+          }
+        });
+      }
     });
 
     return totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;

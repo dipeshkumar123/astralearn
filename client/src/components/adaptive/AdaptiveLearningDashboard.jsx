@@ -58,25 +58,40 @@ const AdaptiveLearningDashboard = ({ userId, onBackToMain }) => {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`/api/adaptive-learning/learning-path/current?userId=${userId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);if (dashboardResponse.ok) {
-        const dashboardResult = await dashboardResponse.json();
-        setDashboardData(dashboardResult.dashboard);
+          headers: { 'Authorization': `Bearer ${token}` }        })
+      ]);
+        if (dashboardResponse.ok) {
+        try {
+          const dashboardResult = await dashboardResponse.json();
+          setDashboardData(dashboardResult.dashboard);
+        } catch (parseError) {
+          console.error('Failed to parse dashboard response as JSON:', parseError);
+          setDashboardData(null);
+        }
       } else {
         console.error('Dashboard API error:', dashboardResponse.status, dashboardResponse.statusText);
       }
 
       if (recommendationsResponse.ok) {
-        const recommendationsResult = await recommendationsResponse.json();
-        setRecommendations(recommendationsResult.recommendations);
+        try {
+          const recommendationsResult = await recommendationsResponse.json();
+          setRecommendations(recommendationsResult.recommendations);
+        } catch (parseError) {
+          console.error('Failed to parse recommendations response as JSON:', parseError);
+          setRecommendations([]);
+        }
       } else {
         console.error('Recommendations API error:', recommendationsResponse.status);
       }
 
       if (pathResponse.ok) {
-        const pathResult = await pathResponse.json();
-        setLearningPath(pathResult.learningPath);
+        try {
+          const pathResult = await pathResponse.json();
+          setLearningPath(pathResult.learningPath);
+        } catch (parseError) {
+          console.error('Failed to parse learning path response as JSON:', parseError);
+          setLearningPath(null);
+        }
       } else {
         console.error('Learning path API error:', pathResponse.status);
       }
