@@ -12,17 +12,21 @@ import LoginForm from './components/auth/LoginForm'
 import RegisterForm from './components/auth/RegisterForm'
 
 // Main App Content Component
-function AppContent() {
-  const [serverStatus, setServerStatus] = useState('checking');
-  const [serverInfo, setServerInfo] = useState(null);
-  const [currentView, setCurrentView] = useState('status');
+function AppContent() {  const [serverStatus, setServerStatus] = useState('checking');
+  const [serverInfo, setServerInfo] = useState(null);  const [currentView, setCurrentView] = useState('status');
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  const { user, logout, isDemoMode } = useAuth();
-
+  const { user, logout, isAuthenticated, loading, isDemoMode } = useAuth();
   useEffect(() => {
     checkServerStatus();
   }, []);
+
+  // Show login modal if not authenticated and not loading
+  useEffect(() => {
+    if (!loading && !isAuthenticated && !showLogin && !showRegister) {
+      setShowLogin(true);
+    }
+  }, [loading, isAuthenticated, showLogin, showRegister]);
 
   const checkServerStatus = async () => {
     try {
@@ -35,13 +39,61 @@ function AppContent() {
       setServerInfo(null);
     }
   };  const renderCurrentView = () => {
+    // Show loading while authentication is being checked
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading AstraLearn...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // If not authenticated, show authentication prompt
+    if (!isAuthenticated) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="max-w-md mx-auto text-center">
+            <h1 className="text-4xl font-bold text-blue-600 mb-4">
+              🌟 AstraLearn
+            </h1>
+            <p className="text-gray-600 mb-8">
+              Advanced LMS with Context-Aware AI
+            </p>
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <p className="text-gray-700 mb-4">
+                Please sign in to access your personalized learning experience.
+              </p>
+              <div className="space-y-3">
+                <button 
+                  onClick={() => setShowLogin(true)}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Sign In
+                </button>
+                <button 
+                  onClick={() => setShowRegister(true)}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                  Create Account
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Authenticated user views
     switch (currentView) {
       case 'demo':
         return <DemoLearningEnvironment onBackToStatus={() => setCurrentView('status')} />;
       case 'course-management':
         return <CourseManagementDashboard onBackToStatus={() => setCurrentView('status')} />;
       case 'adaptive-learning':
-        return <AdaptiveLearningDashboard userId="demo-user" onBackToMain={() => setCurrentView('status')} />;
+        return <AdaptiveLearningDashboard userId={user.id} onBackToMain={() => setCurrentView('status')} />;
       case 'gamification':
         return <GamificationDashboard onBackToMain={() => setCurrentView('status')} />;
       case 'social-learning':
@@ -97,27 +149,23 @@ function AppContent() {
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                   >
                     Refresh Status
-                  </button>
+                  </button>                  {/* Authentication Buttons */}
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => setShowLogin(true)}
+                      className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                    >
+                      Login
+                    </button>
+                    <button 
+                      onClick={() => setShowRegister(true)}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      Register
+                    </button>
+                  </div>
 
-                  {/* Authentication Buttons */}
-                  {!isDemoMode && (
-                    <div className="flex space-x-2">
-                      <button 
-                        onClick={() => setShowLogin(true)}
-                        className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-                      >
-                        Login
-                      </button>
-                      <button 
-                        onClick={() => setShowRegister(true)}
-                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                      >
-                        Register
-                      </button>
-                    </div>
-                  )}
-
-                  {serverStatus === 'connected' && (
+                  {serverStatus === 'connected' && isAuthenticated && (
                     <>
                       <button 
                         onClick={() => setCurrentView('demo')}

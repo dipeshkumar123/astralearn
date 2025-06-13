@@ -158,9 +158,8 @@ export class AIService {  // Orchestrated Chat - Context-aware conversation
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`,
-        },
-        body: JSON.stringify({
-          message,
+        },        body: JSON.stringify({
+          content: message, // Backend expects 'content' not 'message'
           context: {
             ...context,
             stream: true

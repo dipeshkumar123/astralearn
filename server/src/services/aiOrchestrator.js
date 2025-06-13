@@ -307,9 +307,7 @@ class AIOrchestrator {
       context,
       config
     );
-  }
-
-  /**
+  }  /**
    * Post-process AI responses based on learning style
    */
   async postProcessResponse(response, context, requestType) {
@@ -317,6 +315,12 @@ class AIOrchestrator {
 
     const learningStyle = context.user?.learning_style || 'visual';
     let enhancedResponse = { ...response };
+
+    // First, replace placeholders in the response with actual context data
+    enhancedResponse = this.replacePlaceholdersInResponse(enhancedResponse, context);
+    
+    // Additional safety check: ensure no template placeholders remain
+    enhancedResponse = this.cleanupRemainingPlaceholders(enhancedResponse, context);
 
     // Add learning style specific enhancements
     switch (learningStyle) {
@@ -447,6 +451,136 @@ class AIOrchestrator {
     };
 
     return advice[type] || "Keep practicing and don't hesitate to ask for help when needed.";
+  }
+
+  /**
+   * Replace placeholders in AI response with actual context data
+   */
+  replacePlaceholdersInResponse(response, context) {
+    if (!response.reply) return response;
+
+    let processedReply = response.reply;
+
+    // Create a comprehensive mapping of placeholders to actual values
+    const placeholderMap = {
+      // User context
+      user_name: context.user?.user_name || context.user?.firstName || 'Student',
+      first_name: context.user?.firstName || 'Student',
+      
+      // Course context
+      course_title: context.course?.course_title || context.course?.title || 'your course',
+      course_name: context.course?.course_title || context.course?.title || 'your course',
+      course_category: context.course?.course_category || context.course?.category || 'General',
+      difficulty_level: context.course?.difficulty_level || context.course?.difficulty || 'intermediate',
+      
+      // Lesson context
+      lesson_title: context.lesson?.lesson_title || context.lesson?.title || 'the current lesson',
+      lesson_name: context.lesson?.lesson_title || context.lesson?.title || 'the current lesson',
+      module_title: context.lesson?.module_name || 'the current module',
+      module_name: context.lesson?.module_name || 'the current module',
+      
+      // Key concepts and objectives
+      key_concepts: this.formatArrayForDisplay(context.lesson?.keyTopics || context.lesson?.key_topics) || 'key concepts',
+      lesson_objectives: this.formatObjectivesForDisplay(context.lesson?.objectives || context.lesson?.lesson_objectives) || 'learning objectives',
+      
+      // Progress context
+      completed_lessons: context.progress?.completed_lessons || context.analytics?.completed_lessons || '0',
+      total_lessons: context.course?.total_lessons || 'several',
+      overall_progress: context.progress?.overall_progress || context.analytics?.overall_progress || '0',
+      current_progress: context.progress?.current_progress || context.analytics?.current_progress || '0',
+      
+      // Performance context
+      recent_score: context.analytics?.recent_scores?.[0] || context.analytics?.average_performance || 'N/A',
+      average_score: context.analytics?.average_performance || 'N/A',
+      performance_trend: context.analytics?.performance_trend || 'steady',
+      
+      // Learning style
+      learning_style: context.user?.learning_style || 'visual',
+      
+      // Time and engagement
+      time_spent: context.analytics?.time_spent || 'some time',
+      session_count: context.analytics?.session_count || 'several sessions',
+      
+      // Default fallbacks
+      instructor_name: context.course?.instructor_name || 'your instructor',
+      estimated_duration: context.lesson?.estimated_duration || context.lesson?.estimatedDuration || '30 minutes',
+    };
+
+    // Replace all placeholders in the response
+    for (const [placeholder, value] of Object.entries(placeholderMap)) {
+      const regex = new RegExp(`\\{${placeholder}\\}`, 'gi');
+      processedReply = processedReply.replace(regex, value);
+    }
+
+    // Handle any remaining unreplaced placeholders
+    processedReply = processedReply.replace(/\{[^}]+\}/g, '[information not available]');
+
+    return {
+      ...response,
+      reply: processedReply,
+    };
+  }
+  /**
+   * Clean up any remaining template placeholders that weren't replaced
+   */
+  cleanupRemainingPlaceholders(response, context) {
+    if (!response.reply) return response;
+
+    let cleanedReply = response.reply;
+
+    // More comprehensive placeholder replacements with better fallbacks
+    const fallbackReplacements = {
+      '{course_title}': context.course?.course_title || context.course?.title || 'this course',
+      '{course_name}': context.course?.course_title || context.course?.title || 'this course',
+      '{lesson_title}': context.lesson?.lesson_title || context.lesson?.title || 'this lesson',
+      '{lesson_name}': context.lesson?.lesson_title || context.lesson?.title || 'this lesson',
+      '{user_name}': context.user?.firstName || context.user?.user_name || '',
+      '{first_name}': context.user?.firstName || '',
+      '{learning_style}': context.user?.learning_style || 'visual',
+      '{module_title}': context.lesson?.module_name || 'this module',
+      '{module_name}': context.lesson?.module_name || 'this module',
+      '{key_concepts}': 'the key concepts covered in this lesson',
+      '{lesson_objectives}': 'the learning objectives for this lesson',
+      '{completed_lessons}': context.progress?.completed_lessons || '0',
+      '{total_lessons}': context.course?.total_lessons || 'several',
+      '{overall_progress}': (context.progress?.overall_progress || '0') + '%',
+      '{current_progress}': (context.progress?.current_progress || '0') + '%',
+      '{recent_score}': 'your recent performance',
+      '{average_score}': 'your average performance',
+      '{performance_trend}': 'your learning progress',
+      '{instructor_name}': context.course?.instructor_name || 'your instructor',
+      '{estimated_duration}': context.lesson?.estimated_duration || '30 minutes',
+      '{time_spent}': 'the time you\'ve spent studying',
+      '{session_count}': 'your learning sessions'
+    };
+
+    // Apply fallback replacements
+    for (const [placeholder, fallback] of Object.entries(fallbackReplacements)) {
+      const regex = new RegExp(`\\${placeholder.replace(/[{}]/g, '\\$&')}`, 'gi');
+      cleanedReply = cleanedReply.replace(regex, fallback);
+    }
+
+    // Handle special cases where user name is empty
+    if (!context.user?.firstName) {
+      cleanedReply = cleanedReply.replace(/Hello,\s*!/, 'Hello!');
+      cleanedReply = cleanedReply.replace(/Hi,\s*!/, 'Hi!');
+      cleanedReply = cleanedReply.replace(/,\s*!/, '!');
+    }
+
+    // Remove any remaining unmatched placeholders
+    cleanedReply = cleanedReply.replace(/\{[^}]+\}/g, '');
+
+    // Clean up any double spaces or awkward formatting
+    cleanedReply = cleanedReply.replace(/\s{2,}/g, ' ').trim();
+    
+    // Fix any awkward sentence starts
+    cleanedReply = cleanedReply.replace(/^,\s*/, '');
+    cleanedReply = cleanedReply.replace(/\.\s*,/, '.');
+
+    return {
+      ...response,
+      reply: cleanedReply,
+    };
   }
 
   // Enhanced methods for learning style adaptations

@@ -55,9 +55,7 @@ class AIService {
         timestamp: new Date().toISOString(),
       };
     }
-  }
-
-  /**
+  }  /**
    * Process a context-aware chat message
    */
   async processContextAwareChat(userMessage, context = {}, options = {}) {

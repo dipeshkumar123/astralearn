@@ -26,10 +26,9 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   }, [token]);
-
   const validateToken = async () => {
     try {
-      const response = await fetch('/api/auth/validate', {
+      const response = await fetch('http://localhost:5000/api/auth/validate', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -50,7 +49,7 @@ export const AuthProvider = ({ children }) => {
     }
   };  const login = async (identifier, password) => {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -78,7 +77,7 @@ export const AuthProvider = ({ children }) => {
     }
   };  const register = async (userData) => {
     try {
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -104,7 +103,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       return { success: false, error: 'Registration failed. Please try again.' };
     }
-  };  const logout = () => {
+  };const logout = () => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
@@ -131,16 +130,15 @@ export const AuthProvider = ({ children }) => {
   });
 
   const getDemoToken = () => 'demo_token_for_development';
-
   const value = {
-    user: user || getMockUser(),
-    token: token || getDemoToken(),
+    user: user,
+    token: token,
     loading,
     login,
     register,
     logout,
-    isAuthenticated: !!token || true, // Always true for demo
-    isDemoMode: !token
+    isAuthenticated: !!token && !!user,
+    isDemoMode: false // We'll only use real authentication now
   };
 
   return (
