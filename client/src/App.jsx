@@ -10,6 +10,8 @@ import SocialDashboard from './components/social/SocialDashboard'
 import AuthProvider, { useAuth } from './components/auth/AuthProvider'
 import LoginForm from './components/auth/LoginForm'
 import RegisterForm from './components/auth/RegisterForm'
+import RoleBasedDashboard from './components/dashboard/RoleBasedDashboard'
+import LandingPage from './components/LandingPage'
 
 // Main App Content Component
 function AppContent() {  const [serverStatus, setServerStatus] = useState('checking');
@@ -49,186 +51,108 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
           </div>
         </div>
       );
-    }
-
-    // If not authenticated, show authentication prompt
+    }    // If not authenticated, show landing page with authentication options
     if (!isAuthenticated) {
       return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="max-w-md mx-auto text-center">
-            <h1 className="text-4xl font-bold text-blue-600 mb-4">
-              🌟 AstraLearn
-            </h1>
-            <p className="text-gray-600 mb-8">
-              Advanced LMS with Context-Aware AI
-            </p>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <p className="text-gray-700 mb-4">
-                Please sign in to access your personalized learning experience.
-              </p>
-              <div className="space-y-3">
-                <button 
-                  onClick={() => setShowLogin(true)}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Sign In
-                </button>
-                <button 
-                  onClick={() => setShowRegister(true)}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                >
-                  Create Account
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <LandingPage 
+          onShowLogin={() => setShowLogin(true)}
+          onShowRegister={() => setShowRegister(true)}
+        />
       );
-    }
-
-    // Authenticated user views
+    }    // Authenticated user views
     switch (currentView) {
       case 'demo':
-        return <DemoLearningEnvironment onBackToStatus={() => setCurrentView('status')} />;
+        return <DemoLearningEnvironment onBackToStatus={() => setCurrentView('dashboard')} />;
       case 'course-management':
-        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('status')} />;
+        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;
       case 'adaptive-learning':
-        return <AdaptiveLearningDashboard userId={user.id} onBackToMain={() => setCurrentView('status')} />;
+        return <AdaptiveLearningDashboard userId={user.id} onBackToMain={() => setCurrentView('dashboard')} />;
       case 'gamification':
-        return <GamificationDashboard onBackToMain={() => setCurrentView('status')} />;
+        return <GamificationDashboard onBackToMain={() => setCurrentView('dashboard')} />;
       case 'social-learning':
-        return <SocialDashboard onBackToMain={() => setCurrentView('status')} />;
+        return <SocialDashboard onBackToMain={() => setCurrentView('dashboard')} />;
+      case 'dashboard':
       default:
-        return (
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="max-w-md mx-auto text-center">
-              <h1 className="text-4xl font-bold text-blue-600 mb-4">
-                🌟 AstraLearn
-              </h1>
-              <p className="text-gray-600 mb-8">
-                Advanced LMS with Context-Aware AI
-              </p>
-              
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                <h2 className="text-xl font-semibold mb-4">Development Server</h2>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Server Status:</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      serverStatus === 'connected' ? 'bg-green-100 text-green-800' :
-                      serverStatus === 'disconnected' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {serverStatus === 'connected' ? '🟢 Connected' :
-                       serverStatus === 'disconnected' ? '🔴 Disconnected' :
-                       '🟡 Checking...'}
-                    </span>
-                  </div>
-                  
-                  {serverInfo && (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Database:</span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          serverInfo.database === 'Connected' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {serverInfo.database}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Environment:</span>
-                        <span className="text-gray-800 font-medium">{serverInfo.environment}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                  <div className="space-y-3 mt-6">
-                  <button 
-                    onClick={checkServerStatus}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    Refresh Status
-                  </button>                  {/* Authentication Buttons */}
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => setShowLogin(true)}
-                      className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-                    >
-                      Login
-                    </button>
-                    <button 
-                      onClick={() => setShowRegister(true)}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                    >
-                      Register
-                    </button>
-                  </div>
-
-                  {serverStatus === 'connected' && isAuthenticated && (
-                    <>
-                      <button 
-                        onClick={() => setCurrentView('demo')}
-                        className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-md hover:from-purple-700 hover:to-blue-700 transition-all"
-                      >
-                        🚀 Try AI Assistant Demo
-                      </button>
-                      <button 
-                        onClick={() => setCurrentView('course-management')}
-                        className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-md hover:from-green-700 hover:to-teal-700 transition-all"
-                      >
-                        📚 Course Management Dashboard
-                      </button>
-                        <button 
-                        onClick={() => setCurrentView('adaptive-learning')}
-                        className="w-full px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-md hover:from-orange-700 hover:to-red-700 transition-all"
-                      >
-                        🧠 Adaptive Learning Dashboard
-                      </button>
-                      
-                      <button 
-                        onClick={() => setCurrentView('gamification')}
-                        className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 transition-all"
-                      >
-                        🎮 Gamification Dashboard
-                      </button>
-                      
-                      <button 
-                        onClick={() => setCurrentView('social-learning')}
-                        className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-md hover:from-blue-700 hover:to-cyan-700 transition-all"
-                      >
-                        🤝 Social Learning Hub
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>              <div className="mt-8 text-sm text-gray-500">
-                <p>Phase 4 Step 3: Gamification & Social Learning</p>
-                <p>✅ User Profile Management</p>
-                <p>✅ AI Orchestration Layer</p>
-                <p>✅ Frontend AI Interface</p>
-                <p>✅ Course Management System</p>
-                <p>✅ Adaptive Learning & Assessment</p>
-                <p>✅ Real-time Integration System</p>
-                <p>🔄 Gamification & Achievement System</p>
-              </div></div>
-          </div>
-        );
+        return <RoleBasedDashboard />;
     }
-  };
-  return (
+  };  return (
     <AIContextProvider>
       <div className="min-h-screen bg-gray-50">
-        {/* User Authentication Status */}        {user && (
-          <div className="bg-blue-600 text-white px-4 py-2 text-sm">
-            <div className="max-w-7xl mx-auto flex justify-between items-center">
-              <span>Welcome, {user.firstName} {user.lastName}! {isDemoMode && '(Demo Mode)'}</span>
-              <button
-                onClick={logout}
-                className="text-blue-200 hover:text-white underline"
-              >
-                Logout
-              </button>
+        {/* User Authentication Status */}
+        {user && (
+          <div className="bg-white border-b border-gray-200 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16">
+                <div className="flex items-center space-x-8">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xl font-bold text-blue-600">🌟 AstraLearn</span>
+                  </div>
+                  
+                  {/* Navigation for specific views */}
+                  {currentView !== 'dashboard' && (
+                    <nav className="hidden md:flex space-x-6">
+                      <button
+                        onClick={() => setCurrentView('dashboard')}
+                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                      >
+                        Dashboard
+                      </button>
+                      <button
+                        onClick={() => setCurrentView('demo')}
+                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                      >
+                        AI Demo
+                      </button>
+                      {(user.role === 'instructor' || user.role === 'admin') && (
+                        <button
+                          onClick={() => setCurrentView('course-management')}
+                          className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                        >
+                          Course Management
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setCurrentView('adaptive-learning')}
+                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                      >
+                        Adaptive Learning
+                      </button>
+                      <button
+                        onClick={() => setCurrentView('gamification')}
+                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                      >
+                        Gamification
+                      </button>
+                      <button
+                        onClick={() => setCurrentView('social-learning')}
+                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                      >
+                        Social Learning
+                      </button>
+                    </nav>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-700">
+                    Welcome, {user.firstName} {user.lastName}
+                    <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                      {user.role}
+                    </span>
+                    {isDemoMode && (
+                      <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                        Demo
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    onClick={logout}
+                    className="text-gray-600 hover:text-gray-900 text-sm font-medium"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -256,8 +180,8 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
           />
         )}
         
-        {/* AI Assistant - Always available */}
-        <AIAssistant />
+        {/* AI Assistant - Always available for authenticated users */}
+        {isAuthenticated && <AIAssistant />}
       </div>
     </AIContextProvider>
   )
