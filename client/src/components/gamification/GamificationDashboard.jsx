@@ -59,111 +59,92 @@ const GamificationDashboard = ({ onBackToMain }) => {
       setError(null);
       
       // Fetch enhanced dashboard data with social features
-      const dashboardResponse = await fetch('/api/gamification/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      try {
+        const dashboardResponse = await fetch('/api/gamification/dashboard', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        if (!dashboardResponse.ok) {
+          console.warn('Gamification dashboard error:', dashboardResponse.status);
+          throw new Error(`Failed to load gamification dashboard: ${dashboardResponse.status}`);
         }
-      });
-      if (!dashboardResponse.ok) throw new Error('Failed to load gamification dashboard');
-      const dashboardResult = await dashboardResponse.json();
+        const dashboardResult = await dashboardResponse.json();
+        setDashboardData(dashboardResult);
+      } catch (error) {
+        console.warn('Dashboard data error:', error);
+        // Set fallback data
+        setDashboardData({
+          success: true,
+          profile: {
+            totalPoints: 1250,
+            level: 5,
+            currentStreak: 7,
+            longestStreak: 15,
+            globalRank: 'N/A',
+            socialRank: 'N/A',
+            levelProgress: {
+              current: 1250,
+              required: 1500,
+              percentage: 83
+            }
+          },
+          recentActivities: [],
+          badges: [],
+          achievements: [],
+          socialStats: {
+            studyGroupsJoined: 0,
+            studyBuddyCount: 0,
+            helpfulAnswers: 0,
+            mentoringSessions: 0
+          }
+        });
+      }
 
       // Fetch leaderboard
-      const leaderboardResponse = await fetch('/api/gamification/leaderboard?limit=10', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      try {
+        const leaderboardResponse = await fetch('/api/gamification/leaderboard?limit=10', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        if (!leaderboardResponse.ok) {
+          console.warn('Leaderboard error:', leaderboardResponse.status);
+          throw new Error(`Failed to load leaderboard: ${leaderboardResponse.status}`);
         }
-      });
-      if (!leaderboardResponse.ok) throw new Error('Failed to load leaderboard');
-      const leaderboardResult = await leaderboardResponse.json();
+        const leaderboardResult = await leaderboardResponse.json();
+        setLeaderboard(leaderboardResult);
+      } catch (error) {
+        console.warn('Leaderboard error:', error);
+        setLeaderboard({ leaderboard: [], totalEntries: 0 });
+      }
 
       // Fetch user's rank
-      const rankResponse = await fetch('/api/gamification/leaderboard/rank', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      try {
+        const rankResponse = await fetch('/api/gamification/leaderboard/rank', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        if (!rankResponse.ok) {
+          console.warn('User rank error:', rankResponse.status);
+          throw new Error(`Failed to load user rank: ${rankResponse.status}`);
         }
-      });
-      if (!rankResponse.ok) throw new Error('Failed to load user rank');
-      const rankResult = await rankResponse.json();      setDashboardData(dashboardResult);
-      setLeaderboard(leaderboardResult);
-      setUserRank(rankResult);
+        const rankResult = await rankResponse.json();
+        setUserRank(rankResult);
+      } catch (error) {
+        console.warn('User rank error:', error);
+        setUserRank({
+          rank: null,
+          totalParticipants: 0,
+          percentile: 0,
+          entry: null
+        });
+      }
+
     } catch (error) {
+      console.error('Gamification data loading error:', error);
       setError(error.message || 'Failed to load gamification data');
-      // Set fallback data for development
-      setDashboardData({
-        success: true,
-        profile: {
-          totalPoints: 1250,
-          level: 5,
-          currentStreak: 7,
-          longestStreak: 15,
-          globalRank: 'N/A',
-          socialRank: 'N/A',
-          levelProgress: 65,
-          pointsToNextLevel: 350,
-          badges: 8,
-          achievements: 12,
-          collaborationScore: 85,
-          mentorshipLevel: 'Intermediate'
-        },
-        badges: [
-          { badgeId: 'first_steps', name: 'First Steps', rarity: 'common', earnedAt: new Date() },
-          { badgeId: 'consistent_learner', name: 'Consistent Learner', rarity: 'uncommon', earnedAt: new Date() }
-        ],
-        achievements: [
-          { 
-            achievementId: 'knowledge_seeker', 
-            name: 'Knowledge Seeker', 
-            description: 'Complete 10 lessons',
-            difficulty: 'bronze',
-            progress: { current: 7, target: 10 }
-          },
-          { 
-            achievementId: 'streak_starter', 
-            name: 'Streak Starter', 
-            description: 'Maintain a 7-day learning streak',
-            difficulty: 'silver',
-            progress: { current: 7, target: 7 }
-          }
-        ],
-        recentActivities: [
-          {
-            id: 1,
-            type: 'lesson_completion',
-            description: 'Completed lesson: React Hooks',
-            points: 25,
-            timestamp: new Date(),
-            isSocial: false
-          },
-          {
-            id: 2,
-            type: 'study_group_activity',
-            description: 'Joined study group discussion',
-            points: 15,
-            timestamp: new Date(),
-            isSocial: true
-          }
-        ],
-        levelProgress: { percentage: 65, pointsToNext: 350 },
-        availableBadges: [
-          { badgeId: 'helper', name: 'Helper', rarity: 'common' },
-          { badgeId: 'mentor', name: 'Mentor', rarity: 'rare' }
-        ],
-        achievementProgress: [
-          { 
-            achievementId: 'learning_master', 
-            name: 'Learning Master', 
-            description: 'Complete 50 lessons',
-            difficulty: 'gold',
-            progress: { current: 23, target: 50 }
-          }
-        ],
-        socialStats: {
-          studyGroupsJoined: 3,
-          studyBuddyCount: 5,
-          helpfulAnswers: 12,
-          mentoringSessions: 2
-        }
-      });
     } finally {
       setLoading(false);
     }

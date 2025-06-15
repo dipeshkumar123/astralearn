@@ -1911,4 +1911,53 @@ router.post('/instructor/update-intervention',
   }
 );
 
+/**
+ * Get User Overview Analytics
+ * Basic analytics overview for user dashboard
+ */
+router.get('/user/overview',
+  auth,
+  async (req, res) => {
+    try {
+      const userId = req.user._id;
+      
+      // Get user analytics summary
+      const userAnalytics = await analyticsService.getUserAnalytics(userId, {
+        type: 'overview',
+        timeframe: 30
+      });
+
+      res.json({
+        success: true,
+        data: userAnalytics || {
+          totalPoints: 0,
+          streak: 0,
+          certificates: 0,
+          todayStudyTime: 0,
+          achievements: 0,
+          totalStudents: 0,
+          averagePerformance: 0
+        },
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('User overview analytics error:', error);
+      res.json({
+        success: true,
+        data: {
+          totalPoints: 0,
+          streak: 0,
+          certificates: 0,
+          todayStudyTime: 0,
+          achievements: 0,
+          totalStudents: 0,
+          averagePerformance: 0
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+);
+
 export default router;

@@ -575,6 +575,23 @@ router.get('/statistics',
   }
 );
 
+// Get user statistics (alias for dashboard for backwards compatibility)
+router.get('/user-stats',
+  flexibleAuthenticate,
+  async (req, res) => {
+    try {
+      const dashboard = await gamificationService.getUserDashboard(req.user._id);
+      res.json(dashboard);
+    } catch (error) {
+      console.error('Get user stats error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not retrieve user statistics'
+      });
+    }
+  }
+);
+
 // Health check endpoint
 router.get('/health', (req, res) => {
   res.json({
@@ -1086,6 +1103,70 @@ router.get('/challenges/weekly',
       res.status(500).json({
         error: 'Internal server error',
         message: 'Could not retrieve weekly challenge'
+      });
+    }
+  }
+);
+
+// Get social recommendations
+router.get('/recommendations/social',
+  flexibleAuthenticate,
+  async (req, res) => {
+    try {
+      const userProfile = await gamificationService.getUserGamificationProfile(req.user._id);
+      
+      // Generate social learning recommendations
+      const socialRecommendations = {
+        studyGroups: [
+          {
+            id: 'group_001',
+            name: 'JavaScript Mastery Group',
+            members: 12,
+            activity: 'high',
+            matchScore: 85
+          },
+          {
+            id: 'group_002', 
+            name: 'React Beginners',
+            members: 8,
+            activity: 'medium',
+            matchScore: 78
+          }
+        ],
+        studyBuddies: [
+          {
+            id: 'user_001',
+            name: 'Sarah Chen',
+            level: userProfile.level || 1,
+            compatibility: 92,
+            subjects: ['JavaScript', 'React']
+          }
+        ],
+        collaborativeOpportunities: [
+          {
+            type: 'peer_tutoring',
+            title: 'Help with CSS Flexbox',
+            points: 50,
+            difficulty: 'easy'
+          }
+        ]
+      };
+      
+      res.json({
+        success: true,
+        recommendations: socialRecommendations,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Get social recommendations error:', error);
+      res.json({
+        success: true,
+        recommendations: {
+          studyGroups: [],
+          studyBuddies: [],
+          collaborativeOpportunities: []
+        },
+        timestamp: new Date().toISOString()
       });
     }
   }

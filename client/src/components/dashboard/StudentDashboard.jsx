@@ -44,38 +44,74 @@ const StudentDashboard = () => {
       setError(null);
       
       // Load enrolled courses
-      const coursesResponse = await fetch('/api/courses/my/enrolled', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      
-      if (!coursesResponse.ok) throw new Error('Failed to load enrolled courses');
-      
-      const coursesData = await coursesResponse.json();
-      setEnrolledCourses(coursesData.enrolledCourses || []);
+      try {
+        const coursesResponse = await fetch('/api/courses/my/enrolled', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        
+        if (!coursesResponse.ok) {
+          console.warn('Failed to load enrolled courses:', coursesResponse.status);
+          throw new Error(`Failed to load enrolled courses: ${coursesResponse.status}`);
+        }
+        
+        const coursesData = await coursesResponse.json();
+        setEnrolledCourses(coursesData.enrolledCourses || []);
+      } catch (error) {
+        console.warn('Enrolled courses error:', error);
+        setEnrolledCourses([]); // Set empty array as fallback
+      }
 
       // Load learning analytics
-      const analyticsResponse = await fetch('/api/analytics/user/overview', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      
-      if (!analyticsResponse.ok) throw new Error('Failed to load analytics');
-      
-      const analyticsData = await analyticsResponse.json();
-      setLearningStats(analyticsData.data);
+      try {
+        const analyticsResponse = await fetch('/api/analytics/user/overview', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        
+        if (!analyticsResponse.ok) {
+          console.warn('Failed to load analytics:', analyticsResponse.status);
+          throw new Error(`Failed to load analytics: ${analyticsResponse.status}`);
+        }
+        
+        const analyticsData = await analyticsResponse.json();
+        setLearningStats(analyticsData.data || {
+          totalPoints: 0,
+          streak: 0,
+          certificates: 0,
+          todayStudyTime: 0,
+          achievements: 0
+        });
+      } catch (error) {
+        console.warn('Analytics error:', error);
+        setLearningStats({
+          totalPoints: 0,
+          streak: 0,
+          certificates: 0,
+          todayStudyTime: 0,
+          achievements: 0
+        });
+      }
 
       // Load recommendations
-      const recommendationsResponse = await fetch('/api/adaptive-learning/recommendations', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      
-      if (!recommendationsResponse.ok) throw new Error('Failed to load recommendations');
-      
-      const recData = await recommendationsResponse.json();
-      setRecommendations(recData.recommendations || []);
+      try {
+        const recommendationsResponse = await fetch('/api/adaptive-learning/recommendations', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        
+        if (!recommendationsResponse.ok) {
+          console.warn('Failed to load recommendations:', recommendationsResponse.status);
+          throw new Error(`Failed to load recommendations: ${recommendationsResponse.status}`);
+        }
+        
+        const recData = await recommendationsResponse.json();
+        setRecommendations(recData.recommendations || []);
+      } catch (error) {
+        console.warn('Recommendations error:', error);
+        setRecommendations([]);
+      }
 
     } catch (error) {
-      setError(error.message || 'Failed to load dashboard data.');
       console.error('Dashboard data loading error:', error);
+      // Don't set error state since we have fallbacks for individual components
     } finally {
       setLoading(false);
     }

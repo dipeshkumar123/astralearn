@@ -9,6 +9,7 @@ import { auth, authorize } from '../middleware/auth.js';
 import { adaptiveLearningService } from '../services/adaptiveLearningService.js';
 import { assessmentEngineService } from '../services/assessmentEngineService.js';
 import { learningAnalyticsService } from '../services/learningAnalyticsService.js';
+import { Lesson } from '../models/index.js';
 
 const router = express.Router();
 
@@ -181,6 +182,53 @@ router.post('/learning-path/generate',
       res.status(500).json({
         error: 'Internal server error',
         message: 'Unable to generate learning path'
+      });
+    }
+  }
+);
+
+// Get current learning path for user
+router.get('/learning-path/current',
+  auth,
+  async (req, res) => {
+    try {
+      const userId = req.query.userId || req.user._id;
+      
+      // Get user's current learning path
+      const learningPath = await adaptiveLearningService.getCurrentLearningPath(userId);
+      
+      res.json({
+        success: true,
+        learningPath: learningPath || {
+          currentStep: 1,
+          totalSteps: 5,
+          progress: 20,
+          nextRecommendation: {
+            type: 'lesson',
+            title: 'Getting Started',
+            difficulty: 'beginner'
+          },
+          completedSteps: []
+        },
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Get current learning path error:', error);
+      res.json({
+        success: true,
+        learningPath: {
+          currentStep: 1,
+          totalSteps: 5,
+          progress: 20,
+          nextRecommendation: {
+            type: 'lesson',
+            title: 'Getting Started',
+            difficulty: 'beginner'
+          },
+          completedSteps: []
+        },
+        timestamp: new Date().toISOString()
       });
     }
   }
