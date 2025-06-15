@@ -20,31 +20,34 @@ const MessageBubble = ({ message }) => {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
   };
-
   const renderContent = () => {
     if (type === 'error') {
       return (
         <div className="flex items-start space-x-2">
           <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-red-700">{content}</p>
+            <p className="text-red-700">{content || 'An error occurred'}</p>
             {error && (
               <p className="text-xs text-red-500 mt-1 opacity-75">{error}</p>
             )}
           </div>
         </div>
       );
-    }
+    }    // Handle undefined or null content
+    const safeContent = content || '';
 
     return (
       <div className="space-y-3">
         {/* Main content */}
         <div className="prose prose-sm max-w-none">
-          {content.split('\n').map((line, index) => (
+          {safeContent && typeof safeContent === 'string' && safeContent.split('\n').map((line, index) => (
             <p key={index} className="mb-2 last:mb-0">
               {line}
             </p>
           ))}
+          {!safeContent && (
+            <p className="text-gray-500 italic">No content available</p>
+          )}
         </div>
 
         {/* Streaming indicator */}

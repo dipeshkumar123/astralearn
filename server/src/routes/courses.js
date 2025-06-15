@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Course, User, UserProgress } from '../models/index.js';
 import { auth, authorize } from '../middleware/auth.js';
+import { flexibleAuthenticate, flexibleAuthorize } from '../middleware/devAuth.js';
 
 const router = Router();
 
@@ -252,7 +253,7 @@ router.post('/:id/enroll', auth, async (req, res) => {
 });
 
 // Get user's enrolled courses
-router.get('/my/enrolled', auth, async (req, res) => {
+router.get('/my/enrolled', flexibleAuthenticate, async (req, res) => {
   try {
     const userProgress = await UserProgress.find({ userId: req.user?._id })
       .populate({
@@ -277,17 +278,34 @@ router.get('/my/enrolled', auth, async (req, res) => {
 });
 
 // Get instructor's courses
-router.get('/instructor', auth, authorize(['instructor', 'admin']), async (req, res) => {
+router.get('/instructor', flexibleAuthenticate, flexibleAuthorize(['instructor', 'admin']), async (req, res) => {
   try {
     const courses = await Course.find({ 
-      instructor: req.user._id 
-    })
+      instructor: req.user._id    })
     .populate('instructor', 'firstName lastName email')
     .sort({ createdAt: -1 });
 
     res.json(courses);
   } catch (error) {
     console.error('Get instructor courses error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Get courses by instructor ID
+router.get('/instructor/:instructorId', flexibleAuthenticate, async (req, res) => {
+  try {
+    const { instructorId } = req.params;
+    
+    const courses = await Course.find({ 
+      instructor: instructorId 
+    })
+    .populate('instructor', 'firstName lastName email')
+    .sort({ createdAt: -1 });
+
+    res.json(courses);
+  } catch (error) {
+    console.error('Get instructor courses by ID error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

@@ -6,6 +6,7 @@
 import express from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { auth, authorize } from '../middleware/auth.js';
+import { flexibleAuthenticate, flexibleAuthorize } from '../middleware/devAuth.js';
 import { adaptiveLearningService } from '../services/adaptiveLearningService.js';
 import { assessmentEngineService } from '../services/assessmentEngineService.js';
 import { learningAnalyticsService } from '../services/learningAnalyticsService.js';
@@ -189,7 +190,7 @@ router.post('/learning-path/generate',
 
 // Get current learning path for user
 router.get('/learning-path/current',
-  auth,
+  flexibleAuthenticate,
   async (req, res) => {
     try {
       const userId = req.query.userId || req.user._id;

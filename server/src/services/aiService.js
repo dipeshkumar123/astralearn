@@ -192,23 +192,54 @@ class AIService {
       options
     );
   }
-
   /**
    * Generate a fallback response when AI services fail
    */
   generateFallbackResponse(userMessage, context = {}) {
     const courseName = context.course?.course_title || 'your course';
     const lessonName = context.lesson?.lesson_title || 'this lesson';
+    const userName = context.user?.user_name || 'there';
     
-    const fallbackResponses = [
-      `I apologize, but I'm temporarily unable to process your question about ${lessonName}. Please try again in a moment, or refer to the course materials for ${courseName}.`,
+    // Analyze the user message to provide contextual responses
+    const messageWords = userMessage.toLowerCase().split(' ');
+    
+    // Programming-related keywords
+    if (messageWords.some(word => ['code', 'programming', 'function', 'variable', 'loop', 'array', 'object'].includes(word))) {
+      return `Hi ${userName}! I'd be happy to help with your programming question about ${lessonName}. While I'm temporarily unable to provide detailed code assistance, I recommend checking the course materials for ${courseName} or trying the interactive code examples. You can also reach out to your instructor for personalized help.`;
+    }
+    
+    // React-related keywords
+    if (messageWords.some(word => ['react', 'component', 'jsx', 'props', 'state', 'hook'].includes(word))) {
+      return `Great question about React! While my AI capabilities are temporarily limited, for React-specific help with ${lessonName}, I suggest reviewing the React documentation or checking the ${courseName} code examples. The React community is also very helpful on forums like Stack Overflow.`;
+    }
+    
+    // JavaScript-related keywords
+    if (messageWords.some(word => ['javascript', 'js', 'promise', 'async', 'await', 'closure'].includes(word))) {
+      return `JavaScript questions are always interesting! For ${lessonName}, you might find helpful resources in the ${courseName} materials. MDN Web Docs is also an excellent reference for JavaScript concepts. Feel free to ask your instructor for clarification on specific topics.`;
+    }
+    
+    // General learning questions
+    if (messageWords.some(word => ['how', 'what', 'why', 'explain', 'help', 'understand'].includes(word))) {
+      return `I understand you're looking for help with ${lessonName}. While I'm experiencing some technical difficulties, here are some suggestions: 1) Review the course materials for ${courseName}, 2) Check any provided examples or exercises, 3) Join study groups or discussion forums, 4) Reach out to your instructor for clarification. Learning is a journey, and asking questions shows you're engaged!`;
+    }
+    
+    // Error or debugging help
+    if (messageWords.some(word => ['error', 'bug', 'debug', 'fix', 'problem', 'issue'].includes(word))) {
+      return `Debugging can be challenging! While I can't analyze your specific issue right now, here's a general approach: 1) Read the error message carefully, 2) Check your syntax and variable names, 3) Use console.log to trace your code execution, 4) Break down the problem into smaller parts. The ${courseName} materials might have similar examples that could help.`;
+    }
+    
+    // Default responses with variety
+    const generalResponses = [
+      `Hello ${userName}! I'm temporarily experiencing some technical difficulties, but I'm here to help you with ${lessonName}. Please try asking your question again in a moment, or check the ${courseName} resources for immediate assistance.`,
       
-      `The AI service is currently unavailable. In the meantime, you might find helpful information in the ${courseName} resources or consider reaching out to your instructor.`,
+      `Thanks for your question about ${lessonName}! While my AI services are currently limited, you can find great information in the ${courseName} materials. I'll be back to full functionality soon to provide more personalized help.`,
       
-      `I'm experiencing technical difficulties right now. For immediate help with ${lessonName}, please check the course documentation or discussion forums.`,
+      `I appreciate your patience! My AI capabilities are temporarily reduced, but don't let that stop your learning in ${courseName}. Check out the lesson materials, practice exercises, or connect with fellow students for support.`,
+      
+      `Great to see you're engaged with ${lessonName}! While I'm having some technical issues, the ${courseName} has excellent resources to help you. Consider reviewing the documentation or reaching out to your instructor for detailed guidance.`
     ];
 
-    return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+    return generalResponses[Math.floor(Math.random() * generalResponses.length)];
   }
 
   /**

@@ -16,7 +16,7 @@ import socialLearningService from '../services/socialLearningService.js';
 import discussionForumService from '../services/discussionForumService.js';
 import collaborationService from '../services/collaborationService.js';
 import gamificationService from '../services/gamificationService.js';
-import { flexibleAuthenticate, flexibleAuthorize } from '../middleware/authMiddleware.js';
+import { flexibleAuthenticate, flexibleAuthorize } from '../middleware/devAuth.js';
 
 const router = express.Router();
 

@@ -9,6 +9,7 @@ import courseManagementRoutes from './courseManagement.js';
 import adaptiveLearningRoutes from './adaptiveLearning.js';
 import gamificationRoutes from './gamification.js';
 import analyticsRoutes from './analytics.js';
+import socialLearningRoutes from './socialLearning.js';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.use('/course-management', courseManagementRoutes);
 router.use('/adaptive-learning', adaptiveLearningRoutes);
 router.use('/gamification', gamificationRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/social-learning', socialLearningRoutes);
 
 // Health check for API routes
 router.get('/health', (req, res) => {
@@ -39,6 +41,7 @@ router.get('/health', (req, res) => {
       adaptiveLearning: '/api/adaptive-learning',
       gamification: '/api/gamification',
       analytics: '/api/analytics',
+      socialLearning: '/api/social-learning',
     },
   });
 });

@@ -13,6 +13,7 @@
 import express from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { auth, authorize } from '../middleware/auth.js';
+import { flexibleAuthenticate, flexibleAuthorize } from '../middleware/devAuth.js';
 import analyticsService from '../services/analyticsService.js';
 // Phase 5 Step 2 - Instructor Tools Services
 import instructorAnalyticsService from '../services/instructorAnalyticsService.js';
@@ -1346,8 +1347,8 @@ router.get('/instructor/comparative-analytics/:courseId',
  * Comprehensive instructor dashboard data
  */
 router.get('/instructor/dashboard-overview',
-  auth,
-  authorize(['instructor', 'admin']),
+  flexibleAuthenticate,
+  flexibleAuthorize(['instructor', 'admin']),
   async (req, res) => {
     try {
       const instructorId = req.user._id;
@@ -1916,7 +1917,7 @@ router.post('/instructor/update-intervention',
  * Basic analytics overview for user dashboard
  */
 router.get('/user/overview',
-  auth,
+  flexibleAuthenticate,
   async (req, res) => {
     try {
       const userId = req.user._id;
