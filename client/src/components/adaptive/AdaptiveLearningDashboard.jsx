@@ -33,11 +33,11 @@ import {
 import InteractiveAssessment from './InteractiveAssessment';
 import LearningAnalyticsDashboard from './LearningAnalyticsDashboard';
 
-const AdaptiveLearningDashboard = ({ userId, onBackToMain }) => {
-  const [dashboardData, setDashboardData] = useState(null);
+const AdaptiveLearningDashboard = ({ userId, onBackToMain }) => {  const [dashboardData, setDashboardData] = useState(null);
   const [learningPath, setLearningPath] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
-  const [loading, setLoading] = useState(true);  const [activeView, setActiveView] = useState('dashboard'); // dashboard, assessment, analytics, learning-path
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);const [activeView, setActiveView] = useState('dashboard'); // dashboard, assessment, analytics, learning-path
   const [activeTab, setActiveTab] = useState('overview'); // Add missing activeTab state
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -45,9 +45,10 @@ const AdaptiveLearningDashboard = ({ userId, onBackToMain }) => {
 
   useEffect(() => {
     loadDashboardData();
-  }, [userId]);
-  const loadDashboardData = async () => {
-    setLoading(true);    try {
+  }, [userId]);  const loadDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
       // Load all dashboard data in parallel  
       const token = localStorage.getItem('token') || 'demo-token';
       const [dashboardResponse, recommendationsResponse, pathResponse] = await Promise.all([
@@ -58,45 +59,33 @@ const AdaptiveLearningDashboard = ({ userId, onBackToMain }) => {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`/api/adaptive-learning/learning-path/current?userId=${userId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }        })
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
       ]);
-        if (dashboardResponse.ok) {
-        try {
-          const dashboardResult = await dashboardResponse.json();
-          setDashboardData(dashboardResult.dashboard);
-        } catch (parseError) {
-          console.error('Failed to parse dashboard response as JSON:', parseError);
-          setDashboardData(null);
-        }
+
+      if (dashboardResponse.ok) {
+        const dashboardResult = await dashboardResponse.json();
+        setDashboardData(dashboardResult.dashboard);
       } else {
-        console.error('Dashboard API error:', dashboardResponse.status, dashboardResponse.statusText);
+        throw new Error(`Dashboard API error: ${dashboardResponse.status}`);
       }
 
       if (recommendationsResponse.ok) {
-        try {
-          const recommendationsResult = await recommendationsResponse.json();
-          setRecommendations(recommendationsResult.recommendations);
-        } catch (parseError) {
-          console.error('Failed to parse recommendations response as JSON:', parseError);
-          setRecommendations([]);
-        }
+        const recommendationsResult = await recommendationsResponse.json();
+        setRecommendations(recommendationsResult.recommendations || []);
       } else {
-        console.error('Recommendations API error:', recommendationsResponse.status);
-      }
-
-      if (pathResponse.ok) {
-        try {
-          const pathResult = await pathResponse.json();
-          setLearningPath(pathResult.learningPath);
-        } catch (parseError) {
-          console.error('Failed to parse learning path response as JSON:', parseError);
-          setLearningPath(null);
-        }
+        console.warn('Failed to load recommendations:', recommendationsResponse.status);
+        // Non-critical, don't throw error
+      }      if (pathResponse.ok) {
+        const pathResult = await pathResponse.json();
+        setLearningPath(pathResult.learningPath);
       } else {
-        console.error('Learning path API error:', pathResponse.status);
+        console.warn('Failed to load learning path:', pathResponse.status);
+        // Non-critical, don't throw error
       }
     } catch (error) {
       console.error('Dashboard loading error:', error);
+      setError(error.message || 'Failed to load dashboard data');
       // Set mock data for development
       setDashboardData({
         overview: {
@@ -375,9 +364,29 @@ const AdaptiveLearningDashboard = ({ userId, onBackToMain }) => {
       </div>
     </div>
   );
-
   if (loading) {
     return renderLoadingState();
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Adaptive Learning Dashboard</h2>
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              loadDashboardData();
+            }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

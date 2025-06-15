@@ -35,9 +35,9 @@ const SocialDashboard = () => {
   const [socialData, setSocialData] = useState(null);
   const [studyGroups, setStudyGroups] = useState([]);
   const [studyBuddies, setStudyBuddies] = useState([]);
-  const [socialRecommendations, setSocialRecommendations] = useState({});
-  const [activityFeed, setActivityFeed] = useState([]);
+  const [socialRecommendations, setSocialRecommendations] = useState({});  const [activityFeed, setActivityFeed] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [realTimeNotifications, setRealTimeNotifications] = useState([]);
 
   useEffect(() => {
@@ -48,34 +48,38 @@ const SocialDashboard = () => {
       cleanupRealTimeFeatures();
     };
   }, []);
-
   const fetchSocialData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const token = localStorage.getItem('token');
 
       // Fetch social dashboard data
       const dashboardResponse = await fetch('/api/social-learning/dashboard/social', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (!dashboardResponse.ok) throw new Error('Failed to load social dashboard');
       const dashboardData = await dashboardResponse.json();
 
       // Fetch study groups
       const groupsResponse = await fetch('/api/social-learning/study-groups/my-groups', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (!groupsResponse.ok) throw new Error('Failed to load study groups');
       const groupsData = await groupsResponse.json();
 
       // Fetch study buddies
       const buddiesResponse = await fetch('/api/social-learning/study-buddies/list', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (!buddiesResponse.ok) throw new Error('Failed to load study buddies');
       const buddiesData = await buddiesResponse.json();
 
       // Fetch social recommendations
       const recommendationsResponse = await fetch('/api/gamification/recommendations/social', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (!recommendationsResponse.ok) throw new Error('Failed to load social recommendations');
       const recommendationsData = await recommendationsResponse.json();
 
       setSocialData(dashboardData.dashboard || {});
@@ -85,6 +89,7 @@ const SocialDashboard = () => {
       setActivityFeed(dashboardData.dashboard?.recentActivities?.filter(a => a.isSocial) || []);
     } catch (error) {
       console.error('Error fetching social data:', error);
+      setError(error.message || 'Failed to load social data');
     } finally {
       setLoading(false);
     }
@@ -244,8 +249,39 @@ const SocialDashboard = () => {
     { id: 'feed', label: 'Activity Feed', icon: MessageCircle },
     { id: 'groups', label: 'Study Groups', icon: Users },
     { id: 'buddies', label: 'Study Buddies', icon: UserPlus },
-    { id: 'recommendations', label: 'Recommendations', icon: Star }
-  ];
+    { id: 'recommendations', label: 'Recommendations', icon: Star }  ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading social dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <Users className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Social Learning Hub</h2>
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              fetchSocialData();
+            }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">

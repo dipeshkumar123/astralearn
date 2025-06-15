@@ -47,6 +47,16 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // API Routes
 app.use('/api', apiRoutes);
 
+// API 404 handler - ensures API routes always return JSON
+app.use('/api/*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'API endpoint not found',
+    message: `API route ${req.originalUrl} not found`,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Health endpoint with performance metrics
 app.get('/health', async (req, res) => {
   try {

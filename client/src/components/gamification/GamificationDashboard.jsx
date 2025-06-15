@@ -46,6 +46,7 @@ const GamificationDashboard = ({ onBackToMain }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [currentView, setCurrentView] = useState('dashboard'); // New state for view management
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -55,6 +56,7 @@ const GamificationDashboard = ({ onBackToMain }) => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       // Fetch enhanced dashboard data with social features
       const dashboardResponse = await fetch('/api/gamification/dashboard', {
@@ -62,6 +64,7 @@ const GamificationDashboard = ({ onBackToMain }) => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
+      if (!dashboardResponse.ok) throw new Error('Failed to load gamification dashboard');
       const dashboardResult = await dashboardResponse.json();
 
       // Fetch leaderboard
@@ -70,6 +73,7 @@ const GamificationDashboard = ({ onBackToMain }) => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
+      if (!leaderboardResponse.ok) throw new Error('Failed to load leaderboard');
       const leaderboardResult = await leaderboardResponse.json();
 
       // Fetch user's rank
@@ -78,11 +82,12 @@ const GamificationDashboard = ({ onBackToMain }) => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
+      if (!rankResponse.ok) throw new Error('Failed to load user rank');
       const rankResult = await rankResponse.json();      setDashboardData(dashboardResult);
       setLeaderboard(leaderboardResult);
       setUserRank(rankResult);
     } catch (error) {
-      console.error('Error fetching gamification data:', error);
+      setError(error.message || 'Failed to load gamification data');
       // Set fallback data for development
       setDashboardData({
         success: true,
@@ -168,16 +173,14 @@ const GamificationDashboard = ({ onBackToMain }) => {
   const fetchSocialData = async () => {
     try {
       const token = localStorage.getItem('token');
-
-      // Fetch social recommendations
       const socialResponse = await fetch('/api/gamification/recommendations/social', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (!socialResponse.ok) throw new Error('Failed to load social recommendations');
       const socialResult = await socialResponse.json();
-
       setSocialData(socialResult.recommendations || {});
     } catch (error) {
-      console.error('Error fetching social data:', error);
+      setError(error.message || 'Failed to load social data');
     }
   };
 
@@ -241,6 +244,17 @@ const GamificationDashboard = ({ onBackToMain }) => {
         </div>
       );
     }
+    if (error) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-6 flex items-center justify-center">
+          <div className="text-center">
+            <Trophy className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Gamification Dashboard</h2>
+            <p className="text-red-600">{error}</p>
+          </div>
+        </div>
+      );
+    }
     if (!dashboardData) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-6 flex items-center justify-center">
@@ -260,6 +274,9 @@ const GamificationDashboard = ({ onBackToMain }) => {
     const availableBadges = dashboardData.badges || [];
     const achievementProgress = dashboardData.achievements || [];
     const socialStats = dashboardData.socialStats || {};
+
+    // Defensive: streaks may be missing
+    const streaks = profile.streaks || { current: { dailyLearning: 0 }, longest: { dailyLearning: 0 } };
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-6">
@@ -448,7 +465,7 @@ const GamificationDashboard = ({ onBackToMain }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Daily Streak</p>
-                  <p className="text-3xl font-bold text-orange-600">{profile.streaks.current.dailyLearning}</p>
+                  <p className="text-3xl font-bold text-orange-600">{streaks.current.dailyLearning}</p>
                 </div>
                 <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
                   <Flame className="h-6 w-6 text-orange-600" />
@@ -456,7 +473,7 @@ const GamificationDashboard = ({ onBackToMain }) => {
               </div>
               <div className="mt-4 flex items-center text-sm text-gray-600">
                 <Zap className="h-4 w-4 mr-1" />
-                <span>Best: {profile.streaks.longest.dailyLearning} days</span>
+                <span>Best: {streaks.longest.dailyLearning} days</span>
               </div>
             </motion.div>
           </div>

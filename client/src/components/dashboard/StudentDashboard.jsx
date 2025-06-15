@@ -32,6 +32,7 @@ const StudentDashboard = () => {
   const [recommendations, setRecommendations] = useState([]);
   const [learningStats, setLearningStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -40,38 +41,40 @@ const StudentDashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       // Load enrolled courses
       const coursesResponse = await fetch('/api/courses/my/enrolled', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       
-      if (coursesResponse.ok) {
-        const coursesData = await coursesResponse.json();
-        setEnrolledCourses(coursesData.enrolledCourses || []);
-      }
+      if (!coursesResponse.ok) throw new Error('Failed to load enrolled courses');
+      
+      const coursesData = await coursesResponse.json();
+      setEnrolledCourses(coursesData.enrolledCourses || []);
 
       // Load learning analytics
       const analyticsResponse = await fetch('/api/analytics/user/overview', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       
-      if (analyticsResponse.ok) {
-        const analyticsData = await analyticsResponse.json();
-        setLearningStats(analyticsData.data);
-      }
+      if (!analyticsResponse.ok) throw new Error('Failed to load analytics');
+      
+      const analyticsData = await analyticsResponse.json();
+      setLearningStats(analyticsData.data);
 
       // Load recommendations
       const recommendationsResponse = await fetch('/api/adaptive-learning/recommendations', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       
-      if (recommendationsResponse.ok) {
-        const recData = await recommendationsResponse.json();
-        setRecommendations(recData.recommendations || []);
-      }
+      if (!recommendationsResponse.ok) throw new Error('Failed to load recommendations');
+      
+      const recData = await recommendationsResponse.json();
+      setRecommendations(recData.recommendations || []);
 
     } catch (error) {
+      setError(error.message || 'Failed to load dashboard data.');
       console.error('Dashboard data loading error:', error);
     } finally {
       setLoading(false);
@@ -323,6 +326,22 @@ const StudentDashboard = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your learning dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-600 text-2xl mb-4">{error}</div>
+          <button
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={loadDashboardData}
+          >
+            Retry
+          </button>
         </div>
       </div>
     );

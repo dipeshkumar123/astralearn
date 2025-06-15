@@ -18,17 +18,17 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
   const [serverInfo, setServerInfo] = useState(null);  const [currentView, setCurrentView] = useState('status');
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [userDismissedAuth, setUserDismissedAuth] = useState(false);
   const { user, logout, isAuthenticated, loading, isDemoMode } = useAuth();
   useEffect(() => {
     checkServerStatus();
   }, []);
-
   // Show login modal if not authenticated and not loading
   useEffect(() => {
-    if (!loading && !isAuthenticated && !showLogin && !showRegister) {
+    if (!loading && !isAuthenticated && !showLogin && !showRegister && !userDismissedAuth) {
       setShowLogin(true);
     }
-  }, [loading, isAuthenticated, showLogin, showRegister]);
+  }, [loading, isAuthenticated, showLogin, showRegister, userDismissedAuth]);
 
   const checkServerStatus = async () => {
     try {
@@ -52,11 +52,16 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
         </div>
       );
     }    // If not authenticated, show landing page with authentication options
-    if (!isAuthenticated) {
-      return (
+    if (!isAuthenticated) {      return (
         <LandingPage 
-          onShowLogin={() => setShowLogin(true)}
-          onShowRegister={() => setShowRegister(true)}
+          onShowLogin={() => {
+            setUserDismissedAuth(false);
+            setShowLogin(true);
+          }}
+          onShowRegister={() => {
+            setUserDismissedAuth(false);
+            setShowRegister(true);
+          }}
         />
       );
     }    // Authenticated user views
@@ -158,11 +163,13 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
         )}
 
         {renderCurrentView()}
-        
-        {/* Authentication Forms */}
+          {/* Authentication Forms */}
         {showLogin && (
           <LoginForm
-            onClose={() => setShowLogin(false)}
+            onClose={() => {
+              setShowLogin(false);
+              setUserDismissedAuth(true);
+            }}
             switchToRegister={() => {
               setShowLogin(false);
               setShowRegister(true);
@@ -172,7 +179,10 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
 
         {showRegister && (
           <RegisterForm
-            onClose={() => setShowRegister(false)}
+            onClose={() => {
+              setShowRegister(false);
+              setUserDismissedAuth(true);
+            }}
             switchToLogin={() => {
               setShowRegister(false);
               setShowLogin(true);
