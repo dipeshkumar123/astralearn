@@ -7,15 +7,29 @@
     "client",
     "server",
     "shared"
-  ],
-  "scripts": {
+  ],  "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "npm run dev --workspace=client",
     "dev:server": "npm run dev --workspace=server",
     "build": "npm run build --workspace=client && npm run build --workspace=server",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces",
-    "install:all": "npm install && npm install --workspaces"
+    "install:all": "npm install && npm install --workspaces",
+    "setup:dev": "node scripts/development/setup.js",
+    "seed:comprehensive": "node server/src/scripts/comprehensiveSeed.js",
+    "seed:simple": "node server/src/scripts/seedSampleData.js",
+    "simulate:realtime": "node server/src/scripts/realTimeSimulator.js",
+    "validate:system": "node scripts/validateSystem.js",
+    "reorganize:project": "node scripts/reorganizeProject.js",
+    "test:unit": "npm run test --workspaces",
+    "test:integration": "npm run test:integration --workspace=server",
+    "test:e2e": "npm run test:e2e --workspace=client",
+    "test:comprehensive": "npm run validate:system",
+    "docs:serve": "npx serve docs",
+    "clean": "npm run clean --workspaces",
+    "reset": "npm run clean && npm run install:all && npm run setup:dev",
+    "production:build": "NODE_ENV=production npm run build",
+    "production:deploy": "docker-compose -f docker-compose.prod.yml up -d"
   },
   "keywords": [
     "lms",
