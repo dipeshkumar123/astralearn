@@ -60,7 +60,7 @@ router.get('/learning-path/:courseId',
 
 // Get content recommendations
 router.get('/recommendations',
-  auth,
+  flexibleAuthenticate,
   query('limit').optional().isInt({ min: 1, max: 20 }),
   query('type').optional().isIn(['next_lesson', 'remediation', 'enrichment', 'all']),
   async (req, res) => {
@@ -87,10 +87,15 @@ router.get('/recommendations',
         reasoning: recommendations.reasoning,
         metadata: recommendations.metadata,
         timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
+      });    } catch (error) {
       console.error('Content recommendations error:', error);
+      console.error('Error stack:', error.stack);
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        userId: req.user?._id,
+        query: req.query
+      });
       res.status(500).json({
         error: 'Internal server error',
         message: 'Unable to generate recommendations'

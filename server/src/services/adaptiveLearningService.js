@@ -586,6 +586,96 @@ class AdaptiveLearningService {
       };
     }
   }
+
+  /**
+   * Analyze current learning context for a user
+   */
+  async analyzeCurrentLearningContext(userId, userProgress = []) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        return { error: 'User not found' };
+      }
+      // Get recent progress
+      const recentProgress = userProgress.slice(-10);
+      // Calculate basic metrics
+      const averageScore = recentProgress.length > 0 
+        ? recentProgress.reduce((sum, p) => sum + (p.score || 0), 0) / recentProgress.length
+        : 0;
+      return {
+        userId,
+        recentProgress,
+        averageScore,
+        totalLessonsCompleted: userProgress.length,
+        learningStyle: user.learningStyle || 'visual',
+        currentLevel: this.determineCurrentLevel(averageScore),
+        strugglingAreas: [],
+        strengths: [],
+        timestamp: new Date()
+      };
+    } catch (error) {
+      console.error('Error analyzing learning context:', error);
+      return { error: error.message };
+    }
+  }
+
+  /**
+   * Generate fallback recommendations when main algorithm fails
+   */
+  async generateFallbackRecommendations(userId) {
+    try {
+      // Get basic course recommendations
+      const courses = await Course.find({ isActive: true }).limit(3);
+      return courses.map(course => ({
+        type: 'course',
+        id: course._id,
+        title: course.title,
+        description: course.description,
+        difficulty: course.difficulty || 'beginner',
+        reason: 'General recommendation',
+        confidence: 0.5
+      }));
+    } catch (error) {
+      console.error('Error generating fallback recommendations:', error);
+      return [{
+        type: 'lesson',
+        title: 'Getting Started',
+        description: 'Start your learning journey',
+        difficulty: 'beginner',
+        reason: 'Default recommendation',
+        confidence: 0.3
+      }];
+    }
+  }
+
+  /**
+   * Determine current learning level based on average score
+   */
+  determineCurrentLevel(averageScore) {
+    if (averageScore >= 85) return 'advanced';
+    if (averageScore >= 70) return 'intermediate';
+    return 'beginner';
+  }
+
+  /**
+   * Explain recommendation reasoning
+   */
+  explainRecommendationReasoning(recommendations, context) {
+    if (!recommendations || recommendations.length === 0) {
+      return 'No specific recommendations available at this time.';
+    }
+    const reasons = recommendations.map(rec => rec.reason || 'Recommended based on your progress');
+    return reasons.join('; ');
+  }
+
+  /**
+   * Calculate recommendation confidence score
+   */
+  calculateRecommendationConfidence(recommendations) {
+    if (!recommendations || recommendations.length === 0) return 0;
+    const avgConfidence = recommendations.reduce((sum, rec) => sum + (rec.confidence || 0.5), 0) / recommendations.length;
+    return Math.round(avgConfidence * 100) / 100;
+  }
 }
 
 export const adaptiveLearningService = new AdaptiveLearningService();

@@ -141,6 +141,28 @@ router.get('/study-groups/my-groups',
 // STUDY BUDDY ENDPOINTS
 // =========================
 
+// List current study buddies
+router.get('/study-buddies/list',
+  flexibleAuthenticate,
+  async (req, res) => {
+    try {
+      const studyBuddies = await socialLearningService.getUserStudyBuddies(req.user._id);
+      
+      res.json({
+        success: true,
+        studyBuddies: studyBuddies || [],
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Get study buddies list error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Could not retrieve study buddies list'
+      });
+    }
+  }
+);
+
 // Find study buddy matches
 router.get('/study-buddies/find',
   flexibleAuthenticate,

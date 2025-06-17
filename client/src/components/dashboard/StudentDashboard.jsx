@@ -26,7 +26,7 @@ import {
 import { useAuth } from '../auth/AuthProvider';
 
 const StudentDashboard = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
@@ -35,8 +35,10 @@ const StudentDashboard = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (token) {
+      loadDashboardData();
+    }
+  }, [token]);
 
   const loadDashboardData = async () => {
     try {
@@ -46,7 +48,7 @@ const StudentDashboard = () => {
       // Load enrolled courses
       try {
         const coursesResponse = await fetch('/api/courses/my/enrolled', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${token}` }
         });
         
         if (!coursesResponse.ok) {
@@ -63,8 +65,8 @@ const StudentDashboard = () => {
 
       // Load learning analytics
       try {
-        const analyticsResponse = await fetch('/api/analytics/user/overview', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        const analyticsResponse = await fetch('/api/analytics/summary', {
+          headers: { Authorization: `Bearer ${token}` }
         });
         
         if (!analyticsResponse.ok) {
@@ -73,7 +75,7 @@ const StudentDashboard = () => {
         }
         
         const analyticsData = await analyticsResponse.json();
-        setLearningStats(analyticsData.data || {
+        setLearningStats(analyticsData.analytics || {
           totalPoints: 0,
           streak: 0,
           certificates: 0,
@@ -94,7 +96,7 @@ const StudentDashboard = () => {
       // Load recommendations
       try {
         const recommendationsResponse = await fetch('/api/adaptive-learning/recommendations', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${token}` }
         });
         
         if (!recommendationsResponse.ok) {

@@ -28,7 +28,7 @@ import {
 import { useAuth } from '../auth/AuthProvider';
 
 const InstructorDashboard = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [courses, setCourses] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -37,8 +37,10 @@ const InstructorDashboard = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadInstructorData();
-  }, []);
+    if (token) {
+      loadInstructorData();
+    }
+  }, [token]);
 
   const loadInstructorData = async () => {
     try {
@@ -48,31 +50,14 @@ const InstructorDashboard = () => {
       // Load instructor's courses with individual error handling
       try {
         const coursesResponse = await fetch('/api/courses/instructor', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${token}` }
         });
-        
-        if (coursesResponse.ok) {
+          if (coursesResponse.ok) {
           const coursesData = await coursesResponse.json();
           setCourses(coursesData || []);
         } else {
           console.warn('Failed to load courses:', coursesResponse.status);
-          // Set fallback data for courses
-          setCourses([
-            {
-              _id: 'fallback-1',
-              title: 'Sample Course 1',
-              isPublished: true,
-              enrollmentCount: 25,
-              status: 'active'
-            },
-            {
-              _id: 'fallback-2', 
-              title: 'Sample Course 2',
-              isPublished: true,
-              enrollmentCount: 18,
-              status: 'active'
-            }
-          ]);
+          setCourses([]);
         }
       } catch (coursesError) {
         console.error('Courses loading error:', coursesError);
@@ -82,21 +67,19 @@ const InstructorDashboard = () => {
       // Load instructor analytics with individual error handling
       try {
         const analyticsResponse = await fetch('/api/analytics/instructor/dashboard-overview', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${token}` }
         });
-        
-        if (analyticsResponse.ok) {
+          if (analyticsResponse.ok) {
           const analyticsData = await analyticsResponse.json();
           setAnalytics(analyticsData.data);
         } else {
           console.warn('Failed to load analytics:', analyticsResponse.status);
-          // Set fallback analytics data
           setAnalytics({
-            totalStudents: 45,
-            averagePerformance: 87,
-            averageCompletionRate: 85,
-            totalCourses: 3,
-            activeStudents: 38
+            totalStudents: 0,
+            averagePerformance: 0,
+            averageCompletionRate: 0,
+            totalCourses: 0,
+            activeStudents: 0
           });
         }
       } catch (analyticsError) {

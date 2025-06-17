@@ -87,6 +87,21 @@ router.get('/health', async (req, res) => {
   }
 });
 
+// Get instructor's courses  
+router.get('/instructor', flexibleAuthenticate, flexibleAuthorize(['instructor', 'admin']), async (req, res) => {
+  try {
+    const courses = await Course.find({ 
+      instructor: req.user._id    })
+    .populate('instructor', 'firstName lastName email')
+    .sort({ createdAt: -1 });
+
+    res.json(courses);
+  } catch (error) {
+    console.error('Get instructor courses error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Get course by ID
 router.get('/:id', async (req, res) => {
   try {
@@ -273,21 +288,6 @@ router.get('/my/enrolled', flexibleAuthenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Get enrolled courses error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-});
-
-// Get instructor's courses
-router.get('/instructor', flexibleAuthenticate, flexibleAuthorize(['instructor', 'admin']), async (req, res) => {
-  try {
-    const courses = await Course.find({ 
-      instructor: req.user._id    })
-    .populate('instructor', 'firstName lastName email')
-    .sort({ createdAt: -1 });
-
-    res.json(courses);
-  } catch (error) {
-    console.error('Get instructor courses error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

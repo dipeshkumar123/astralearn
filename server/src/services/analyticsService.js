@@ -15,6 +15,7 @@ import { UserGamification } from '../models/Gamification.js';
 import { learningAnalyticsService } from './learningAnalyticsService.js';
 import gamificationService from './gamificationService.js';
 import { adaptiveLearningService } from './adaptiveLearningService.js';
+import socialLearningService from './socialLearningService.js';
 
 class AnalyticsService {
   constructor() {
@@ -652,9 +653,10 @@ class AnalyticsService {
       return { pointsEarned: 0, achievementsUnlocked: 0, badgesEarned: 0 };
     }
   }
-
   async getCollaborationAnalytics(userId, timeframe) {
     try {
+      // Import socialLearningService locally to avoid circular dependency
+      const { default: socialLearningService } = await import('./socialLearningService.js');
       const socialData = await socialLearningService.getSocialLearningAnalytics(userId);
       
       return {
@@ -666,7 +668,7 @@ class AnalyticsService {
       };
     } catch (error) {
       console.error('Error fetching collaboration analytics:', error);
-      return { studyGroupsJoined: 0, collaborativeSessions: 0, helpProvided: 0 };
+      return { studyGroupsJoined: 0, collaborativeSessions: 0, helpProvided: 0, socialInteractions: 0, peerFeedbackScore: 0 };
     }
   }
 
@@ -794,6 +796,86 @@ class AnalyticsService {
       completedGoals: 2,
       progressPercentage: 67
     };
+  }
+
+  /**
+   * Group progress data by sessions for analysis
+   */
+  groupProgressBySessions(progressData) {
+    if (!Array.isArray(progressData)) return [];
+    
+    // Group progress by day/session
+    const sessions = {};
+    progressData.forEach(progress => {
+      const dateKey = progress.timestamp ? new Date(progress.timestamp).toDateString() : 'unknown';
+      if (!sessions[dateKey]) {
+        sessions[dateKey] = [];
+      }
+      sessions[dateKey].push(progress);
+    });
+    
+    return Object.entries(sessions).map(([date, data]) => ({
+      date,
+      activities: data.length,
+      totalTime: data.reduce((sum, p) => sum + (p.progressData?.timeSpent || 0), 0),
+      averageScore: data.reduce((sum, p) => sum + (p.progressData?.score || 0), 0) / data.length
+    }));
+  }
+
+  /**
+   * Generate optimal study schedule recommendation
+   */
+  async generateOptimalStudySchedule(userId, patterns) {
+    try {
+      const userPreferences = patterns?.learningBehavior?.studyPatterns || {};
+      const performanceData = patterns?.learningBehavior?.performanceEvolution || {};
+      
+      const schedule = {
+        dailySchedule: {},
+        weeklyGoals: {},
+        recommendations: []
+      };
+      
+      // Default schedule based on performance patterns
+      const optimalHours = this.calculateOptimalStudyHours(performanceData);
+      
+      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].forEach(day => {
+        schedule.dailySchedule[day] = {
+          recommendedHours: optimalHours,
+          bestTimeSlots: ['9:00-11:00', '14:00-16:00', '19:00-21:00'],
+          breakIntervals: 15,
+          focusBlocks: 45
+        };
+      });
+      
+      schedule.recommendations.push('Take regular breaks to maintain focus');
+      schedule.recommendations.push('Study during your peak performance hours');
+      
+      return schedule;
+    } catch (error) {
+      console.error('Error generating optimal study schedule:', error);
+      return {
+        dailySchedule: {},
+        weeklyGoals: {},
+        recommendations: ['Focus on consistent daily study habits']
+      };
+    }
+  }
+
+  /**
+   * Calculate optimal study hours based on performance
+   */
+  calculateOptimalStudyHours(performanceData) {
+    // Default to 2 hours if no performance data
+    if (!performanceData || !performanceData.averageScore) {
+      return 2;
+    }
+    
+    // Adjust hours based on performance
+    const score = performanceData.averageScore;
+    if (score > 85) return 1.5; // High performers need less time
+    if (score > 70) return 2;   // Average performers
+    return 2.5; // Struggling learners need more time
   }
 }
 
