@@ -231,7 +231,7 @@ const SocialDashboard = ({ userRole = 'student', onBackToMain }) => {
         currentStudyTopic: studyTopic
       } : null);
 
-      console.log(`📱 Study buddy status updated to: ${status}`);
+      // Study buddy status updated
     } catch (error) {
       console.error('Error updating study buddy status:', error);
     }
@@ -250,7 +250,7 @@ const SocialDashboard = ({ userRole = 'student', onBackToMain }) => {
         }
       });
 
-      console.log(`📡 Social activity broadcasted: ${activityType}`);
+      // Social activity broadcasted
     } catch (error) {
       console.error('Error broadcasting social activity:', error);
     }
@@ -267,7 +267,7 @@ const SocialDashboard = ({ userRole = 'student', onBackToMain }) => {
     // Setup real-time event listeners
     realTimeIntegrationService.on('socialActivityUpdate', (data) => {
       setActivityFeed(prev => [data, ...prev].slice(0, 20)); // Keep latest 20 activities
-      console.log('📡 New social activity:', data);
+      // New social activity received
     });
 
     realTimeIntegrationService.on('studyBuddyStatusChange', (data) => {
@@ -276,7 +276,7 @@ const SocialDashboard = ({ userRole = 'student', onBackToMain }) => {
           ? { ...buddy, status: data.status, studyTopic: data.studyTopic }
           : buddy
       ));
-      console.log('👤 Study buddy status changed:', data);
+      // Study buddy status changed
     });
 
     realTimeIntegrationService.on('socialAchievementUnlocked', (data) => {

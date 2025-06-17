@@ -1,124 +1,127 @@
-# AstraLearn - Advanced LMS with Context-Aware AI
+# AstraLearn - AI-Powered Learning Platform
 
-## Overview
-AstraLearn is an advanced Learning Management System (LMS) that leverages context-aware AI to provide personalized learning experiences. The system understands user context, learning progress, and course material to deliver intelligent assistance throughout the learning journey.
+## 🎯 Overview
+AstraLearn is a comprehensive AI-powered learning platform featuring adaptive learning paths, gamification, social collaboration, and advanced analytics.
 
-## Architecture
-- **Frontend**: React with Vite, TypeScript, and Tailwind CSS
-- **Backend**: Node.js with Express.js, TypeScript
-- **Database**: MongoDB with Mongoose ODM
-- **AI Integration**: OpenRouter API for context-aware responses
-- **Real-time**: Socket.IO for live features
-- **Caching**: Redis for performance optimization
+## 🏗️ Project Structure
 
-## Prerequisites
-- Node.js v18+ 
-- npm v9+
-- MongoDB Atlas account (or local MongoDB v6+)
-- Redis (optional, for caching)
+```
+AstraLearn/
+├── client/                 # React Frontend Application
+├── server/                 # Node.js Backend API
+├── shared/                 # Shared utilities and types
+├── docs/                   # Project documentation
+├── testing/                # Test files and utilities
+├── k8s/                    # Kubernetes deployment configs
+└── scripts/                # Build and deployment scripts
+```
 
-## Environment Configuration
+## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Prerequisites
+- Node.js 18+
+- MongoDB 5.0+
+- npm or yarn
+
+### Installation
+
+1. Clone the repository
 ```bash
-npm run install:all
+git clone <repository-url>
+cd AstraLearn
 ```
 
-### 2. Environment Setup
-Copy environment examples and configure:
-
-**Server (.env)**:
+2. Install dependencies
 ```bash
-cd server
-cp .env.example .env
+# Install root dependencies
+npm install
+
+# Install client dependencies
+cd client && npm install
+
+# Install server dependencies  
+cd ../server && npm install
 ```
 
-**Client (.env)**:
+3. Environment Setup
 ```bash
-cd client  
-cp .env.example .env
+# Copy environment files
+cp client/.env.example client/.env
+cp server/.env.example server/.env
+
+# Edit environment variables as needed
 ```
 
-### 3. MongoDB Setup
-1. Create a MongoDB Atlas cluster
-2. Get your connection string
-3. Update `MONGODB_URI` in `server/.env`
-
-### 4. API Keys Setup
-- Get OpenRouter API key from https://openrouter.ai/
-- Update `OPENROUTER_API_KEY` in `server/.env`
-- Configure other API keys as needed
-
-## Development
-
-### Start Development Servers
+4. Start Development Servers
 ```bash
-# Start both client and server
-npm run dev
+# Terminal 1: Start backend
+cd server && npm run dev
 
-# Or start individually
-npm run dev:client    # Frontend on http://localhost:3000
-npm run dev:server    # Backend on http://localhost:5000
+# Terminal 2: Start frontend
+cd client && npm run dev
 ```
 
-### Build for Production
+## 📖 Documentation
+
+- [API Documentation](docs/api/)
+- [Implementation Reports](docs/implementation-reports/)
+- [Deployment Guide](docs/deployment.md)
+- [Development Guide](docs/development.md)
+
+## 🧪 Testing
+
 ```bash
-npm run build
+# Run test suite
+npm test
+
+# Run specific tests
+cd testing && node <test-file.js>
 ```
 
-### Testing
-```bash
-npm run test
-```
+## 🏛️ Architecture
 
-### Linting
-```bash
-npm run lint
-```
+### Frontend (React)
+- **Components**: Modular UI components organized by feature
+- **Services**: API communication layer
+- **Contexts**: State management for cross-component data
+- **Hooks**: Custom React hooks for reusable logic
 
-## Project Structure
-```
-├── client/          # React frontend application
-├── server/          # Express.js backend API
-├── shared/          # Shared types and utilities
-├── package.json     # Root workspace configuration
-└── plan.md         # Detailed implementation plan
-```
+### Backend (Node.js/Express)
+- **Routes**: API endpoint definitions
+- **Services**: Business logic and external service integration
+- **Models**: Database schemas and data models
+- **Middleware**: Authentication, authorization, and request processing
 
-## Development Phases
+## 🔧 Development
 
-### ✅ Phase 1: Foundation Setup (Current)
-- [x] Environment Configuration
-- [ ] Core Architecture
-- [ ] AI Infrastructure
+### Code Organization
+- Follow feature-based folder structure
+- Use TypeScript where applicable
+- Implement proper error handling
+- Write comprehensive tests
 
-### Phase 2: Context-Aware AI System
-- [ ] Context Gathering Engine
-- [ ] AI Orchestration Layer  
-- [ ] Frontend AI Interface
+### Best Practices
+- Use ESLint and Prettier for code formatting
+- Follow semantic versioning
+- Write meaningful commit messages
+- Update documentation with changes
 
-### Phase 3: Learning Core
-- [ ] Course Management
-- [ ] Adaptive Learning Engine
-- [ ] Assessment System
+## 📦 Deployment
 
-### Phase 4: Engagement Features
-- [ ] Gamification System
-- [ ] Social Learning
+See [Production Deployment Guide](docs/deployment.md) for detailed instructions.
 
-### Phase 5: Analytics & Insights
-- [ ] Dashboard Framework
-- [ ] Instructor Tools
+## 🤝 Contributing
 
-### Phase 6: Testing & Deployment
-- [ ] Quality Assurance
-- [ ] Deployment Pipeline
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-## Contributing
-1. Create feature branch from `develop`
-2. Make changes following the established patterns
-3. Test thoroughly
-4. Submit pull request to `develop`
+## 📄 License
 
-## License
-MIT License - see LICENSE file for details
+[License information here]
+
+## 📞 Support
+
+For support and questions, please [create an issue](../../issues) or contact the development team.

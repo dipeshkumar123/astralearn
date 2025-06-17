@@ -95,13 +95,13 @@ const LiveCollaboration = () => {
     // Setup real-time event listeners
     realTimeIntegrationService.on('collaborationSessionCreated', (data) => {
       setActiveSessions(prev => [...prev, data]);
-      console.log('🎉 New collaboration session created:', data);
+      // New collaboration session created
     });
 
     realTimeIntegrationService.on('collaborationUserJoined', (data) => {
       if (sessionData && data.sessionId === sessionData.id) {
         setParticipants(prev => [...prev, data.user]);
-        console.log('👤 User joined session:', data.user.name);
+        // User joined session
       }
     });
 

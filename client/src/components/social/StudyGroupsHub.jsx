@@ -129,7 +129,7 @@ const StudyGroupsHub = () => {
 
   const joinGroupRoom = (groupId) => {
     realTimeIntegrationService.joinStudyGroupRoom(groupId);
-    console.log(`📚 Joined study group room: ${groupId}`);
+    // Joined study group room
   };
 
   const leaveGroupRoom = (groupId) => {
