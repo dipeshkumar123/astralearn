@@ -9,7 +9,7 @@ import StudentDashboard from './StudentDashboard';
 import InstructorDashboard from './InstructorDashboard';
 import AdminDashboard from './AdminDashboard';
 
-const RoleBasedDashboard = () => {
+const RoleBasedDashboard = ({ setCurrentView }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -30,13 +30,13 @@ const RoleBasedDashboard = () => {
   // Route to appropriate dashboard based on user role
   switch (user.role) {
     case 'student':
-      return <StudentDashboard />;
+      return <StudentDashboard setCurrentView={setCurrentView} />;
     case 'instructor':
-      return <InstructorDashboard />;
+      return <InstructorDashboard setCurrentView={setCurrentView} />;
     case 'admin':
-      return <AdminDashboard />;
+      return <AdminDashboard setCurrentView={setCurrentView} />;
     default:
-      return <StudentDashboard />; // Default to student dashboard
+      return <StudentDashboard setCurrentView={setCurrentView} />; // Default to student dashboard
   }
 };
 

@@ -30,7 +30,7 @@ import realTimeIntegrationService from '../../services/realTimeIntegrationServic
  * Social Dashboard Component
  * Enhanced social learning interface with comprehensive social features
  */
-const SocialDashboard = () => {
+const SocialDashboard = ({ userRole = 'student', onBackToMain }) => {
   const [activeTab, setActiveTab] = useState('feed');
   const [socialData, setSocialData] = useState(null);
   const [studyGroups, setStudyGroups] = useState([]);
@@ -625,16 +625,20 @@ const SocialDashboard = () => {
               <div className="space-y-6">
                 <div className="bg-white rounded-xl p-6 shadow-sm">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                  <div className="space-y-3">
-                    <button className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                  <div className="space-y-3">                    <button 
+                      onClick={() => setActiveTab('groups')}
+                      className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                    >
                       <div className="flex items-center">
                         <Plus className="h-5 w-5 text-blue-600 mr-3" />
                         <span className="text-sm font-medium text-blue-900">Create Study Group</span>
                       </div>
                       <ChevronRight className="h-4 w-4 text-blue-600" />
                     </button>
-                    
-                    <button className="w-full flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+                      <button 
+                      onClick={() => setActiveTab('community')}
+                      className="w-full flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                    >
                       <div className="flex items-center">
                         <Search className="h-5 w-5 text-green-600 mr-3" />
                         <span className="text-sm font-medium text-green-900">Find Study Buddy</span>
@@ -642,7 +646,10 @@ const SocialDashboard = () => {
                       <ChevronRight className="h-4 w-4 text-green-600" />
                     </button>
                     
-                    <button className="w-full flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors">
+                    <button 
+                      onClick={() => setActiveTab('live-sessions')}
+                      className="w-full flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                    >
                       <div className="flex items-center">
                         <Video className="h-5 w-5 text-purple-600 mr-3" />
                         <span className="text-sm font-medium text-purple-900">Start Live Session</span>

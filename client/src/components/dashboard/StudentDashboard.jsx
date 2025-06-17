@@ -199,8 +199,10 @@ const StudentDashboard = () => {
       {/* Continue Learning Section */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-gray-900">Continue Learning</h2>
-          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+          <h2 className="text-xl font-bold text-gray-900">Continue Learning</h2>          <button 
+            onClick={() => setActiveTab('my-learning')}
+            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+          >
             View All Courses
           </button>
         </div>
@@ -247,8 +249,10 @@ const StudentDashboard = () => {
       {recommendations.length > 0 && (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Recommended for You</h2>
-            <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+            <h2 className="text-xl font-bold text-gray-900">Recommended for You</h2>            <button 
+              onClick={() => setActiveTab('explore')}
+              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
               View All
             </button>
           </div>
@@ -270,8 +274,18 @@ const StudentDashboard = () => {
                   <div className="flex items-center space-x-2 text-xs text-gray-500">
                     <Clock className="h-3 w-3" />
                     <span>{rec.duration}</span>
-                  </div>
-                  <button className="text-blue-600 hover:text-blue-700 text-xs font-medium">
+                  </div>                  <button 
+                    onClick={() => {
+                      // Navigate to course detail or continue learning
+                      if (setCurrentView) {
+                        setCurrentView('course-preview');
+                        localStorage.setItem('selectedCourseId', rec.id);
+                      } else {
+                        alert(`Starting course: ${rec.title}`);
+                      }
+                    }}
+                    className="text-blue-600 hover:text-blue-700 text-xs font-medium"
+                  >
                     Start Learning
                   </button>
                 </div>
@@ -295,8 +309,13 @@ const StudentDashboard = () => {
               placeholder="Search courses..."
               className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-          </div>
-          <button className="flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+          </div>          <button 
+            onClick={() => {
+              // Add filter functionality
+              alert('Filter options will be implemented');
+            }}
+            className="flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
             <Filter className="h-4 w-4 mr-2" />
             Filter
           </button>
@@ -347,8 +366,19 @@ const StudentDashboard = () => {
                   <Users className="h-3 w-3" />
                   <span>{enrollment.course?.enrollmentCount || 0}</span>
                 </div>
-              </div>
-              <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors">
+              </div>              <button 
+                onClick={() => {
+                  // Navigate to course detail or continue learning
+                  if (typeof setCurrentView === 'function') {
+                    setCurrentView('course-detail');
+                    localStorage.setItem('selectedCourseId', enrollment.course?._id);
+                  } else {
+                    // Fallback navigation - could use router
+                    alert(`Continuing course: ${enrollment.course?.title}`);
+                  }
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
+              >
                 Continue
               </button>
             </div>
@@ -422,8 +452,17 @@ const StudentDashboard = () => {
           <div className="text-center py-12">
             <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Course Catalog</h3>
-            <p className="text-gray-600">Explore thousands of courses across various subjects.</p>
-            <button className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+            <p className="text-gray-600">Explore thousands of courses across various subjects.</p>            <button 
+              onClick={() => {
+                // Navigate to course catalog
+                if (setCurrentView) {
+                  setCurrentView('course-management');
+                } else {
+                  alert('Browse courses feature will be implemented');
+                }
+              }}
+              className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
               Browse Courses
             </button>
           </div>

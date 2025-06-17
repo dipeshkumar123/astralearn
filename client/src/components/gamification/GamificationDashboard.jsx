@@ -38,7 +38,7 @@ import ChallengeSystem from './ChallengeSystem';
  * Displays user's points, badges, achievements, streaks, leaderboard position, and social stats
  * Now includes navigation to specialized gamification components
  */
-const GamificationDashboard = ({ onBackToMain }) => {
+const GamificationDashboard = ({ userRole = 'student', onBackToMain }) => {
   const [dashboardData, setDashboardData] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
   const [userRank, setUserRank] = useState(null);

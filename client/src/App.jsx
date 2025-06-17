@@ -69,16 +69,12 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       case 'demo':
         return <DemoLearningEnvironment onBackToStatus={() => setCurrentView('dashboard')} />;
       case 'course-management':
-        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;
-      case 'adaptive-learning':
-        return <AdaptiveLearningDashboard userId={user.id} onBackToMain={() => setCurrentView('dashboard')} />;
-      case 'gamification':
-        return <GamificationDashboard onBackToMain={() => setCurrentView('dashboard')} />;
-      case 'social-learning':
-        return <SocialDashboard onBackToMain={() => setCurrentView('dashboard')} />;
-      case 'dashboard':
+        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;      case 'adaptive-learning':
+        return <AdaptiveLearningDashboard userId={user.id} userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'gamification':
+        return <GamificationDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'social-learning':
+        return <SocialDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'dashboard':
       default:
-        return <RoleBasedDashboard />;
+        return <RoleBasedDashboard setCurrentView={setCurrentView} />;
     }
   };  return (
     <AIContextProvider>
@@ -92,8 +88,7 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                   <div className="flex items-center space-x-2">
                     <span className="text-xl font-bold text-blue-600">🌟 AstraLearn</span>
                   </div>
-                  
-                  {/* Navigation for specific views */}
+                    {/* Navigation for specific views */}
                   {currentView !== 'dashboard' && (
                     <nav className="hidden md:flex space-x-6">
                       <button
@@ -102,12 +97,16 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                       >
                         Dashboard
                       </button>
+                      
+                      {/* AI Demo - Available to all roles */}
                       <button
                         onClick={() => setCurrentView('demo')}
                         className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                       >
                         AI Demo
                       </button>
+                      
+                      {/* Course Management - Only for instructors and admins */}
                       {(user.role === 'instructor' || user.role === 'admin') && (
                         <button
                           onClick={() => setCurrentView('course-management')}
@@ -116,24 +115,36 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                           Course Management
                         </button>
                       )}
+                      
+                      {/* Adaptive Learning - Available to all roles but customized per role */}
                       <button
                         onClick={() => setCurrentView('adaptive-learning')}
                         className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                       >
-                        Adaptive Learning
+                        {user.role === 'student' ? 'My Learning Path' : 
+                         user.role === 'instructor' ? 'Student Analytics' : 
+                         'Learning Analytics'}
                       </button>
-                      <button
-                        onClick={() => setCurrentView('gamification')}
-                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                      >
-                        Gamification
-                      </button>
-                      <button
-                        onClick={() => setCurrentView('social-learning')}
-                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                      >
-                        Social Learning
-                      </button>
+                      
+                      {/* Gamification - Students and Instructors only */}
+                      {(user.role === 'student' || user.role === 'instructor') && (
+                        <button
+                          onClick={() => setCurrentView('gamification')}
+                          className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                        >
+                          {user.role === 'student' ? 'Achievements' : 'Student Engagement'}
+                        </button>
+                      )}
+                      
+                      {/* Social Learning - Primarily for students */}
+                      {user.role === 'student' && (
+                        <button
+                          onClick={() => setCurrentView('social-learning')}
+                          className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                        >
+                          Social Learning
+                        </button>
+                      )}
                     </nav>
                   )}
                 </div>

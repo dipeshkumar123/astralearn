@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 
-const InstructorDashboard = () => {
+const InstructorDashboard = ({ setCurrentView }) => {
   const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [courses, setCourses] = useState([]);
@@ -35,6 +35,7 @@ const InstructorDashboard = () => {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showCreateCourse, setShowCreateCourse] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -205,10 +206,18 @@ const InstructorDashboard = () => {
       </div>
 
       {/* Course Management */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-gray-900">My Courses</h2>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-900">My Courses</h2>          <button 
+            onClick={() => {
+              // Navigate to course creation or open modal
+              if (setCurrentView) {
+                setCurrentView('course-management');
+              } else {
+                setShowCreateCourse(true);
+              }
+            }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Create Course
           </button>
@@ -226,15 +235,35 @@ const InstructorDashboard = () => {
               <div className="flex items-start justify-between mb-3">
                 <h3 className="font-semibold text-gray-900 text-sm">
                   {course.title}
-                </h3>
-                <div className="flex items-center space-x-1">
-                  <button className="text-gray-400 hover:text-gray-600">
+                </h3>                <div className="flex items-center space-x-1">                  <button 
+                    onClick={() => {                      // Preview course functionality
+                      if (setCurrentView) {
+                        setCurrentView('course-preview');
+                        // You could store the course ID in context or localStorage
+                        localStorage.setItem('selectedCourseId', course._id);
+                      }
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
                     <Eye className="h-4 w-4" />
-                  </button>
-                  <button className="text-gray-400 hover:text-gray-600">
+                  </button>                  <button 
+                    onClick={() => {                      // Edit course functionality
+                      if (setCurrentView) {
+                        setCurrentView('course-management');
+                        localStorage.setItem('selectedCourseId', course._id);
+                        localStorage.setItem('courseAction', 'edit');
+                      }
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
                     <Edit3 className="h-4 w-4" />
                   </button>
-                  <button className="text-gray-400 hover:text-gray-600">
+                  <button                    onClick={() => {
+                      // Course settings functionality - could open a modal or navigate
+                      alert('Course settings feature will be implemented');
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
                     <Settings className="h-4 w-4" />
                   </button>
                 </div>

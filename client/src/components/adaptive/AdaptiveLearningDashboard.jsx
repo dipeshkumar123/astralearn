@@ -33,7 +33,7 @@ import {
 import InteractiveAssessment from './InteractiveAssessment';
 import LearningAnalyticsDashboard from './LearningAnalyticsDashboard';
 
-const AdaptiveLearningDashboard = ({ userId, onBackToMain }) => {  const [dashboardData, setDashboardData] = useState(null);
+const AdaptiveLearningDashboard = ({ userId, userRole = 'student', onBackToMain }) => {  const [dashboardData, setDashboardData] = useState(null);
   const [learningPath, setLearningPath] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -439,13 +439,16 @@ const AdaptiveLearningDashboard = ({ userId, onBackToMain }) => {  const [dashbo
                 className="text-blue-600 hover:text-blue-700 mb-4"
               >
                 ← Back to Main Dashboard
-              </button>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              </button>              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
                 <Brain className="w-8 h-8 mr-3 text-blue-600" />
-                Adaptive Learning Dashboard
+                {userRole === 'student' ? 'My Learning Path' : 
+                 userRole === 'instructor' ? 'Student Learning Analytics' : 
+                 'Adaptive Learning Overview'}
               </h1>
               <p className="text-gray-600 mt-2">
-                Personalized learning experience powered by AI
+                {userRole === 'student' ? 'Personalized learning experience powered by AI' :
+                 userRole === 'instructor' ? 'Monitor and guide student adaptive learning progress' :
+                 'System-wide adaptive learning insights and management'}
               </p>
             </div>
               <button
