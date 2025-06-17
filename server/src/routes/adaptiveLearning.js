@@ -196,9 +196,27 @@ router.post('/learning-path/generate',
 // Get current learning path for user
 router.get('/learning-path/current',
   flexibleAuthenticate,
+  [
+    query('userId').optional().isMongoId().withMessage('Invalid user ID format')
+  ],
   async (req, res) => {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array()
+        });
+      }
+
       const userId = req.query.userId || req.user._id;
+      
+      if (!userId) {
+        return res.status(400).json({
+          error: 'User ID is required',
+          message: 'Please provide a valid user ID'
+        });
+      }
       
       // Get user's current learning path
       const learningPath = await adaptiveLearningService.getCurrentLearningPath(userId);

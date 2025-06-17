@@ -794,11 +794,10 @@ class GamificationService {
       throw new Error('Could not retrieve daily goals');
     }
   }
-
   // New method: Create and manage challenges
   async createChallenge(challengeData, creatorId) {
     try {
-      const { Challenge } = await import('../models/Gamification.js');
+      const { Challenge } = await import('../models/Challenge.js');
       
       const challenge = new Challenge({
         ...challengeData,
@@ -820,13 +819,12 @@ class GamificationService {
     } catch (error) {
       console.error('Error creating challenge:', error);
       throw new Error('Could not create challenge');
-    }
-  }
+    }  }
 
   // New method: Join a challenge
   async joinChallenge(challengeId, userId) {
     try {
-      const { Challenge } = await import('../models/Gamification.js');
+      const { Challenge } = await import('../models/Challenge.js');
       
       const challenge = await Challenge.findById(challengeId);
       if (!challenge) {
@@ -852,11 +850,10 @@ class GamificationService {
       throw new Error('Could not join challenge');
     }
   }
-
   // New method: Get available challenges
   async getAvailableChallenges(userId, options = {}) {
     try {
-      const { Challenge } = await import('../models/Gamification.js');
+      const { Challenge } = await import('../models/Challenge.js');
       const { limit = 10, type = null, difficulty = null } = options;
       
       let query = {
@@ -878,13 +875,12 @@ class GamificationService {
     } catch (error) {
       console.error('Error getting available challenges:', error);
       throw new Error('Could not retrieve available challenges');
-    }
-  }
+    }  }
 
   // New method: Get active challenges for user
   async getActiveChallenges(userId, options = {}) {
     try {
-      const { Challenge } = await import('../models/Gamification.js');
+      const { Challenge } = await import('../models/Challenge.js');
       const { limit = 10 } = options;
       
       const challenges = await Challenge.find({
@@ -912,14 +908,13 @@ class GamificationService {
       return challengesWithProgress;
     } catch (error) {
       console.error('Error getting active challenges:', error);
-      throw new Error('Could not retrieve active challenges');
-    }
+      throw new Error('Could not retrieve active challenges');    }
   }
 
   // Calculate challenge progress for a user
   async calculateChallengeProgress(challengeId, userId) {
     try {
-      const { Challenge } = await import('../models/Gamification.js');
+      const { Challenge } = await import('../models/Challenge.js');
       const challenge = await Challenge.findById(challengeId);
       
       if (!challenge) return { current: 0, target: 1, percentage: 0 };

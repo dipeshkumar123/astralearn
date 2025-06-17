@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 
-const StudentDashboard = () => {
+const StudentDashboard = ({ setCurrentView }) => {
   const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [enrolledCourses, setEnrolledCourses] = useState([]);
@@ -455,7 +455,7 @@ const StudentDashboard = () => {
             <p className="text-gray-600">Explore thousands of courses across various subjects.</p>            <button 
               onClick={() => {
                 // Navigate to course catalog
-                if (setCurrentView) {
+                if (setCurrentView && typeof setCurrentView === 'function') {
                   setCurrentView('course-management');
                 } else {
                   alert('Browse courses feature will be implemented');

@@ -1057,7 +1057,7 @@ router.get('/challenges/weekly',
   flexibleAuthenticate,
   async (req, res) => {
     try {
-      const { Challenge } = await import('../models/Gamification.js');
+      const { Challenge } = await import('../models/Challenge.js');
       
       // Get current week's challenge
       const weekStart = new Date();

@@ -89,17 +89,31 @@ export const devAuthenticate = async (req, res, next) => {
  */
 export const flexibleAuthenticate = async (req, res, next) => {
   // Check if we have authorization header
-  const hasAuthHeader = req.headers.authorization && req.headers.authorization.startsWith('Bearer ');
+  const authHeader = req.headers.authorization;
+  const hasAuthHeader = authHeader && authHeader.startsWith('Bearer ');
   
-  // If we have auth header, use real authentication
+  // In development mode, handle demo tokens or no auth
+  if (config.server.environment === 'development') {
+    // If it's a demo token or no token, use dev authentication
+    if (!hasAuthHeader || authHeader.includes('demo-token')) {
+      return devAuthenticate(req, res, next);
+    }
+    
+    // If we have a real JWT token, try real authentication
+    try {
+      const { authenticate } = await import('./auth.js');
+      return authenticate(req, res, next);
+    } catch (error) {
+      // If real auth fails in dev, fallback to dev auth
+      console.log('Real auth failed in dev mode, falling back to dev auth');
+      return devAuthenticate(req, res, next);
+    }
+  }
+  
+  // In production, require real authentication
   if (hasAuthHeader) {
     const { authenticate } = await import('./auth.js');
     return authenticate(req, res, next);
-  }
-  
-  // Otherwise, in development mode, use dev authentication
-  if (config.server.environment === 'development') {
-    return devAuthenticate(req, res, next);
   }
   
   // In production without auth header, deny access
