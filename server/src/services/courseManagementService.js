@@ -109,33 +109,53 @@ class CourseManagementService {
       }
     }
   }
-
   /**
    * Get complete course hierarchy with modules and lessons
    */
   async getCourseWithHierarchy(courseId, includeContent = false) {
     const populateOptions = includeContent 
       ? 'title content objectives estimatedDuration difficulty position metadata'
-      : 'title objectives estimatedDuration difficulty position metadata';    const course = await Course.findById(courseId)
+      : 'title objectives estimatedDuration difficulty position metadata';
+      
+    const course = await Course.findById(courseId)
       .populate('instructor', 'firstName lastName email')
       .populate({
         path: 'modules',
         select: 'title description position objectives estimatedDuration difficulty metadata content',
-        options: { sort: { position: 1 } },
-        populate: {
-          path: 'lessons',
-          model: 'Lesson',
-          select: populateOptions,
-          options: { sort: { position: 1 } }
-        }
+        options: { sort: { position: 1 } }
       });
 
     if (!course) {
       throw new Error('Course not found');
+    }    // Manually populate lessons for each module
+    if (course.modules && course.modules.length > 0) {
+      for (let module of course.modules) {
+        // Try both moduleId and module fields for compatibility
+        const lessons = await Lesson.find({
+          $or: [
+            { moduleId: module._id },
+            { module: module._id }
+          ]
+        })
+          .sort({ position: 1 })
+          .select(populateOptions);
+        
+        module.lessons = lessons;
+      }
     }
 
     // Add calculated fields
     const enrichedCourse = course.toObject();
+    
+    // Ensure lessons are included in the object representation
+    if (enrichedCourse.modules && enrichedCourse.modules.length > 0) {
+      for (let i = 0; i < enrichedCourse.modules.length; i++) {
+        if (course.modules[i].lessons) {
+          enrichedCourse.modules[i].lessons = course.modules[i].lessons.map(lesson => lesson.toObject ? lesson.toObject() : lesson);
+        }
+      }
+    }
+    
     enrichedCourse.statistics = await this.getCourseStatistics(courseId);
     enrichedCourse.completionEstimate = this.calculateCompletionEstimate(enrichedCourse);
 

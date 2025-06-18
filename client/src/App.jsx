@@ -4,6 +4,8 @@ import AIAssistant from './components/ai/AIAssistant'
 import AIContextProvider from './contexts/AIContextProvider'
 import DemoLearningEnvironment from './components/demo/DemoLearningEnvironment'
 import CourseManagementDashboard from './components/course/CourseManagementDashboard'
+import CoursePreview from './components/course/CoursePreview'
+import CourseLearningEnvironment from './components/course/CourseLearningEnvironment'
 import AdaptiveLearningDashboard from './components/adaptive/AdaptiveLearningDashboard'
 import GamificationDashboard from './components/gamification/GamificationDashboard'
 import SocialDashboard from './components/social/SocialDashboard'
@@ -16,10 +18,12 @@ import LandingPage from './components/LandingPage'
 // Main App Content Component
 function AppContent() {  const [serverStatus, setServerStatus] = useState('checking');
   const [serverInfo, setServerInfo] = useState(null);  const [currentView, setCurrentView] = useState('status');
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [selectedCourse, setSelectedCourse] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [userDismissedAuth, setUserDismissedAuth] = useState(false);
-  const { user, logout, isAuthenticated, loading, isDemoMode } = useAuth();
+  const { user, logout, isAuthenticated, loading, isDemoMode, token } = useAuth();
   useEffect(() => {
     checkServerStatus();
   }, []);
@@ -29,7 +33,6 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       setShowLogin(true);
     }
   }, [loading, isAuthenticated, showLogin, showRegister, userDismissedAuth]);
-
   const checkServerStatus = async () => {
     try {
       const response = await fetch('http://localhost:5000/health');
@@ -40,7 +43,49 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       setServerStatus('disconnected');
       setServerInfo(null);
     }
-  };  const renderCurrentView = () => {
+  };
+  // Load course data when needed for preview/detail views
+  const loadCourseData = async (courseId) => {
+    try {
+      console.log('Loading course data for:', courseId);
+        // Try course-management endpoint first for full hierarchy
+      let response = await fetch(`/api/course-management/${courseId}/hierarchy?includeContent=true`, {
+        headers: {
+          'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Course hierarchy loaded:', data.course?.title);
+        setSelectedCourse(data.course);
+        return data.course;
+      }
+      
+      // Fallback to basic courses endpoint
+      console.log('Falling back to basic course endpoint');
+      response = await fetch(`/api/courses/${courseId}`, {
+        headers: {
+          'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Handle both response formats
+        const courseData = data.course || data;
+        console.log('Basic course loaded:', courseData?.title);
+        setSelectedCourse(courseData);
+        return courseData;
+      } else {
+        console.error('Failed to load course:', response.status);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error loading course:', error);
+      return null;
+    }
+  };const renderCurrentView = () => {
     // Show loading while authentication is being checked
     if (loading) {
       return (
@@ -69,12 +114,35 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       case 'demo':
         return <DemoLearningEnvironment onBackToStatus={() => setCurrentView('dashboard')} />;
       case 'course-management':
-        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;      case 'adaptive-learning':
+        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;
+      case 'course-preview':
+        return (
+          <CoursePreviewWrapper 
+            courseId={selectedCourseId} 
+            onBack={() => setCurrentView('dashboard')}
+            loadCourseData={loadCourseData}
+          />
+        );
+      case 'course-detail':
+        return (
+          <CourseDetailWrapper 
+            courseId={selectedCourseId} 
+            onBack={() => setCurrentView('dashboard')}
+            loadCourseData={loadCourseData}
+          />
+        );      case 'adaptive-learning':
         return <AdaptiveLearningDashboard userId={user.id} userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'gamification':
         return <GamificationDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'social-learning':
         return <SocialDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'dashboard':
       default:
-        return <RoleBasedDashboard setCurrentView={setCurrentView} />;
+        return <RoleBasedDashboard setCurrentView={(view) => {
+          // Extract course ID from localStorage when navigating to course views
+          if (view === 'course-preview' || view === 'course-detail') {
+            const courseId = localStorage.getItem('selectedCourseId');
+            setSelectedCourseId(courseId);
+          }
+          setCurrentView(view);
+        }} />;
     }
   };  return (
     <AIContextProvider>
@@ -217,3 +285,125 @@ function App() {
 }
 
 export default App
+
+// Course Preview Wrapper Component
+const CoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
+  const [course, setCourse] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCourse = async () => {
+      // First try to get courseId from localStorage if not provided
+      const targetCourseId = courseId || localStorage.getItem('selectedCourseId');
+      
+      if (targetCourseId) {
+        setLoading(true);
+        const courseData = await loadCourseData(targetCourseId);
+        setCourse(courseData);
+        setLoading(false);
+      } else {
+        console.error('No course ID provided for preview');
+        onBack();
+      }
+    };
+
+    loadCourse();
+  }, [courseId, loadCourseData, onBack]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading course preview...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Course not found</p>
+          <button 
+            onClick={onBack}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <CoursePreview
+      course={course}
+      isVisible={true}
+      mode="student"
+      onClose={onBack}
+    />
+  );
+};
+
+// Course Detail Wrapper Component (for enrolled courses)
+const CourseDetailWrapper = ({ courseId, onBack, loadCourseData }) => {
+  const [course, setCourse] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCourse = async () => {
+      // First try to get courseId from localStorage if not provided
+      const targetCourseId = courseId || localStorage.getItem('selectedCourseId');
+      
+      if (targetCourseId) {
+        setLoading(true);
+        const courseData = await loadCourseData(targetCourseId);
+        setCourse(courseData);
+        setLoading(false);
+      } else {
+        console.error('No course ID provided for course detail');
+        onBack();
+      }
+    };
+
+    loadCourse();
+  }, [courseId, loadCourseData, onBack]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading course...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Course not found</p>
+          <button 
+            onClick={onBack}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <CoursePreview
+      course={course}
+      isVisible={true}
+      mode="student"
+      onClose={onBack}
+    />
+  );
+};

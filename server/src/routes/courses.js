@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { Course, User, UserProgress } from '../models/index.js';
 import { auth, authorize } from '../middleware/auth.js';
 import { flexibleAuthenticate, flexibleAuthorize } from '../middleware/devAuth.js';
@@ -105,12 +106,27 @@ router.get('/instructor', flexibleAuthenticate, flexibleAuthorize(['instructor',
 // Get course by ID
 router.get('/:id', async (req, res) => {
   try {
+    console.log('Get course ID:', req.params.id);
     const course = await Course.findById(req.params.id)
       .populate('instructor', 'firstName lastName email')
-      .populate('lessons');
+      .populate('modules');
 
     if (!course) {
       return res.status(404).json({ message: 'Course not found' });
+    }    // Manually populate lessons for each module
+    if (course.modules && course.modules.length > 0) {
+      const Lesson = mongoose.model('Lesson');
+      for (let module of course.modules) {
+        const lessons = await Lesson.find({
+          $or: [
+            { moduleId: module._id },
+            { module: module._id }
+          ]
+        })
+          .sort({ position: 1 })
+          .select('title content objectives estimatedDuration difficulty position');
+        module.lessons = lessons;
+      }
     }
 
     // If user is authenticated, get their progress
