@@ -88,13 +88,25 @@ router.post('/register', [
     });    await user.save();
 
     // Generate tokens
-    const tokens = await user.generateAuthTokens();
-
-    res.status(201).json({
-      message: 'User registered successfully',
-      user: user.toJSON(),
-      tokens,
-    });
+    try {
+      const tokens = await user.generateAuthTokens();
+      
+      res.status(201).json({
+        message: 'User registered successfully',
+        user: user.toJSON(),
+        tokens,
+      });
+    } catch (tokenError) {
+      console.error('Token generation error:', tokenError);
+      
+      // User was created but token generation failed
+      res.status(201).json({
+        message: 'User registered successfully, but token generation failed',
+        user: user.toJSON(),
+        tokens: null,
+        error: 'Token generation failed'
+      });
+    }
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({
@@ -141,13 +153,22 @@ router.post('/login', [
     await user.save();
 
     // Generate tokens
-    const tokens = await user.generateAuthTokens();
+    try {
+      const tokens = await user.generateAuthTokens();
 
-    res.json({
-      message: 'Login successful',
-      user: user.toJSON(),
-      tokens,
-    });
+      res.json({
+        message: 'Login successful',
+        user: user.toJSON(),
+        tokens,
+      });
+    } catch (tokenError) {
+      console.error('Token generation error during login:', tokenError);
+      
+      res.status(500).json({
+        error: 'Authentication failed',
+        message: 'Token generation failed',
+      });
+    }
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({

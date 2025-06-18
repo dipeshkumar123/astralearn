@@ -30,8 +30,10 @@ import RichTextEditor from './RichTextEditor';
 import MetadataManager from './MetadataManager';
 import VersionControlPanel from './VersionControlPanel';
 import CoursePreview from './CoursePreview';
+import { useAuth } from '../auth/AuthProvider';
 
 const CourseManagementDashboard = ({ onBackToStatus }) => {
+  const { user } = useAuth();
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, create, edit, preview
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);

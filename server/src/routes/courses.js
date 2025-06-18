@@ -222,8 +222,12 @@ router.delete('/:id', auth, authorize(['instructor', 'admin']), async (req, res)
 });
 
 // Enroll in course
-router.post('/:id/enroll', auth, async (req, res) => {
+router.post('/:id/enroll', flexibleAuthenticate, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     const course = await Course.findById(req.params.id);
     
     if (!course) {
@@ -232,23 +236,25 @@ router.post('/:id/enroll', auth, async (req, res) => {
 
     if (!course.isPublished) {
       return res.status(400).json({ message: 'Course is not published' });
-    }
-
-    // Check if already enrolled
+    }    // Check if already enrolled
     const existingProgress = await UserProgress.findOne({
-      userId: req.user?._id,
+      userId: req.user._id,
       courseId: course._id,
+      progressType: 'enrollment',
     });
 
     if (existingProgress) {
       return res.status(400).json({ message: 'Already enrolled in this course' });
-    }
-
-    // Create user progress record
+    }    // Create user progress record for enrollment
     const userProgress = new UserProgress({
-      userId: req.user?._id,
+      userId: req.user._id,
       courseId: course._id,
-      enrolledAt: new Date(),
+      progressType: 'enrollment',
+      progressData: {
+        completionPercentage: 0,
+        timeSpent: 0
+      },
+      timestamp: new Date(),
     });
 
     await userProgress.save();
@@ -270,7 +276,14 @@ router.post('/:id/enroll', auth, async (req, res) => {
 // Get user's enrolled courses
 router.get('/my/enrolled', flexibleAuthenticate, async (req, res) => {
   try {
-    const userProgress = await UserProgress.find({ userId: req.user?._id })
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const userProgress = await UserProgress.find({ 
+      userId: req.user._id,
+      progressType: 'enrollment'
+    })
       .populate({
         path: 'courseId',
         populate: {
@@ -278,12 +291,13 @@ router.get('/my/enrolled', flexibleAuthenticate, async (req, res) => {
           select: 'firstName lastName email',
         },
       })
-      .sort({ enrolledAt: -1 });
+      .sort({ timestamp: -1 });
 
     res.json({
       enrolledCourses: userProgress.map(progress => ({
         ...progress.toObject(),
         course: progress.courseId,
+        enrolledAt: progress.timestamp,
       })),
     });
   } catch (error) {
