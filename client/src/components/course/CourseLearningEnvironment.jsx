@@ -32,6 +32,11 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
   const [completedLessons, setCompletedLessons] = useState(new Set());
   const [lessonProgress, setLessonProgress] = useState({});
 
+  // AI Assistant integration state
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [currentAIHelp, setCurrentAIHelp] = useState(null);
+
   useEffect(() => {
     // Initialize progress based on userProgress
     if (userProgress && userProgress.progressData) {
@@ -40,6 +45,39 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
       setLessonProgress(userProgress.progressData.lessonProgress || {});
     }
   }, [userProgress]);
+
+  // Load AI suggestions based on current lesson
+  useEffect(() => {
+    const loadAISuggestions = () => {
+      const lesson = getCurrentLesson();
+      if (lesson) {
+        // Generate contextual AI suggestions
+        const suggestions = [
+          {
+            type: 'study_tip',
+            title: 'Study Tip',
+            content: `For mastering "${lesson.title}", try the spaced repetition technique. Review this material again in 1 day, then 3 days, then 1 week.`,
+            icon: '💡'
+          },
+          {
+            type: 'practice',
+            title: 'Practice Suggestion',
+            content: 'Based on your progress, you might benefit from additional practice exercises related to this topic.',
+            icon: '🎯'
+          },
+          {
+            type: 'connection',
+            title: 'Learning Connection',
+            content: `This lesson connects well with concepts from earlier modules. Consider reviewing Module ${Math.max(1, currentModule)} for better understanding.`,
+            icon: '🔗'
+          }
+        ];
+        setAiSuggestions(suggestions);
+      }
+    };
+
+    loadAISuggestions();
+  }, [currentModule, currentLesson]);
 
   const getCurrentModule = () => {
     return course?.modules?.[currentModule];
@@ -179,7 +217,21 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">              <div className="flex items-center space-x-2 bg-gray-100 rounded-full px-3 py-1">
+            <div className="flex items-center space-x-4">
+              {/* AI Assistant Toggle */}
+              <button
+                onClick={() => setShowAIAssistant(!showAIAssistant)}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-full transition-colors ${
+                  showAIAssistant 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Brain className="w-4 h-4" />
+                <span className="text-sm font-medium">AI Assistant</span>
+              </button>
+              
+              <div className="flex items-center space-x-2 bg-gray-100 rounded-full px-3 py-1">
                 <TrendingUp className="w-4 h-4 text-blue-600" />
                 <span className="text-sm font-medium">{overallProgress}% Complete</span>
               </div>
@@ -324,10 +376,8 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
                       <span>Interactive</span>
                     </div>
                   </div>
-                </div>
-
-                {/* Lesson Content */}
-                <div className="p-6">
+                </div>                {/* Lesson Content - Add bottom padding for sticky buttons */}
+                <div className="p-6 pb-24">
                   <div className="max-w-4xl mx-auto">
                     {/* Learning Objectives */}
                     {lesson.objectives && lesson.objectives.length > 0 && (
@@ -389,14 +439,15 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
                           </div>
                         </div>
                       )}
-                    </div>
-
-                    {/* Lesson Actions */}
-                    <div className="border-t border-gray-200 pt-6">
+                    </div>                    {/* Lesson Actions - Fixed positioning */}
+                    <div className="border-t border-gray-200 pt-6 mt-6 bg-white sticky bottom-0 left-0 right-0 px-6 py-4 border-t border-gray-200 shadow-lg z-10">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                           <div className="text-sm text-gray-600">
                             Estimated time: {formatDuration(lesson.estimatedDuration || 15)}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Progress: {Math.round((currentLesson + 1) / (getCurrentModule()?.lessons?.length || 1) * 100)}%
                           </div>
                         </div>
 
@@ -404,7 +455,7 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
                           {!completedLessons.has(lesson._id || `${currentModule}-${currentLesson}`) && (
                             <button
                               onClick={markLessonComplete}
-                              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
                             >
                               <CheckCircle className="w-4 h-4 mr-2" />
                               Mark Complete
@@ -415,9 +466,9 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
                             onClick={nextLesson}
                             disabled={
                               currentModule === course.modules.length - 1 && 
-                              currentLesson === module?.lessons?.length - 1
+                              currentLesson === getCurrentModule()?.lessons?.length - 1
                             }
-                            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                           >
                             Next Lesson
                             <SkipForward className="w-4 h-4 ml-2" />
@@ -425,6 +476,24 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
                         </div>
                       </div>
                     </div>
+
+                    {/* AI Assistant - Suggestions */}
+                    {showAIAssistant && aiSuggestions.length > 0 && (
+                      <div className="mt-8">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Assistant Suggestions</h3>
+                        <div className="space-y-4">
+                          {aiSuggestions.map((suggestion, index) => (
+                            <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="flex items-center mb-2">
+                                <span className="text-xl mr-2">{suggestion.icon}</span>
+                                <h4 className="font-medium text-gray-900">{suggestion.title}</h4>
+                              </div>
+                              <p className="text-gray-700">{suggestion.content}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -435,11 +504,84 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Welcome to {course.title}</h3>
                   <p className="text-gray-600 mb-6">Select a lesson from the sidebar to begin your learning journey.</p>
                 </div>
-              </div>
-            )}
+              </div>            )}
           </div>
         </div>
       </div>
+
+      {/* AI Assistant Floating Panel */}
+      {showAIAssistant && (
+        <motion.div
+          initial={{ opacity: 0, x: 300 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 300 }}
+          className="fixed right-4 top-20 bottom-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 flex flex-col"
+        >
+          {/* AI Panel Header */}
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Brain className="w-5 h-5 text-blue-600" />
+                <h3 className="font-semibold text-gray-900">AI Learning Assistant</h3>
+              </div>
+              <button
+                onClick={() => setShowAIAssistant(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">Get personalized help with your learning</p>
+          </div>
+
+          {/* AI Panel Content */}
+          <div className="flex-1 p-4 overflow-y-auto">
+            {/* Current Lesson Context */}
+            {lesson && (
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-900 mb-2">Current Lesson</h4>
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm font-medium text-blue-900">{lesson.title}</p>
+                  <p className="text-xs text-blue-700 mt-1">{module?.title}</p>
+                </div>
+              </div>
+            )}
+
+            {/* AI Suggestions */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-900">AI Suggestions</h4>
+              {aiSuggestions.map((suggestion, index) => (
+                <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center mb-2">
+                    <span className="text-lg mr-2">{suggestion.icon}</span>
+                    <h5 className="text-sm font-medium text-gray-900">{suggestion.title}</h5>
+                  </div>
+                  <p className="text-xs text-gray-700">{suggestion.content}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Quick Actions */}
+            <div className="mt-6">
+              <h4 className="font-medium text-gray-900 mb-3">Quick Actions</h4>
+              <div className="space-y-2">
+                <button className="w-full text-left p-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+                  💡 Explain this concept
+                </button>
+                <button className="w-full text-left p-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+                  🎯 Get practice exercises
+                </button>
+                <button className="w-full text-left p-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+                  📚 Related resources
+                </button>
+                <button className="w-full text-left p-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+                  ❓ Ask a question
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 };

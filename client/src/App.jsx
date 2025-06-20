@@ -143,7 +143,23 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
           setCurrentView(view);
         }} />;
     }
-  };  return (
+  };  // Handle custom navigation events from dashboard
+  useEffect(() => {
+    const handleNavigateToCourse = (event) => {
+      const { view, courseId } = event.detail;
+      console.log('🎯 Custom navigation event received:', { view, courseId });
+      setSelectedCourseId(courseId);
+      setCurrentView(view);
+    };
+
+    window.addEventListener('navigateToCourse', handleNavigateToCourse);
+    
+    return () => {
+      window.removeEventListener('navigateToCourse', handleNavigateToCourse);
+    };
+  }, []);
+
+  return (
     <AIContextProvider>
       <div className="min-h-screen bg-gray-50">
         {/* User Authentication Status */}
@@ -154,13 +170,15 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                 <div className="flex items-center space-x-8">
                   <div className="flex items-center space-x-2">
                     <span className="text-xl font-bold text-blue-600">🌟 AstraLearn</span>
-                  </div>
-                    {/* Navigation for specific views */}
-                  {currentView !== 'dashboard' && (
+                  </div>                    {/* Navigation - Always show but highlight current view */}
                     <nav className="hidden md:flex space-x-6">
                       <button
                         onClick={() => setCurrentView('dashboard')}
-                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          currentView === 'dashboard' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
                       >
                         Dashboard
                       </button>
@@ -168,7 +186,11 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                       {/* AI Demo - Available to all roles */}
                       <button
                         onClick={() => setCurrentView('demo')}
-                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          currentView === 'demo' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
                       >
                         AI Demo
                       </button>
@@ -177,7 +199,11 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                       {(user.role === 'instructor' || user.role === 'admin') && (
                         <button
                           onClick={() => setCurrentView('course-management')}
-                          className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                          className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                            currentView === 'course-management' 
+                              ? 'bg-blue-100 text-blue-700' 
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
                         >
                           Course Management
                         </button>
@@ -186,7 +212,11 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                       {/* Adaptive Learning - Available to all roles but customized per role */}
                       <button
                         onClick={() => setCurrentView('adaptive-learning')}
-                        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          currentView === 'adaptive-learning' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
                       >
                         {user.role === 'student' ? 'My Learning Path' : 
                          user.role === 'instructor' ? 'Student Analytics' : 
@@ -197,23 +227,30 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                       {(user.role === 'student' || user.role === 'instructor') && (
                         <button
                           onClick={() => setCurrentView('gamification')}
-                          className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                          className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                            currentView === 'gamification' 
+                              ? 'bg-blue-100 text-blue-700' 
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
                         >
                           {user.role === 'student' ? 'Achievements' : 'Student Engagement'}
                         </button>
                       )}
-                      
+                        
                       {/* Social Learning - Primarily for students */}
                       {user.role === 'student' && (
                         <button
                           onClick={() => setCurrentView('social-learning')}
-                          className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                          className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                            currentView === 'social-learning' 
+                              ? 'bg-blue-100 text-blue-700' 
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
                         >
                           Social Learning
                         </button>
                       )}
                     </nav>
-                  )}
                 </div>
 
                 <div className="flex items-center space-x-4">

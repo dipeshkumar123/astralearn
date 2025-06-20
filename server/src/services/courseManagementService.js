@@ -597,6 +597,122 @@ class CourseManagementService {
       }
     };
   }
+
+  /**
+   * Add modules to an existing course
+   */
+  async addModulesToCourse(courseId, modules, userId) {
+    const useTransactions = process.env.NODE_ENV === 'production';
+    let session = null;
+    
+    if (useTransactions) {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    }
+
+    try {
+      // Check if course exists and user has permission
+      const course = await Course.findById(courseId);
+      if (!course) {
+        throw new Error('Course not found');
+      }
+
+      if (course.instructor.toString() !== userId.toString()) {
+        throw new Error('Unauthorized to modify this course');
+      }
+
+      const moduleIds = [];
+      
+      for (let i = 0; i < modules.length; i++) {
+        const moduleData = modules[i];
+          const module = new Module({
+          title: moduleData.title,
+          description: moduleData.description,
+          courseId: courseId,
+          position: (course.modules.length || 0) + i + 1,
+          objectives: ['Learn the fundamentals', 'Apply concepts in practice'],
+          estimatedDuration: 60,
+          difficulty: 'beginner',
+          prerequisites: [],
+          learningOutcomes: ['Understand key concepts', 'Demonstrate practical skills'],
+          content: {
+            introduction: moduleData.description || `Introduction to ${moduleData.title}`,
+            summary: `This module covers ${moduleData.title}`,
+            keyTopics: [moduleData.title]
+          },
+          metadata: {
+            version: '1.0.0',
+            createdBy: userId,
+            lastEditedBy: userId,
+            tags: [],
+            category: 'general'
+          }
+        });
+
+        await module.save(session ? { session } : {});
+        moduleIds.push(module._id);
+
+        // Create lessons for this module
+        const lessonIds = [];
+        if (moduleData.lessons && moduleData.lessons.length > 0) {
+          for (let j = 0; j < moduleData.lessons.length; j++) {
+            const lessonData = moduleData.lessons[j];            const lesson = new Lesson({
+              title: lessonData.title,
+              courseId: courseId,
+              moduleId: module._id,
+              content: {
+                type: lessonData.type || 'text',
+                data: lessonData.content || '',
+                duration: lessonData.duration || 30
+              },
+              objectives: ['Learn key concepts', 'Apply knowledge'],
+              position: j + 1,
+              keyTopics: [lessonData.title],
+              contentSummary: `This lesson covers ${lessonData.title}`,
+              difficulty: 'beginner',
+              prerequisites: [],
+              isPublished: false,
+              metadata: {
+                version: '1.0.0',
+                createdBy: userId,
+                lastEditedBy: userId
+              }
+            });
+
+            await lesson.save(session ? { session } : {});
+            lessonIds.push(lesson._id);
+          }        }
+
+        // Note: Lessons reference modules via moduleId, no need to update module.lessons
+      }
+
+      // Update course with new modules
+      course.modules = [...(course.modules || []), ...moduleIds];
+      course.metadata.totalModules = course.modules.length;
+      course.metadata.lastEditedBy = userId;
+      course.metadata.lastEdited = new Date();
+      
+      await course.save(session ? { session } : {});
+
+      if (useTransactions && session) {
+        await session.commitTransaction();
+        session.endSession();
+      }
+
+      return {
+        success: true,
+        addedModules: moduleIds.length,
+        courseId: course._id
+      };
+
+    } catch (error) {
+      if (useTransactions && session) {
+        await session.abortTransaction();
+        session.endSession();
+      }
+      throw error;
+    }
+  }
 }
 
 export const courseManagementService = new CourseManagementService();

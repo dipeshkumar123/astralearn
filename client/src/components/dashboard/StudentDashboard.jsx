@@ -461,17 +461,32 @@ const StudentDashboard = ({ setCurrentView }) => {
                 </div>
               </div>              <button 
                 onClick={() => {
+                  console.log('🎯 Continue button clicked for course:', enrollment.course?.title);
+                  
                   // Navigate to course detail or continue learning
                   if (typeof setCurrentView === 'function') {
+                    console.log('✅ setCurrentView function available');
                     setCurrentView('course-detail');
                     localStorage.setItem('selectedCourseId', enrollment.course?._id);
+                    console.log('📝 Stored course ID:', enrollment.course?._id);
                   } else {
-                    // Fallback navigation - could use router
-                    alert(`Continuing course: ${enrollment.course?.title}`);
+                    console.warn('⚠️ setCurrentView not available - using fallback');
+                    // Enhanced fallback - attempt to navigate using window history
+                    const courseId = enrollment.course?._id;
+                    if (courseId) {
+                      localStorage.setItem('selectedCourseId', courseId);
+                      // Trigger a custom event that App.jsx can listen for
+                      window.dispatchEvent(new CustomEvent('navigateToCourse', { 
+                        detail: { view: 'course-detail', courseId } 
+                      }));
+                    } else {
+                      alert(`Continuing course: ${enrollment.course?.title}`);
+                    }
                   }
                 }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center"
               >
+                <PlayCircle className="w-4 h-4 mr-1" />
                 Continue
               </button>
             </div>
@@ -761,12 +776,74 @@ const StudentDashboard = ({ setCurrentView }) => {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">        {activeTab === 'overview' && renderOverview()}
         {activeTab === 'my-learning' && renderMyLearning()}
-        {activeTab === 'explore' && renderCourseCatalog()}
-        {activeTab === 'achievements' && (
-          <div className="text-center py-12">
-            <Trophy className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Your Achievements</h3>
-            <p className="text-gray-600">Track your learning milestones and certificates.</p>
+        {activeTab === 'explore' && renderCourseCatalog()}        {activeTab === 'achievements' && (
+          <div className="space-y-6">
+            {/* Achievement Dashboard Link */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">🏆 Your Achievements</h2>
+                  <p className="text-purple-100">Track your learning milestones and certificates.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (setCurrentView) {
+                      setCurrentView('gamification');
+                    }
+                  }}
+                  className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-white font-medium transition-colors"
+                >
+                  View Full Dashboard →
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Achievement Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <Trophy className="h-8 w-8 text-yellow-500" />
+                  <span className="text-2xl font-bold text-gray-900">{learningStats?.achievements || 0}</span>
+                </div>
+                <h3 className="font-semibold text-gray-900">Total Achievements</h3>
+                <p className="text-sm text-gray-600">Earned through learning</p>
+              </div>
+
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <Award className="h-8 w-8 text-purple-500" />
+                  <span className="text-2xl font-bold text-gray-900">{learningStats?.certificates || 0}</span>
+                </div>
+                <h3 className="font-semibold text-gray-900">Certificates</h3>
+                <p className="text-sm text-gray-600">Course completions</p>
+              </div>
+
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <Zap className="h-8 w-8 text-orange-500" />
+                  <span className="text-2xl font-bold text-gray-900">{learningStats?.streak || 0}</span>
+                </div>
+                <h3 className="font-semibold text-gray-900">Learning Streak</h3>
+                <p className="text-sm text-gray-600">Days in a row</p>
+              </div>
+            </div>
+
+            {/* Recent Achievements */}
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Achievements</h3>
+              <div className="space-y-3">
+                {Array.from({ length: 3 }, (_, i) => (
+                  <div key={i} className="flex items-center p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <Trophy className="h-6 w-6 text-yellow-600 mr-3" />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">First Course Completed</p>
+                      <p className="text-sm text-gray-600">Completed your first full course</p>
+                    </div>
+                    <span className="text-xs text-gray-500">2 days ago</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
