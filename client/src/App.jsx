@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import AIAssistant from './components/ai/AIAssistant'
 import AIContextProvider from './contexts/AIContextProvider'
@@ -43,9 +43,8 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       setServerStatus('disconnected');
       setServerInfo(null);
     }
-  };
-  // Load course data when needed for preview/detail views
-  const loadCourseData = async (courseId) => {
+  };  // Load course data when needed for preview/detail views
+  const loadCourseData = useCallback(async (courseId) => {
     try {
       console.log('Loading course data for:', courseId);
         // Try course-management endpoint first for full hierarchy
@@ -85,7 +84,7 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       console.error('Error loading course:', error);
       return null;
     }
-  };const renderCurrentView = () => {
+  }, [token]);const renderCurrentView = () => {
     // Show loading while authentication is being checked
     if (loading) {
       return (
@@ -290,7 +289,6 @@ export default App
 const CoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     const loadCourse = async () => {
       // First try to get courseId from localStorage if not provided
@@ -308,7 +306,7 @@ const CoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
     };
 
     loadCourse();
-  }, [courseId, loadCourseData, onBack]);
+  }, [courseId]); // Removed loadCourseData and onBack from dependencies
 
   if (loading) {
     return (
@@ -351,7 +349,6 @@ const CoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
 const CourseDetailWrapper = ({ courseId, onBack, loadCourseData }) => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     const loadCourse = async () => {
       // First try to get courseId from localStorage if not provided
@@ -369,7 +366,7 @@ const CourseDetailWrapper = ({ courseId, onBack, loadCourseData }) => {
     };
 
     loadCourse();
-  }, [courseId, loadCourseData, onBack]);
+  }, [courseId]); // Removed loadCourseData and onBack from dependencies
 
   if (loading) {
     return (
