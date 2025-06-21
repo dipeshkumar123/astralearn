@@ -266,8 +266,7 @@ const StudentDashboard = ({ setCurrentView }) => {
             View All Courses
           </button>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {enrolledCourses.slice(0, 3).map((enrollment, index) => (
             <motion.div
               key={index}
@@ -275,6 +274,22 @@ const StudentDashboard = ({ setCurrentView }) => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
               className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => {
+                // Navigate to course detail to continue learning
+                if (typeof setCurrentView === 'function') {
+                  setCurrentView('course-detail');
+                  localStorage.setItem('selectedCourseId', enrollment.course?._id);
+                } else {
+                  // Fallback navigation using custom event
+                  const courseId = enrollment.course?._id;
+                  if (courseId) {
+                    localStorage.setItem('selectedCourseId', courseId);
+                    window.dispatchEvent(new CustomEvent('navigateToCourse', { 
+                      detail: { view: 'course-detail', courseId } 
+                    }));
+                  }
+                }
+              }}
             >
               <div className="flex items-start justify-between mb-3">
                 <h3 className="font-semibold text-gray-900 text-sm">
@@ -428,17 +443,12 @@ const StudentDashboard = ({ setCurrentView }) => {
                 </div>
               </div>              <button 
                 onClick={() => {
-                  console.log('🎯 Continue button clicked for course:', enrollment.course?.title);
-                  
-                  // Navigate to course detail or continue learning
+                  // Navigate to course detail to continue learning
                   if (typeof setCurrentView === 'function') {
-                    console.log('✅ setCurrentView function available');
                     setCurrentView('course-detail');
                     localStorage.setItem('selectedCourseId', enrollment.course?._id);
-                    console.log('📝 Stored course ID:', enrollment.course?._id);
                   } else {
-                    console.warn('⚠️ setCurrentView not available - using fallback');
-                    // Enhanced fallback - attempt to navigate using window history
+                    // Enhanced fallback - attempt to navigate using custom event
                     const courseId = enrollment.course?._id;
                     if (courseId) {
                       localStorage.setItem('selectedCourseId', courseId);
