@@ -1349,12 +1349,8 @@ router.get('/instructor/dashboard-overview',
   flexibleAuthenticate,
   flexibleAuthorize(['instructor', 'admin']),  async (req, res) => {
     try {
-      const instructorId = req.user._id;
-
-      // Mock dashboard data for now - in production, this would fetch real data
-      let dashboardData = {
-        totalCourses: 3,
-        totalStudents: 45,
+      const instructorId = req.user._id;      // Mock dashboard data for now - in production, this would fetch real data
+      let dashboardData = { totalCourses: 3, totalStudents: 45, // Key metrics for instructor dashboard
         averagePerformance: 78.5,
         recentActivity: [
           { type: 'course_enrollment', count: 5, course: 'JavaScript Fundamentals' },

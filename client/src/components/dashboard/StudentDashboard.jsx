@@ -39,16 +39,10 @@ const StudentDashboard = ({ setCurrentView }) => {
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');  useEffect(() => {
-    console.log('🔍 StudentDashboard useEffect triggered');
-    console.log('   Token available:', !!token);
-    console.log('   User available:', !!user);
-    
     if (token) {
-      console.log('✅ Token found, loading dashboard data...');
       loadDashboardData();
     } else {
       // If no token, still show dashboard with default/empty state
-      console.warn('⚠️ No authentication token available');
       setLoading(false);
       // Set default values
       setEnrolledCourses([]);
@@ -64,12 +58,10 @@ const StudentDashboard = ({ setCurrentView }) => {
 
     // Safety timeout to prevent infinite loading
     const timeout = setTimeout(() => {
-      console.warn('⏰ Dashboard loading timeout - forcing loading to false');
       setLoading(false);
     }, 10000); // Reduced to 10 seconds
 
     return () => {
-      console.log('🧹 Cleaning up dashboard useEffect');
       clearTimeout(timeout);
     };
   }, [token]);
@@ -79,15 +71,9 @@ const StudentDashboard = ({ setCurrentView }) => {
       loadAvailableCourses();
     }
   }, [activeTab, searchTerm, selectedCategory]);  const loadDashboardData = async () => {
-    console.log('🚀 Starting loadDashboardData...');
-    console.log('   Token available:', !!token);
-    console.log('   User available:', !!user);
-    
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('📋 Loading dashboard components...');
       
       // Load enrolled courses
       try {        const coursesResponse = await fetch('/api/courses/my/enrolled', {
@@ -95,15 +81,11 @@ const StudentDashboard = ({ setCurrentView }) => {
         });
         
         if (!coursesResponse.ok) {
-          console.warn('Failed to load enrolled courses:', coursesResponse.status);
           throw new Error(`Failed to load enrolled courses: ${coursesResponse.status}`);
-        }
-        
+        }        
         const coursesData = await coursesResponse.json();
         setEnrolledCourses(coursesData.enrolledCourses || []);
-        console.log('Enrolled courses loaded:', coursesData.enrolledCourses?.length || 0);
       } catch (error) {
-        console.warn('Enrolled courses error:', error);
         setEnrolledCourses([]); // Set empty array as fallback
       }
 
@@ -114,10 +96,8 @@ const StudentDashboard = ({ setCurrentView }) => {
         });
         
         if (!analyticsResponse.ok) {
-          console.warn('Failed to load analytics:', analyticsResponse.status);
           throw new Error(`Failed to load analytics: ${analyticsResponse.status}`);
         }        const analyticsData = await analyticsResponse.json();
-        console.log('Analytics response data:', analyticsData);
         
         // Handle different response structures from the analytics API
         const analyticsPayload = analyticsData.data || analyticsData.analytics || analyticsData.summary || analyticsData;
@@ -129,9 +109,7 @@ const StudentDashboard = ({ setCurrentView }) => {
           todayStudyTime: analyticsPayload?.todayStudyTime || 0,
           achievements: analyticsPayload?.achievements || 0
         });
-        console.log('Analytics loaded successfully');
       } catch (error) {
-        console.warn('Analytics error:', error);
         setLearningStats({
           totalPoints: 0,
           streak: 0,
@@ -139,33 +117,24 @@ const StudentDashboard = ({ setCurrentView }) => {
           todayStudyTime: 0,
           achievements: 0
         });
-      }
-
-      // Load recommendations
+      }      // Load recommendations
       try {
         const recommendationsResponse = await fetch('/api/adaptive-learning/recommendations', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
         if (!recommendationsResponse.ok) {
-          console.warn('Failed to load recommendations:', recommendationsResponse.status);
           throw new Error(`Failed to load recommendations: ${recommendationsResponse.status}`);
         }
           const recData = await recommendationsResponse.json();
         setRecommendations(recData.recommendations || []);
-        console.log('Recommendations loaded:', recData.recommendations?.length || 0);
       } catch (error) {
-        console.warn('Recommendations error:', error);
         setRecommendations([]);
       }
 
-      console.log('Dashboard data loading completed');
-
     } catch (error) {
-      console.error('Dashboard data loading error:', error);
       // Don't set error state since we have fallbacks for individual components
     } finally {
-      console.log('Setting loading to false');
       setLoading(false);
     }
   };
@@ -194,9 +163,7 @@ const StudentDashboard = ({ setCurrentView }) => {
       
       if (response.ok) {
         const data = await response.json();
-        setAvailableCourses(data.courses || []);
-      } else {
-        console.warn('Failed to load course catalog:', response.status);
+        setAvailableCourses(data.courses || []);      } else {
         setAvailableCourses([]);
       }
     } catch (error) {

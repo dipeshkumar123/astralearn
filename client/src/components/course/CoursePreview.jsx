@@ -431,15 +431,10 @@ const CoursePreview = ({
                           <span className="text-blue-800">Option C</span>
                         </label>
                       </div>                      <button 
-                        onClick={() => {
-                          // Get selected answer
-                          const selectedRadio = document.querySelector('input[name="quiz"]:checked');
+                        onClick={() => { const selectedRadio = document.querySelector('input[name="quiz"]:checked');
                           if (selectedRadio) {
-                            // Mock quiz submission logic
                             const answer = selectedRadio.nextSibling.textContent;
-                            console.log('Submitted answer:', answer);
                             alert(`Answer submitted: ${answer}`);
-                            // Here you would normally send to backend
                           } else {
                             alert('Please select an answer first');
                           }

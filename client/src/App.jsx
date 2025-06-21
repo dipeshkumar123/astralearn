@@ -130,10 +130,12 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
             loadCourseData={loadCourseData}
           />
         );      case 'adaptive-learning':
-        return <AdaptiveLearningDashboard userId={user.id} userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'gamification':
+        // Pass userRole for student, instructor, admin access levels
+        return <AdaptiveLearningDashboard userId={user.id} userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;case 'gamification':
         return <GamificationDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'social-learning':
         return <SocialDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'dashboard':
       default:
+        // Pass setCurrentView as prop for navigation functionality
         return <RoleBasedDashboard setCurrentView={(view) => {
           // Extract course ID from localStorage when navigating to course views
           if (view === 'course-preview' || view === 'course-detail') {
@@ -147,7 +149,6 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
   useEffect(() => {
     const handleNavigateToCourse = (event) => {
       const { view, courseId } = event.detail;
-      console.log('🎯 Custom navigation event received:', { view, courseId });
       setSelectedCourseId(courseId);
       setCurrentView(view);
     };
@@ -193,10 +194,8 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                         }`}
                       >
                         AI Demo
-                      </button>
-                      
-                      {/* Course Management - Only for instructors and admins */}
-                      {(user.role === 'instructor' || user.role === 'admin') && (
+                      </button>                      {/* Course Management - Only for instructors and admins */}
+                      {(user.role === 'instructor' || user.role === 'admin') && ( // course-management access
                         <button
                           onClick={() => setCurrentView('course-management')}
                           className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -236,9 +235,8 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                           {user.role === 'student' ? 'Achievements' : 'Student Engagement'}
                         </button>
                       )}
-                        
-                      {/* Social Learning - Primarily for students */}
-                      {user.role === 'student' && (
+                          {/* Social Learning - Primarily for students */}
+                      {user.role === 'student' && ( // Social Learning for students
                         <button
                           onClick={() => setCurrentView('social-learning')}
                           className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
