@@ -5,6 +5,10 @@ import AIContextProvider from './contexts/AIContextProvider'
 import DemoLearningEnvironment from './components/demo/DemoLearningEnvironment'
 import CourseManagementDashboard from './components/course/CourseManagementDashboard'
 import CoursePreview from './components/course/CoursePreview'
+import ModernCoursePreview from './components/course/ModernCoursePreview'
+import RedesignedCoursePreview from './components/course/RedesignedCoursePreview'
+import ModernLessonPage from './components/course/ModernLessonPage'
+import ModernLessonCompletion from './components/course/ModernLessonCompletion'
 import CourseLearningEnvironment from './components/course/CourseLearningEnvironment'
 import AdaptiveLearningDashboard from './components/adaptive/AdaptiveLearningDashboard'
 import GamificationDashboard from './components/gamification/GamificationDashboard'
@@ -113,37 +117,34 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       case 'demo':
         return <DemoLearningEnvironment onBackToStatus={() => setCurrentView('dashboard')} />;
       case 'course-management':
-        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;
-      case 'course-preview':
+        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;      case 'course-preview':
         return (
-          <CoursePreviewWrapper 
+          <ModernCoursePreviewWrapper 
             courseId={selectedCourseId} 
-            onBack={() => setCurrentView('dashboard')}
+            onBack={(destination) => {
+              if (destination === 'course-detail') {
+                setCurrentView('course-detail');
+              } else {
+                setCurrentView('dashboard');
+              }
+            }}
             loadCourseData={loadCourseData}
           />
         );
       case 'course-detail':
         return (
-          <CourseDetailWrapper 
+          <ModernLessonWrapper 
             courseId={selectedCourseId} 
             onBack={() => setCurrentView('dashboard')}
             loadCourseData={loadCourseData}
           />
-        );      case 'adaptive-learning':
+        );case 'adaptive-learning':
         // Pass userRole for student, instructor, admin access levels
         return <AdaptiveLearningDashboard userId={user.id} userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;case 'gamification':
         return <GamificationDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'social-learning':
         return <SocialDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'dashboard':
-      default:
-        // Pass setCurrentView as prop for navigation functionality
-        return <RoleBasedDashboard setCurrentView={(view) => {
-          // Extract course ID from localStorage when navigating to course views
-          if (view === 'course-preview' || view === 'course-detail') {
-            const courseId = localStorage.getItem('selectedCourseId');
-            setSelectedCourseId(courseId);
-          }
-          setCurrentView(view);
-        }} />;
+      default:        // Pass setCurrentView as prop for navigation functionality
+        return <RoleBasedDashboard setCurrentView={handleViewChange} />;
     }
   };  // Handle custom navigation events from dashboard
   useEffect(() => {
@@ -158,6 +159,16 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
     return () => {
       window.removeEventListener('navigateToCourse', handleNavigateToCourse);
     };
+  }, []);
+
+  // Also handle navigation changes in the main setCurrentView function
+  const handleViewChange = useCallback((view, options = {}) => {
+    // Extract course ID from localStorage when navigating to course views
+    if (view === 'course-preview' || view === 'course-detail') {
+      const courseId = options.courseId || localStorage.getItem('selectedCourseId');
+      setSelectedCourseId(courseId);
+    }
+    setCurrentView(view);
   }, []);
 
   return (
@@ -320,7 +331,264 @@ function App() {
 
 export default App
 
-// Course Preview Wrapper Component
+// Modern Course Preview Wrapper Component
+const ModernCoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
+  const [course, setCourse] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [userProgress, setUserProgress] = useState(null);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const { user, token } = useAuth();
+
+  useEffect(() => {
+    const loadCourse = async () => {
+      const targetCourseId = courseId || localStorage.getItem('selectedCourseId');
+      
+      if (targetCourseId) {
+        setLoading(true);
+        const courseData = await loadCourseData(targetCourseId);
+        setCourse(courseData);
+        
+        // Check enrollment status
+        if (user && courseData) {
+          try {
+            const response = await fetch('/api/courses/my/enrolled', {
+              headers: {
+                'Authorization': `Bearer ${token || localStorage.getItem('token')}`
+              }
+            });
+            if (response.ok) {
+              const data = await response.json();
+              const enrollment = data.enrolledCourses?.find(
+                e => e.course?._id === targetCourseId
+              );
+              if (enrollment) {
+                setIsEnrolled(true);
+                setUserProgress(enrollment.progressData);
+              }
+            }
+          } catch (error) {
+            console.error('Error checking enrollment:', error);
+          }
+        }
+        
+        setLoading(false);      } else {
+        console.error('No course ID provided for preview');
+        onBack();
+      }
+    };
+
+    loadCourse();
+  }, [courseId, user, token]);
+
+  const handleEnroll = async (courseId) => {
+    try {
+      const response = await fetch(`/api/courses/${courseId}/enroll`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        setIsEnrolled(true);
+        // Optionally reload course data to get updated enrollment info
+        return true;
+      } else {
+        console.error('Enrollment failed');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error enrolling in course:', error);
+      return false;
+    }
+  };
+
+  const handleBackNavigation = (destination) => {
+    if (destination === 'learning') {
+      // Navigate to learning environment
+      localStorage.setItem('selectedCourseId', course._id);
+      // Use a custom event to trigger navigation to course-detail
+      window.dispatchEvent(new CustomEvent('navigateToCourse', {
+        detail: { view: 'course-detail', courseId: course._id }
+      }));
+    } else {
+      onBack();
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading course preview...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Course not found</p>
+          <button 
+            onClick={() => onBack()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <RedesignedCoursePreview
+      course={course}
+      userProgress={userProgress}
+      isEnrolled={isEnrolled}
+      onEnroll={handleEnroll}
+      onBack={handleBackNavigation}
+    />
+  );
+};
+
+// Modern Lesson Page Wrapper Component
+const ModernLessonWrapper = ({ courseId, onBack, loadCourseData }) => {
+  const [course, setCourse] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [userProgress, setUserProgress] = useState({});
+  const [currentModule, setCurrentModule] = useState(0);
+  const [currentLesson, setCurrentLesson] = useState(0);
+  const { user, token } = useAuth();
+
+  useEffect(() => {
+    const loadCourse = async () => {
+      const targetCourseId = courseId || localStorage.getItem('selectedCourseId');
+      
+      if (targetCourseId) {
+        setLoading(true);
+        const courseData = await loadCourseData(targetCourseId);
+        setCourse(courseData);
+        
+        // Load user progress
+        if (user && courseData) {
+          try {
+            const response = await fetch('/api/courses/my/enrolled', {
+              headers: {
+                'Authorization': `Bearer ${token || localStorage.getItem('token')}`
+              }
+            });
+            if (response.ok) {
+              const data = await response.json();
+              const enrollment = data.enrolledCourses?.find(
+                e => e.course?._id === targetCourseId
+              );
+              if (enrollment) {
+                setUserProgress(enrollment.progressData || {});
+              }
+            }
+          } catch (error) {
+            console.error('Error loading progress:', error);
+          }
+        }
+        
+        setLoading(false);      } else {
+        console.error('No course ID provided for lesson');
+        onBack();
+      }
+    };
+
+    loadCourse();
+  }, [courseId, user, token]);
+
+  const handleLessonComplete = async (lessonId, moduleIndex, lessonIndex) => {
+    try {
+      // Update progress on server
+      const response = await fetch(`/api/courses/${course._id}/progress`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          lessonId,
+          moduleIndex,
+          lessonIndex,
+          completed: true
+        })
+      });
+      
+      if (response.ok) {
+        // Update local progress state
+        setUserProgress(prev => ({
+          ...prev,
+          completedLessons: [...(prev.completedLessons || []), lessonId]
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating progress:', error);
+    }
+  };
+
+  const handleNavigateToLesson = (moduleIndex, lessonIndex) => {
+    setCurrentModule(moduleIndex);
+    setCurrentLesson(lessonIndex);
+  };
+
+  const handleNextLesson = (moduleIndex, lessonIndex) => {
+    setCurrentModule(moduleIndex);
+    setCurrentLesson(lessonIndex);
+  };
+
+  const handlePreviousLesson = (moduleIndex, lessonIndex) => {
+    setCurrentModule(moduleIndex);
+    setCurrentLesson(lessonIndex);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading lesson...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Course not found</p>
+          <button 
+            onClick={() => onBack()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <ModernLessonCompletion
+      course={course}
+      currentModule={currentModule}
+      currentLesson={currentLesson}
+      userProgress={userProgress}
+      onBack={() => onBack()}
+      onLessonComplete={handleLessonComplete}
+      onNextLesson={handleNextLesson}
+      onPreviousLesson={handlePreviousLesson}
+      onNavigateToLesson={handleNavigateToLesson}
+    />
+  );
+};
+
+// Legacy Course Preview Wrapper Component (kept for backward compatibility)
 const CoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
