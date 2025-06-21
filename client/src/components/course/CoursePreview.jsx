@@ -279,13 +279,11 @@ const CoursePreview = ({
               </div>
             </div>
           </div>
-        )}
-
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col">
+        )}        {/* Main Content */}
+        <div className="flex-1 flex flex-col h-full">
           {/* Lesson Header */}
           {lesson && (
-            <div className="bg-white border-b border-gray-200 p-4">
+            <div className="bg-white border-b border-gray-200 p-4 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">{lesson.title}</h2>
@@ -325,9 +323,9 @@ const CoursePreview = ({
             </div>
           )}
 
-          {/* Lesson Content */}
-          <div className="flex-1 p-6 overflow-y-auto">
-            {lesson ? (
+          {/* Lesson Content - Scrollable Area */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-6 pb-24">{/* Added extra padding bottom for button space */}            {lesson ? (
               <div className="max-w-4xl mx-auto">
                 {/* Lesson Content Preview */}
                 <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -380,35 +378,6 @@ const CoursePreview = ({
                       </div>
                     )}
                   </div>
-
-                  {/* Lesson Actions */}
-                  <div className="mt-8 pt-6 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-600">
-                        Estimated time: {formatDuration(lesson.estimatedDuration || 15)}
-                      </div>
-
-                      <div className="flex items-center space-x-3">
-                        {!progress[currentModule]?.[currentLesson]?.completed && (
-                          <button
-                            onClick={markLessonComplete}
-                            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                          >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Mark Complete
-                          </button>
-                        )}
-
-                        <button
-                          onClick={nextLesson}
-                          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                        >
-                          Next Lesson
-                          <SkipForward className="w-4 h-4 ml-2" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Mock Quiz/Assessment */}
@@ -454,6 +423,40 @@ const CoursePreview = ({
                 <p>Select a lesson from the sidebar to preview its content.</p>
               </div>
             )}
+          </div>
+
+          {/* Fixed Lesson Actions Bar - Always visible at bottom */}
+          {lesson && (
+            <div className="bg-white border-t border-gray-200 p-4 flex-shrink-0">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Estimated time: {formatDuration(lesson.estimatedDuration || 15)}
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    {!progress[currentModule]?.[currentLesson]?.completed && (
+                      <button
+                        onClick={markLessonComplete}
+                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Mark Complete
+                      </button>
+                    )}
+
+                    <button
+                      onClick={nextLesson}
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Next Lesson
+                      <SkipForward className="w-4 h-4 ml-2" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           </div>
         </div>
       </div>
