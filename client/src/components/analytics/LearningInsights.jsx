@@ -41,8 +41,7 @@ import {
   Lightbulb, 
   AlertTriangle,
   CheckCircle,
-  Clock,
-  Calendar,
+  Clock,  Calendar,
   Zap,
   BookOpen,
   Users,
@@ -51,45 +50,167 @@ import {
   Download,
   Share
 } from 'lucide-react';
+import { useDataSync } from '../../contexts/DataSyncProvider';
 
 const LearningInsights = () => {
+  const { 
+    analytics, 
+    userProgress, 
+    courses, 
+    getLearningStats, 
+    loading: dataLoading, 
+    fetchAnalytics 
+  } = useDataSync();
+  
   const [insights, setInsights] = useState(null);
   const [patterns, setPatterns] = useState(null);
   const [predictions, setPredictions] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [processingInsights, setProcessingInsights] = useState(false);
   const [selectedInsight, setSelectedInsight] = useState(null);
   const [timeframe, setTimeframe] = useState(30);
   const [analysisType, setAnalysisType] = useState('detailed');
 
+  // Generate insights from real data
   useEffect(() => {
-    loadInsightsData();
-  }, [timeframe, analysisType]);
+    if (analytics && userProgress && courses.length > 0) {
+      generateInsights();
+    }
+  }, [analytics, userProgress, courses, timeframe, analysisType]);
 
-  const loadInsightsData = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
+  const generateInsights = () => {
+    setProcessingInsights(true);
+    
+    // Generate real insights from actual user data
+    const learningStats = getLearningStats();
+    
+    const realInsights = {
+      totalStudyTime: learningStats.totalTimeSpent,
+      averageProgress: learningStats.averageProgress,
+      coursesEnrolled: learningStats.totalCoursesEnrolled,
+      lessonsCompleted: learningStats.totalLessonsCompleted,
+      currentStreak: learningStats.currentStreak,
       
-      const [insightsRes, patternsRes] = await Promise.all([
-        fetch('/api/analytics/insights/personalized', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/analytics/patterns/analyze?timeframe=${timeframe}&analysisType=${analysisType}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+      // Calculate learning velocity
+      learningVelocity: learningStats.totalLessonsCompleted > 0 
+        ? (learningStats.totalTimeSpent / learningStats.totalLessonsCompleted) 
+        : 0,
+      
+      // Engagement patterns
+      engagementTrend: calculateEngagementTrend(),
+      
+      // Performance by course
+      coursePerformance: calculateCoursePerformance(),
+      
+      // Learning recommendations
+      recommendations: generateRecommendations(learningStats)
+    };
 
-      if (insightsRes.ok) {
-        const data = await insightsRes.json();
-        setInsights(data.insights);
-      }
+    setInsights(realInsights);
+    
+    // Generate learning patterns from real data
+    setPatterns(generateLearningPatterns());
+    
+    // Generate predictions
+    setPredictions(generatePredictions(realInsights));
+    
+    setProcessingInsights(false);
+  };
 
-      if (patternsRes.ok) {
-        const data = await patternsRes.json();
-        setPatterns(data.patterns);
-      }
+  const calculateEngagementTrend = () => {
+    // Calculate engagement based on real progress data
+    const courseProgress = Object.values(userProgress);
+    if (courseProgress.length === 0) return 'stable';
+    
+    const avgProgress = courseProgress.reduce((sum, p) => sum + (p.overallProgress || 0), 0) / courseProgress.length;
+    
+    if (avgProgress > 70) return 'increasing';
+    if (avgProgress < 30) return 'decreasing';
+    return 'stable';
+  };
 
-      // Generate sample predictions data
+  const calculateCoursePerformance = () => {
+    return courses.map(course => {
+      const progress = userProgress[course._id || course.id];
+      return {
+        courseName: course.title,
+        progress: progress?.overallProgress || 0,
+        timeSpent: progress?.totalTimeSpent || 0,
+        completion: progress?.completedLessons?.length || 0,
+        rating: progress?.averageScore || 0
+      };
+    });
+  };
+
+  const generateRecommendations = (stats) => {
+    const recommendations = [];
+    
+    if (stats.currentStreak === 0) {
+      recommendations.push({
+        type: 'engagement',
+        priority: 'high',
+        title: 'Restart Your Learning Streak',
+        description: 'Complete a lesson today to begin building a consistent learning habit.',
+        action: 'Start a lesson'
+      });
+    }
+    
+    if (stats.averageProgress < 50) {
+      recommendations.push({
+        type: 'progress',
+        priority: 'medium',
+        title: 'Accelerate Your Progress',
+        description: 'Focus on completing current courses before starting new ones.',
+        action: 'Continue current course'
+      });
+    }
+    
+    if (stats.totalCoursesEnrolled > 3 && stats.averageProgress < 30) {
+      recommendations.push({
+        type: 'focus',
+        priority: 'high',
+        title: 'Reduce Course Load',
+        description: 'Consider focusing on 1-2 courses to improve completion rates.',
+        action: 'Review enrolled courses'
+      });
+    }
+    
+    return recommendations;
+  };
+
+  const generateLearningPatterns = () => {
+    // Generate patterns based on real user behavior
+    const enrolledCourses = courses.filter(course => userProgress[course._id || course.id]);
+    
+    return {
+      preferredCategories: [...new Set(enrolledCourses.map(c => c.category))],
+      averageSessionTime: getLearningStats().totalTimeSpent / Math.max(1, getLearningStats().totalLessonsCompleted),
+      completionRate: enrolledCourses.length > 0 
+        ? (Object.values(userProgress).reduce((sum, p) => sum + (p.overallProgress || 0), 0) / enrolledCourses.length) / 100
+        : 0,
+      strongSubjects: enrolledCourses
+        .filter(course => (userProgress[course._id || course.id]?.overallProgress || 0) > 70)
+        .map(course => course.category)
+        .filter((category, index, array) => array.indexOf(category) === index)
+    };
+  };
+
+  const generatePredictions = (insights) => {
+    return {
+      completionProbability: Math.min(95, Math.max(10, insights.averageProgress + insights.currentStreak * 5)),
+      timeToComplete: insights.coursesEnrolled > 0 
+        ? Math.ceil((100 - insights.averageProgress) / Math.max(1, insights.averageProgress / 30)) 
+        : 0,
+      recommendedPace: insights.averageProgress < 50 ? 'increase' : 'maintain',
+      nextMilestone: getNextMilestone(insights)
+    };
+  };
+
+  const getNextMilestone = (insights) => {
+    if (insights.lessonsCompleted < 10) return { type: 'lessons', target: 10, current: insights.lessonsCompleted };
+    if (insights.coursesEnrolled < 3) return { type: 'courses', target: 3, current: insights.coursesEnrolled };
+    if (insights.currentStreak < 7) return { type: 'streak', target: 7, current: insights.currentStreak };
+    return { type: 'mastery', target: 100, current: insights.averageProgress };
+  };
       setPredictions({
         outcomesPrediction: {
           currentTrajectory: 'positive',
@@ -115,49 +236,77 @@ const LearningInsights = () => {
             impact: 'medium',
             effort: 'medium'
           }
-        ]
+        ]      });
+
+  const [learningPatternData, setLearningPatternData] = useState([]);
+  const [skillProgressData, setSkillProgressData] = useState([]);
+  const [learningEfficiencyData, setLearningEfficiencyData] = useState([]);
+
+  const loadLearningPatternData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/analytics/learning-patterns', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
+      if (response.ok) {
+        const data = await response.json();
+        setLearningPatternData(data.patterns || []);
+      } else {
+        setLearningPatternData([]);
+      }
     } catch (error) {
-      console.error('Insights data loading error:', error);
-    } finally {
-      setLoading(false);
+      console.error('Failed to load learning pattern data:', error);
+      setLearningPatternData([]);
     }
   };
 
-  const generateLearningPatternData = () => {
-    return Array.from({ length: 24 }, (_, hour) => ({
-      hour: `${hour}:00`,
-      engagement: Math.sin((hour - 9) * Math.PI / 12) * 30 + 50 + Math.random() * 20,
-      retention: Math.cos((hour - 10) * Math.PI / 10) * 25 + 60 + Math.random() * 15,
-      productivity: Math.sin((hour - 8) * Math.PI / 14) * 35 + 65 + Math.random() * 10
-    }));
+  const loadSkillProgressData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/analytics/skill-progress', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSkillProgressData(data.skills || []);
+      } else {
+        setSkillProgressData([]);
+      }
+    } catch (error) {
+      console.error('Failed to load skill progress data:', error);
+      setSkillProgressData([]);
+    }
   };
 
-  const generateSkillProgressData = () => {
-    return [
-      { skill: 'JavaScript', current: 85, target: 90, growth: 12 },
-      { skill: 'React', current: 75, target: 85, growth: 20 },
-      { skill: 'Node.js', current: 60, target: 80, growth: 8 },
-      { skill: 'Database', current: 70, target: 85, growth: 15 },
-      { skill: 'Testing', current: 45, target: 70, growth: 25 },
-      { skill: 'DevOps', current: 30, target: 60, growth: 10 }
-    ];
+  const loadLearningEfficiencyData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/analytics/learning-efficiency?timeframe=${timeframe}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLearningEfficiencyData(data.efficiency || []);
+      } else {
+        setLearningEfficiencyData([]);
+      }
+    } catch (error) {
+      console.error('Failed to load learning efficiency data:', error);
+      setLearningEfficiencyData([]);
+    }
   };
 
-  const generateLearningEfficiencyData = () => {
-    return Array.from({ length: timeframe }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (timeframe - 1 - i));
-      return {
-        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        efficiency: Math.random() * 40 + 60,
-        difficulty: Math.random() * 30 + 40,
-        satisfaction: Math.random() * 35 + 65,
-        timeSpent: Math.random() * 60 + 30
-      };
-    });
-  };
+  // Load chart data when component mounts or dependencies change
+  useEffect(() => {
+    if (!loading) {
+      loadLearningPatternData();
+      loadSkillProgressData();
+      loadLearningEfficiencyData();
+    }
+  }, [timeframe, loading]);
 
   const colors = {
     primary: '#3B82F6',
@@ -246,7 +395,7 @@ const LearningInsights = () => {
     </ResponsiveContainer>
   );
 
-  if (loading) {
+  if (dataLoading.analytics || processingInsights) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
         <motion.div

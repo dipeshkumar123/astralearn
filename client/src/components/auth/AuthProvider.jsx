@@ -103,7 +103,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       return { success: false, error: 'Registration failed. Please try again.' };
     }
-  };const logout = () => {
+  };  const logout = () => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
@@ -112,24 +112,7 @@ export const AuthProvider = ({ children }) => {
     // Disconnect WebSocket on logout
     webSocketService.disconnect();
   };
-  const getMockUser = () => ({
-    id: 'user_12345',
-    firstName: 'Demo',
-    lastName: 'Student',
-    username: 'demo_student',
-    email: 'demo@astralearn.com',
-    role: 'student',
-    learningStyle: 'visual',
-    progress: 45,
-    enrolledCourses: ['javascript-fundamentals', 'react-advanced'],
-    preferences: {
-      learningStyle: 'visual',
-      difficulty: 'intermediate',
-      studyTime: 'evening'
-    }
-  });
 
-  const getDemoToken = () => 'demo_token_for_development';
   const value = {
     user: user,
     token: token,
@@ -137,8 +120,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    isAuthenticated: !!token && !!user,
-    isDemoMode: false // We'll only use real authentication now
+    isAuthenticated: !!token && !!user
   };
 
   return (

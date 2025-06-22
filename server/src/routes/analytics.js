@@ -2085,4 +2085,53 @@ router.get('/admin/user-analytics',
   }
 );
 
+/**
+ * Get Analytics Summary
+ * Comprehensive analytics summary for user dashboard
+ */
+router.get('/summary', flexibleAuthenticate, async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'User ID not found in token'
+      });
+    }
+
+    // Get basic analytics data
+    const analytics = await analyticsService.getUserAnalytics(userId);
+    
+    // Create summary response
+    const summary = {
+      userId: userId,
+      totalStudyTime: analytics.totalStudyTime || 0,
+      coursesCompleted: analytics.coursesCompleted || 0,
+      coursesInProgress: analytics.coursesInProgress || 0,
+      averageScore: analytics.averageScore || 0,
+      streakDays: analytics.streakDays || 0,
+      weeklyGoalProgress: analytics.weeklyGoalProgress || 0,
+      skillsLearned: analytics.skillsLearned || [],
+      recentActivity: analytics.recentActivity || [],
+      performanceTrend: analytics.performanceTrend || 'stable',
+      lastUpdated: new Date().toISOString()
+    };
+
+    res.json({
+      success: true,
+      analytics: summary,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Analytics summary error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch analytics summary',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 export default router;

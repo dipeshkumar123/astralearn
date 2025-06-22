@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import AIAssistant from './components/ai/AIAssistant'
 import AIContextProvider from './contexts/AIContextProvider'
+import DataSyncProvider from './contexts/DataSyncProvider'
 import DemoLearningEnvironment from './components/demo/DemoLearningEnvironment'
 import CourseManagementDashboard from './components/course/CourseManagementDashboard'
 import CoursePreview from './components/course/CoursePreview'
@@ -324,12 +325,15 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <DataSyncProvider>
+        <AIContextProvider>
+          <AppContent />
+          <AIAssistant />
+        </AIContextProvider>
+      </DataSyncProvider>
     </AuthProvider>
   );
 }
-
-export default App
 
 // Modern Course Preview Wrapper Component
 const ModernCoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
@@ -707,3 +711,5 @@ const CourseDetailWrapper = ({ courseId, onBack, loadCourseData }) => {
     />
   );
 };
+
+export default App;

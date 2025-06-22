@@ -24,159 +24,77 @@ import {
   Activity
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
+import { useDataSync } from '../../contexts/DataSyncProvider';
 
 const StudentDashboard = ({ setCurrentView }) => {
-  const { user, token } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [enrolledCourses, setEnrolledCourses] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
-  const [learningStats, setLearningStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { user, token } = useAuth();  const { 
+    courses, 
+    userProgress, 
+    analytics, 
+    loading, 
+    errors,
+    fetchCourses,
+    fetchUserProgress,
+    fetchAnalytics,
+    getCourseProgress,
+    getLearningStats,
+    getRecommendations,
+    enrollInCourse
+  } = useDataSync();
   
-  // Course catalog state
-  const [availableCourses, setAvailableCourses] = useState([]);
-  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');  useEffect(() => {
-    if (token) {
-      loadDashboardData();
-    } else {
-      // If no token, still show dashboard with default/empty state
-      setLoading(false);
-      // Set default values
-      setEnrolledCourses([]);
-      setLearningStats({
-        totalPoints: 0,
-        streak: 0,
-        certificates: 0,
-        todayStudyTime: 0,
-        achievements: 0
-      });
-      setRecommendations([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+
+  // Get enrolled courses from real user progress data
+  const enrolledCourses = courses.filter(course => 
+    userProgress[course._id] || userProgress[course.id]
+  );
+
+  // Get available courses (not enrolled)
+  const availableCourses = courses.filter(course => 
+    !userProgress[course._id] && !userProgress[course.id]
+  );
+  // Get real learning statistics
+  const learningStats = getLearningStats();
+
+  // Get course recommendations based on user's learning pattern
+  const recommendations = getRecommendations();
+
+  // Filter courses based on search and category
+  const filteredCourses = availableCourses.filter(course => {
+    const matchesSearch = !searchTerm || 
+      course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCategory = !selectedCategory || 
+      course.category === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
+
+  // Get unique categories for filter
+  const categories = [...new Set(courses.map(course => course.category))].filter(Boolean);  // Handle course enrollment
+  const handleEnrollCourse = async (courseId) => {
+    try {
+      await enrollInCourse(courseId);
+      // Data will be automatically updated through DataSyncProvider
+    } catch (error) {
+      console.error('Failed to enroll in course:', error);
     }
-
-    // Safety timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 10000); // Reduced to 10 seconds
-
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [token]);
-
+  };
+  // Initialize data when component mounts
   useEffect(() => {
-    if (activeTab === 'explore') {
-      loadAvailableCourses();
+    if (token) {
+      fetchCourses();
+      fetchUserProgress();
+      fetchAnalytics();
     }
-  }, [activeTab, searchTerm, selectedCategory]);  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Load enrolled courses
-      try {        const coursesResponse = await fetch('/api/courses/my/enrolled', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        if (!coursesResponse.ok) {
-          throw new Error(`Failed to load enrolled courses: ${coursesResponse.status}`);
-        }        
-        const coursesData = await coursesResponse.json();
-        setEnrolledCourses(coursesData.enrolledCourses || []);
-      } catch (error) {
-        setEnrolledCourses([]); // Set empty array as fallback
-      }
-
-      // Load learning analytics
-      try {
-        const analyticsResponse = await fetch('/api/analytics/summary', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        if (!analyticsResponse.ok) {
-          throw new Error(`Failed to load analytics: ${analyticsResponse.status}`);
-        }        const analyticsData = await analyticsResponse.json();
-        
-        // Handle different response structures from the analytics API
-        const analyticsPayload = analyticsData.data || analyticsData.analytics || analyticsData.summary || analyticsData;
-        
-        setLearningStats({
-          totalPoints: analyticsPayload?.totalPoints || 0,
-          streak: analyticsPayload?.streak || 0,
-          certificates: analyticsPayload?.certificates || 0,
-          todayStudyTime: analyticsPayload?.todayStudyTime || 0,
-          achievements: analyticsPayload?.achievements || 0
-        });
-      } catch (error) {
-        setLearningStats({
-          totalPoints: 0,
-          streak: 0,
-          certificates: 0,
-          todayStudyTime: 0,
-          achievements: 0
-        });
-      }      // Load recommendations
-      try {
-        const recommendationsResponse = await fetch('/api/adaptive-learning/recommendations', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        if (!recommendationsResponse.ok) {
-          throw new Error(`Failed to load recommendations: ${recommendationsResponse.status}`);
-        }
-          const recData = await recommendationsResponse.json();
-        setRecommendations(recData.recommendations || []);
-      } catch (error) {
-        setRecommendations([]);
-      }
-
-    } catch (error) {
-      // Don't set error state since we have fallbacks for individual components
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadAvailableCourses = async () => {
-    try {
-      setCatalogLoading(true);
-      
-      // Build query parameters
-      const queryParams = new URLSearchParams({
-        page: 1,
-        limit: 20
-      });
-      
-      if (searchTerm) {
-        queryParams.append('search', searchTerm);
-      }
-      
-      if (selectedCategory) {
-        queryParams.append('category', selectedCategory);
-      }
-      
-      const response = await fetch(`/api/courses?${queryParams}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableCourses(data.courses || []);      } else {
-        setAvailableCourses([]);
-      }
-    } catch (error) {
-      console.error('Course catalog loading error:', error);
-      setAvailableCourses([]);
-    } finally {
-      setCatalogLoading(false);
-    }
-  };
+  }, [token]); // Remove function dependencies to prevent infinite loop
 
   // Helper function to check if student is enrolled in a course
   const isEnrolledInCourse = (courseId) => {
-    return enrolledCourses.some(enrollment => enrollment.course?._id === courseId);
+    return enrolledCourses.some(course => course._id === courseId || course.id === courseId);
   };
 
   const renderOverview = () => (
@@ -188,53 +106,49 @@ const StudentDashboard = ({ setCurrentView }) => {
         </h1>
         <p className="text-blue-100 mb-4">
           Ready to continue your learning journey? You have {enrolledCourses.length} active courses.
-        </p>
-        <div className="flex items-center space-x-4">
+        </p>        <div className="flex items-center space-x-4">
           <div className="bg-white/20 rounded-lg px-4 py-2">
             <div className="text-sm text-blue-100">Learning Streak</div>
-            <div className="text-xl font-bold">{learningStats?.streak || 0} days</div>
+            <div className="text-xl font-bold">{learningStats.currentStreak} days</div>
           </div>
           <div className="bg-white/20 rounded-lg px-4 py-2">
-            <div className="text-sm text-blue-100">Total Points</div>
-            <div className="text-xl font-bold">{learningStats?.totalPoints || 0}</div>
+            <div className="text-sm text-blue-100">Completed Lessons</div>
+            <div className="text-xl font-bold">{learningStats.totalLessonsCompleted}</div>
           </div>
           <div className="bg-white/20 rounded-lg px-4 py-2">
-            <div className="text-sm text-blue-100">Certificates</div>
-            <div className="text-xl font-bold">{learningStats?.certificates || 0}</div>
+            <div className="text-sm text-blue-100">Study Time</div>
+            <div className="text-xl font-bold">{Math.round(learningStats.totalTimeSpent / 60)}h</div>
           </div>
         </div>
-      </div>
-
-      {/* Quick Stats */}
+      </div>      {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
           {
-            title: 'Courses in Progress',
-            value: enrolledCourses.filter(c => c.progress < 100).length,
+            title: 'Courses Enrolled',
+            value: enrolledCourses.length,
             icon: BookOpen,
             color: 'blue',
-            trend: '+2 this week'
+            trend: `${learningStats.totalCoursesEnrolled} total`
           },
           {
             title: 'Average Progress',
-            value: `${Math.round(enrolledCourses.reduce((acc, c) => acc + (c.progress || 0), 0) / enrolledCourses.length) || 0}%`,
+            value: `${Math.round(learningStats.averageProgress)}%`,
             icon: TrendingUp,
             color: 'green',
-            trend: '+5% this week'
+            trend: enrolledCourses.length > 0 ? 'On track' : 'Get started'
           },
           {
-            title: 'Study Time Today',
-            value: `${learningStats?.todayStudyTime || 0}h`,
+            title: 'Total Study Time',
+            value: `${Math.round(learningStats.totalTimeSpent / 60)}h`,
             icon: Clock,
             color: 'orange',
-            trend: '2h goal'
-          },
-          {
-            title: 'Achievements',
-            value: learningStats?.achievements || 0,
+            trend: `${learningStats.totalLessonsCompleted} lessons`
+          },          {
+            title: 'Current Streak',
+            value: learningStats.currentStreak,
             icon: Award,
             color: 'purple',
-            trend: '+1 this week'
+            trend: learningStats.currentStreak > 0 ? 'Keep it up!' : 'Start today'
           }
         ].map((stat, index) => (
           <motion.div
@@ -395,79 +309,58 @@ const StudentDashboard = ({ setCurrentView }) => {
             Filter
           </button>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {enrolledCourses.map((enrollment, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <h3 className="font-bold text-gray-900">{enrollment.course?.title}</h3>
-              <div className="flex items-center space-x-1">
-                <Star className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm text-gray-600">4.8</span>
-              </div>
-            </div>
-            
-            <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-              {enrollment.course?.description}
-            </p>
-            
-            <div className="mb-4">
-              <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                <span>Progress</span>
-                <span>{enrollment.progress || 0}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all"
-                  style={{ width: `${enrollment.progress || 0}%` }}
-                />
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 text-xs text-gray-500">
+      </div>      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {enrolledCourses.map((course, index) => {
+          const progress = getCourseProgress(course._id || course.id);
+          
+          return (
+            <motion.div
+              key={course._id || course.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="font-bold text-gray-900">{course.title}</h3>
                 <div className="flex items-center space-x-1">
-                  <Clock className="h-3 w-3" />
-                  <span>{enrollment.course?.estimatedDuration}h</span>
+                  <Star className="h-4 w-4 text-yellow-500" />
+                  <span className="text-sm text-gray-600">{course.rating || '4.0'}</span>
                 </div>
-                <div className="flex items-center space-x-1">
-                  <Users className="h-3 w-3" />
-                  <span>{enrollment.course?.enrollmentCount || 0}</span>
+              </div>
+              
+              <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                {course.description}
+              </p>
+              
+              <div className="mb-4">
+                <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                  <span>Progress</span>
+                  <span>{progress.percentage}%</span>
                 </div>
-              </div>              <button 
-                onClick={() => {
-                  // Navigate to course detail to continue learning
-                  if (typeof setCurrentView === 'function') {
-                    setCurrentView('course-detail');
-                    localStorage.setItem('selectedCourseId', enrollment.course?._id);
-                  } else {
-                    // Enhanced fallback - attempt to navigate using custom event
-                    const courseId = enrollment.course?._id;
-                    if (courseId) {
-                      localStorage.setItem('selectedCourseId', courseId);
-                      // Trigger a custom event that App.jsx can listen for
-                      window.dispatchEvent(new CustomEvent('navigateToCourse', { 
-                        detail: { view: 'course-detail', courseId } 
-                      }));
-                    } else {
-                      alert(`Continuing course: ${enrollment.course?.title}`);
-                    }
-                  }
-                }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center"
-              >
-                <PlayCircle className="w-4 h-4 mr-1" />
-                Continue
-              </button>
-            </div>
-          </motion.div>        ))}
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    style={{ width: `${progress.percentage}%` }}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">
+                  {progress.completed} of {progress.total} lessons                </span>
+                <button
+                  onClick={() => setCurrentView(prev => ({
+                    ...prev,
+                    detail: { view: 'course-detail', courseId: course._id || course.id }
+                  }))}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                >
+                  Continue
+                </button>
+              </div>            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
@@ -586,14 +479,15 @@ const StudentDashboard = ({ setCurrentView }) => {
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                     >
                       Preview
-                    </button>                    
-                    {isEnrolledInCourse(course._id) ? (
+                    </button>                      {isEnrolledInCourse(course._id || course.id) ? (
                       <button 
                         onClick={() => {
                           // Navigate to continue learning
                           if (setCurrentView) {
-                            setCurrentView('course-detail');
-                            localStorage.setItem('selectedCourseId', course._id);
+                            setCurrentView(prev => ({
+                              ...prev,
+                              detail: { view: 'course-detail', courseId: course._id || course.id }
+                            }));
                           }
                         }}
                         className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"
@@ -602,32 +496,9 @@ const StudentDashboard = ({ setCurrentView }) => {
                       </button>
                     ) : (
                       <button 
-                        onClick={async () => {
-                          try {
-                            const response = await fetch(`/api/courses/${course._id}/enroll`, {
-                              method: 'POST',
-                              headers: { 
-                                'Authorization': `Bearer ${token}`,
-                                'Content-Type': 'application/json'
-                              }
-                            });
-                            
-                            if (response.ok) {
-                              alert(`Successfully enrolled in: ${course.title}`);
-                              // Refresh enrolled courses
-                              loadDashboardData();
-                            } else {
-                              const errorData = await response.json();
-                              alert(`Enrollment failed: ${errorData.message || 'Unknown error'}`);
-                            }
-                          } catch (error) {
-                            console.error('Enrollment error:', error);
-                            alert('Enrollment failed. Please try again.');
-                          }
-                        }}
+                        onClick={() => handleEnrollCourse(course._id || course.id)}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
-                      >
-                        Enroll
+                      >                        Enroll
                       </button>
                     )}
                   </div>
@@ -661,58 +532,31 @@ const StudentDashboard = ({ setCurrentView }) => {
         </div>
       )}
     </div>
-  );
-  if (loading) {
-    return (      <div className="flex items-center justify-center min-h-screen">
+  );  // Show loading state when essential data is loading
+  if (loading.courses || loading.progress) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your learning dashboard...</p>
           <p className="text-sm text-gray-500 mt-2">
-            Token: {token ? 'Available' : 'Missing'} | 
-            User: {user?.firstName || 'Unknown'}
-          </p>
-          <div className="mt-6 space-y-2">
-            <button
-              onClick={() => {
-                console.log('🚨 Emergency bypass activated');
-                setLoading(false);
-                setEnrolledCourses([]);
-                setLearningStats({
-                  totalPoints: 0,
-                  streak: 0,
-                  certificates: 0,
-                  todayStudyTime: 0,
-                  achievements: 0
-                });
-                setRecommendations([]);
-              }}
-              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors mx-2"
-            >
-              Skip Loading (Emergency)
-            </button>
-            <button
-              onClick={loadDashboardData}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors mx-2"
-            >
-              Retry Loading
-            </button>
-          </div>
-          <p className="text-xs text-gray-400 mt-4">
-            If loading takes more than 10 seconds, click "Skip Loading"
+            Fetching courses and progress data...
           </p>
         </div>
-      </div>
-    );
+      </div>    );
   }
 
-  if (error) {
+  // Show error state if there are critical errors
+  if (errors.courses || errors.progress) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="text-red-600 text-2xl mb-4">{error}</div>
+          <p className="text-red-600 mb-4">Failed to load dashboard data</p>
           <button
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            onClick={loadDashboardData}
+            onClick={() => {
+              fetchCourses(true);
+              fetchUserProgress(true);
+            }}            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
             Retry
           </button>

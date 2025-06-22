@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticate } from '../middleware/auth.js';
+import { flexibleAuthenticate } from '../middleware/devAuth.js';
 import { User } from '../models/User.js';
 import { UserProgress } from '../models/UserProgress.js';
 import aiContextService from '../services/aiContextService.js';
@@ -285,6 +286,50 @@ router.put('/preferences',
     }
   }
 );
+
+// Get user progress across all courses
+router.get('/progress', flexibleAuthenticate, async (req, res) => {
+  try {
+    // Get all user progress records
+    const userProgressRecords = await UserProgress.find({ 
+      userId: req.user._id 
+    }).populate('courseId', 'title category difficulty');
+
+    // Format progress data for frontend consumption
+    const progressData = {};
+    userProgressRecords.forEach(record => {
+      if (record.courseId) {
+        progressData[record.courseId._id] = {
+          courseId: record.courseId._id,
+          courseTitle: record.courseId.title,
+          category: record.courseId.category,
+          difficulty: record.courseId.difficulty,
+          progressType: record.progressType,
+          progressData: record.progressData,
+          completionPercentage: record.progressData?.completionPercentage || 0,
+          startedAt: record.createdAt,
+          completedAt: record.progressData?.completionPercentage === 100 ? record.timestamp : null,
+          lastAccessedAt: record.timestamp,
+          totalTimeSpent: record.progressData?.timeSpent || 0
+        };
+      }
+    });
+
+    res.json({
+      success: true,
+      progress: progressData,
+      totalCourses: Object.keys(progressData).length,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error) {
+    console.error('Get user progress error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Could not retrieve user progress',
+    });
+  }
+});
 
 // Helper Functions
 

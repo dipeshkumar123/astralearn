@@ -97,139 +97,165 @@ const InstructorAnalytics = () => {
   useEffect(() => {
     loadInstructorAnalytics();
   }, [selectedCourse, timeframe]);
-
   const loadInstructorAnalytics = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
       
-      // In a real implementation, these would be separate API calls
-      // For now, we'll generate comprehensive sample data
-      
-      // Sample class data
-      setClassData({
-        totalStudents: 125,
-        activeStudents: 98,
-        averageProgress: 68,
-        completionRate: 82,
-        averageGrade: 84.5,
-        engagementScore: 76,
-        atRiskStudents: 8,
-        topPerformers: 15
-      });
+      if (!token) {
+        console.warn('No authentication token found');
+        setLoading(false);
+        return;
+      }
 
-      // Sample student analytics
-      setStudentAnalytics([
-        {
-          id: 1,
-          name: 'Alice Johnson',
-          email: 'alice@example.com',
-          progress: 95,
-          grade: 92,
-          engagement: 88,
-          lastActive: '2 hours ago',
-          riskLevel: 'low',
-          trend: 'up'
-        },
-        {
-          id: 2,
-          name: 'Bob Smith',
-          email: 'bob@example.com',
-          progress: 45,
-          grade: 58,
-          engagement: 42,
-          lastActive: '3 days ago',
-          riskLevel: 'high',
-          trend: 'down'
-        },
-        {
-          id: 3,
-          name: 'Carol Brown',
-          email: 'carol@example.com',
-          progress: 78,
-          grade: 81,
-          engagement: 75,
-          lastActive: '1 hour ago',
-          riskLevel: 'low',
-          trend: 'up'
-        },
-        {
-          id: 4,
-          name: 'David Wilson',
-          email: 'david@example.com',
-          progress: 32,
-          grade: 45,
-          engagement: 35,
-          lastActive: '5 days ago',
-          riskLevel: 'high',
-          trend: 'down'
-        },
-        {
-          id: 5,
-          name: 'Emma Davis',
-          email: 'emma@example.com',
-          progress: 87,
-          grade: 89,
-          engagement: 92,
-          lastActive: '30 minutes ago',
-          riskLevel: 'low',
-          trend: 'up'
-        }
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      // Parallel API calls for better performance
+      const [classResponse, studentsResponse, contentResponse] = await Promise.allSettled([
+        fetch(`/api/analytics/instructor/class-overview?course=${selectedCourse}&timeframe=${timeframe}`, { headers }),
+        fetch(`/api/analytics/instructor/students?course=${selectedCourse}&timeframe=${timeframe}`, { headers }),
+        fetch(`/api/analytics/instructor/content?course=${selectedCourse}&timeframe=${timeframe}`, { headers })
       ]);
 
-      // Sample content analytics
-      setContentAnalytics({
-        totalLessons: 24,
-        averageCompletion: 75,
-        mostPopular: 'Introduction to React Hooks',
-        leastEngaging: 'Advanced State Management',
-        averageTimeSpent: 45,
-        dropoffPoints: ['Lesson 8', 'Lesson 15', 'Lesson 20']
-      });
+      // Handle class data
+      if (classResponse.status === 'fulfilled' && classResponse.value.ok) {
+        const classData = await classResponse.value.json();
+        setClassData(classData.data || classData);
+      } else {
+        // Fallback to basic data if detailed analytics aren't available
+        setClassData({
+          totalStudents: 0,
+          activeStudents: 0,
+          averageProgress: 0,
+          completionRate: 0,
+          averageGrade: 0,
+          engagementScore: 0,
+          atRiskStudents: 0,
+          topPerformers: 0
+        });
+      }
+
+      // Handle student analytics
+      if (studentsResponse.status === 'fulfilled' && studentsResponse.value.ok) {
+        const studentsData = await studentsResponse.value.json();
+        setStudentAnalytics(studentsData.students || studentsData.data || []);
+      } else {
+        setStudentAnalytics([]);
+      }
+
+      // Handle content analytics
+      if (contentResponse.status === 'fulfilled' && contentResponse.value.ok) {
+        const contentData = await contentResponse.value.json();
+        setContentAnalytics(contentData.data || contentData);
+      } else {
+        setContentAnalytics({
+          totalLessons: 0,
+          averageCompletion: 0,
+          mostPopular: 'N/A',
+          leastEngaging: 'N/A',
+          averageTimeSpent: 0,
+          dropoffPoints: []
+        });
+      }
 
     } catch (error) {
       console.error('Instructor analytics loading error:', error);
+      // Set empty states on error
+      setClassData({
+        totalStudents: 0,
+        activeStudents: 0,
+        averageProgress: 0,
+        completionRate: 0,
+        averageGrade: 0,
+        engagementScore: 0,
+        atRiskStudents: 0,
+        topPerformers: 0
+      });
+      setStudentAnalytics([]);
+      setContentAnalytics({
+        totalLessons: 0,
+        averageCompletion: 0,
+        mostPopular: 'N/A',
+        leastEngaging: 'N/A',
+        averageTimeSpent: 0,
+        dropoffPoints: []
+      });
     } finally {
       setLoading(false);
     }
   };
+  const [classProgressData, setClassProgressData] = useState([]);
+  const [lessonAnalyticsData, setLessonAnalyticsData] = useState([]);
+  const [studentDistributionData, setStudentDistributionData] = useState([]);
 
-  const generateClassProgressData = () => {
-    return Array.from({ length: timeframe }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (timeframe - 1 - i));
-      return {
-        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        progress: Math.random() * 20 + 60 + (i / timeframe) * 15,
-        engagement: Math.random() * 30 + 65,
-        completion: Math.random() * 25 + 70,
-        newStudents: Math.floor(Math.random() * 5)
-      };
-    });
+  const loadClassProgressData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/analytics/instructor/progress-timeline?course=${selectedCourse}&timeframe=${timeframe}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setClassProgressData(data.timeline || []);
+      } else {
+        setClassProgressData([]);
+      }
+    } catch (error) {
+      console.error('Failed to load class progress data:', error);
+      setClassProgressData([]);
+    }
   };
 
-  const generateLessonAnalyticsData = () => {
-    return [
-      { lesson: 'Lesson 1', completion: 95, avgTime: 35, difficulty: 2 },
-      { lesson: 'Lesson 2', completion: 89, avgTime: 42, difficulty: 3 },
-      { lesson: 'Lesson 3', completion: 87, avgTime: 38, difficulty: 3 },
-      { lesson: 'Lesson 4', completion: 82, avgTime: 55, difficulty: 4 },
-      { lesson: 'Lesson 5', completion: 78, avgTime: 48, difficulty: 4 },
-      { lesson: 'Lesson 6', completion: 75, avgTime: 52, difficulty: 5 },
-      { lesson: 'Lesson 7', completion: 73, avgTime: 58, difficulty: 5 },
-      { lesson: 'Lesson 8', completion: 65, avgTime: 45, difficulty: 4 }
-    ];
+  const loadLessonAnalyticsData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/analytics/instructor/lesson-performance?course=${selectedCourse}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLessonAnalyticsData(data.lessons || []);
+      } else {
+        setLessonAnalyticsData([]);
+      }
+    } catch (error) {
+      console.error('Failed to load lesson analytics data:', error);
+      setLessonAnalyticsData([]);
+    }
   };
 
-  const generateStudentDistributionData = () => {
-    return [
-      { name: 'Excellent (90-100%)', value: 15, color: '#10B981' },
-      { name: 'Good (80-89%)', value: 35, color: '#3B82F6' },
-      { name: 'Average (70-79%)', value: 28, color: '#F59E0B' },
-      { name: 'Below Average (60-69%)', value: 15, color: '#F97316' },
-      { name: 'At Risk (<60%)', value: 7, color: '#EF4444' }
-    ];
+  const loadStudentDistributionData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/analytics/instructor/grade-distribution?course=${selectedCourse}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setStudentDistributionData(data.distribution || []);
+      } else {
+        setStudentDistributionData([]);
+      }
+    } catch (error) {
+      console.error('Failed to load student distribution data:', error);
+      setStudentDistributionData([]);
+    }
   };
+
+  // Load chart data when component mounts or dependencies change
+  useEffect(() => {
+    if (!loading) {
+      loadClassProgressData();
+      loadLessonAnalyticsData();
+      loadStudentDistributionData();
+    }
+  }, [selectedCourse, timeframe, loading]);
 
   const colors = {
     primary: '#3B82F6',
@@ -469,9 +495,8 @@ const InstructorAnalytics = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
               >
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Class Progress Trends</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={generateClassProgressData()}>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Class Progress Trends</h3>                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={classProgressData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
                     <YAxis />
@@ -490,11 +515,10 @@ const InstructorAnalytics = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
               >
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Distribution</h3>
-                <ResponsiveContainer width="100%" height={300}>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Distribution</h3>                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={generateStudentDistributionData()}
+                      data={studentDistributionData}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
@@ -503,7 +527,7 @@ const InstructorAnalytics = () => {
                       fill="#8884d8"
                       dataKey="value"
                     >
-                      {generateStudentDistributionData().map((entry, index) => (
+                      {studentDistributionData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -564,7 +588,7 @@ const InstructorAnalytics = () => {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Lesson Analytics</h3>
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={generateLessonAnalyticsData()}>
+                <BarChart data={lessonAnalyticsData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="lesson" />
                   <YAxis />
