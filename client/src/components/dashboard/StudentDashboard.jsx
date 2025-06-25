@@ -41,10 +41,10 @@ const StudentDashboard = ({ setCurrentView }) => {
     getRecommendations,
     enrollInCourse
   } = useDataSync();
-  
-  const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [catalogLoading, setCatalogLoading] = useState(false);
 
   // Get enrolled courses from real user progress data
   const enrolledCourses = courses.filter(course => 
@@ -403,10 +403,8 @@ const StudentDashboard = ({ setCurrentView }) => {
             <option value="languages">Languages</option>
           </select>
         </div>
-      </div>
-
-      {/* Course Grid */}
-      {catalogLoading ? (
+      </div>      {/* Course Grid */}
+      {loading.courses || catalogLoading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading courses...</p>
