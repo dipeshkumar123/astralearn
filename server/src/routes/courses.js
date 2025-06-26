@@ -340,4 +340,173 @@ router.get('/instructor/:instructorId', flexibleAuthenticate, async (req, res) =
   }
 });
 
+// Get course progress for a user
+router.get('/:id/progress', flexibleAuthenticate, async (req, res) => {
+  try {
+    const { id: courseId } = req.params;
+    const userId = req.user._id;
+    
+    // Get user progress for this course
+    const userProgress = await UserProgress.find({
+      userId,
+      courseId,
+      progressType: { $in: ['lesson', 'quiz', 'module'] }
+    }).sort({ lastUpdated: -1 });
+
+    // Convert to progress structure expected by frontend
+    const progress = {};
+    userProgress.forEach(progressItem => {
+      if (progressItem.progressData) {
+        const moduleIndex = progressItem.progressData.moduleIndex || 0;
+        const lessonIndex = progressItem.progressData.lessonIndex || 0;
+        
+        if (!progress[moduleIndex]) {
+          progress[moduleIndex] = {};
+        }
+        
+        progress[moduleIndex][lessonIndex] = {
+          completed: progressItem.progressData.completed || false,
+          timeSpent: progressItem.progressData.timeSpent || 0,
+          score: progressItem.progressData.score || null
+        };
+      }
+    });
+
+    res.json({ progress });
+  } catch (error) {
+    console.error('Get course progress error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Mark lesson as complete
+router.post('/:id/lessons/:lessonId/complete', flexibleAuthenticate, async (req, res) => {
+  try {
+    const { id: courseId, lessonId } = req.params;
+    const userId = req.user._id;
+    const { moduleIndex, lessonIndex, timeSpent } = req.body;
+
+    // Find or create progress record
+    let userProgress = await UserProgress.findOne({
+      userId,
+      courseId,
+      progressType: 'lesson',
+      'progressData.lessonId': lessonId
+    });
+
+    if (!userProgress) {
+      userProgress = new UserProgress({
+        userId,
+        courseId,
+        progressType: 'lesson',
+        progressData: {
+          lessonId,
+          moduleIndex: moduleIndex || 0,
+          lessonIndex: lessonIndex || 0,
+          completed: true,
+          timeSpent: timeSpent || 300,
+          completedAt: new Date()
+        }
+      });
+    } else {
+      userProgress.progressData.completed = true;
+      userProgress.progressData.timeSpent = (userProgress.progressData.timeSpent || 0) + (timeSpent || 300);
+      userProgress.progressData.completedAt = new Date();
+      userProgress.lastUpdated = new Date();
+    }
+
+    await userProgress.save();
+
+    res.json({
+      success: true,
+      timeSpent: userProgress.progressData.timeSpent,
+      completedAt: userProgress.progressData.completedAt
+    });
+  } catch (error) {
+    console.error('Mark lesson complete error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Submit quiz answers
+router.post('/:id/lessons/:lessonId/quiz', flexibleAuthenticate, async (req, res) => {
+  try {
+    const { id: courseId, lessonId } = req.params;
+    const userId = req.user._id;
+    const { answers } = req.body;
+
+    // Get the course and lesson to find correct answers
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    // Find the lesson with quiz
+    let targetLesson = null;
+    let moduleIndex = -1;
+    let lessonIndex = -1;
+
+    for (let mi = 0; mi < course.modules.length; mi++) {
+      const module = course.modules[mi];
+      for (let li = 0; li < module.lessons.length; li++) {
+        const lesson = module.lessons[li];
+        if (lesson._id.toString() === lessonId) {
+          targetLesson = lesson;
+          moduleIndex = mi;
+          lessonIndex = li;
+          break;
+        }
+      }
+      if (targetLesson) break;
+    }
+
+    if (!targetLesson || !targetLesson.quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    // Calculate score
+    const quiz = targetLesson.quiz;
+    let correctAnswers = 0;
+    const totalQuestions = quiz.questions.length;
+
+    quiz.questions.forEach((question, index) => {
+      if (answers[index] === question.correctAnswer) {
+        correctAnswers++;
+      }
+    });
+
+    const score = Math.round((correctAnswers / totalQuestions) * 100);
+
+    // Save quiz result
+    const quizProgress = new UserProgress({
+      userId,
+      courseId,
+      progressType: 'quiz',
+      progressData: {
+        lessonId,
+        moduleIndex,
+        lessonIndex,
+        answers,
+        score,
+        correctAnswers,
+        totalQuestions,
+        completedAt: new Date()
+      }
+    });
+
+    await quizProgress.save();
+
+    res.json({
+      success: true,
+      score,
+      correctAnswers,
+      totalQuestions,
+      passed: score >= 70 // 70% passing grade
+    });
+  } catch (error) {
+    console.error('Submit quiz error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 export default router;

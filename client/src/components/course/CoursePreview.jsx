@@ -42,7 +42,40 @@ const CoursePreview = ({
 
   useEffect(() => {
     if (course && course.modules?.length > 0) {
-      // Initialize progress tracking
+      // Fetch real progress data from server
+      fetchProgressData();
+    }
+  }, [course]);
+
+  const fetchProgressData = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/courses/${course._id}/progress`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const progressData = await response.json();
+        setProgress(progressData.progress || {});
+      } else {
+        // Initialize empty progress tracking if no data found
+        const initialProgress = {};
+        course.modules.forEach((module, moduleIndex) => {
+          initialProgress[moduleIndex] = {};
+          module.lessons?.forEach((lesson, lessonIndex) => {
+            initialProgress[moduleIndex][lessonIndex] = {
+              completed: false,
+              timeSpent: 0,
+              score: null
+            };
+          });
+        });
+        setProgress(initialProgress);
+      }
+    } catch (error) {
+      console.error('Error fetching progress data:', error);
+      // Fallback to empty progress
       const initialProgress = {};
       course.modules.forEach((module, moduleIndex) => {
         initialProgress[moduleIndex] = {};
@@ -56,7 +89,7 @@ const CoursePreview = ({
       });
       setProgress(initialProgress);
     }
-  }, [course]);
+  };
 
   const getCurrentLesson = () => {
     if (!course?.modules?.[currentModule]?.lessons?.[currentLesson]) {
@@ -100,18 +133,34 @@ const CoursePreview = ({
     }
   };
 
-  const markLessonComplete = () => {
-    const newProgress = { ...progress };
-    if (!newProgress[currentModule]) newProgress[currentModule] = {};
-    
-    newProgress[currentModule][currentLesson] = {
-      ...newProgress[currentModule][currentLesson],
-      completed: true,
-      timeSpent: (newProgress[currentModule][currentLesson]?.timeSpent || 0) + 300, // Add 5 minutes
-      score: Math.floor(Math.random() * 30) + 70 // Random score 70-100
-    };
-    
-    setProgress(newProgress);
+  const markLessonComplete = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/courses/${course._id}/lessons/${lesson._id}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const updatedProgress = await response.json();
+        const newProgress = { ...progress };
+        if (!newProgress[currentModule]) newProgress[currentModule] = {};
+        
+        newProgress[currentModule][currentLesson] = {
+          completed: true,
+          timeSpent: updatedProgress.timeSpent || 300,
+          score: updatedProgress.score || null
+        };
+        
+        setProgress(newProgress);
+      } else {
+        console.error('Failed to mark lesson as complete');
+      }
+    } catch (error) {
+      console.error('Error marking lesson complete:', error);
+    }
   };
   const calculateOverallProgress = () => {
     if (!course || !course.modules || !Array.isArray(course.modules)) {
@@ -133,6 +182,37 @@ const CoursePreview = ({
     });
 
     return totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+  };
+
+  const handleQuizSubmit = async (quiz) => {
+    const answers = {};
+    quiz.questions.forEach((question, qIndex) => {
+      const selectedRadio = document.querySelector(`input[name="quiz-${qIndex}"]:checked`);
+      if (selectedRadio) {
+        answers[qIndex] = parseInt(selectedRadio.value);
+      }
+    });
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/courses/${course._id}/lessons/${lesson._id}/quiz`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ answers })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Quiz submitted! Score: ${result.score}%`);
+      } else {
+        alert('Failed to submit quiz. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      alert('Error submitting quiz. Please try again.');
+    }
   };
 
   const formatDuration = (minutes) => {
@@ -380,34 +460,31 @@ const CoursePreview = ({
                   </div>
                 </div>
 
-                {/* Mock Quiz/Assessment */}
-                {Math.random() > 0.7 && (
+                {/* Knowledge Check - Only show if quiz data exists */}
+                {lesson.quiz && lesson.quiz.questions && lesson.quiz.questions.length > 0 && (
                   <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
-                    <h4 className="font-medium text-blue-900 mb-3">Quick Knowledge Check</h4>
+                    <h4 className="font-medium text-blue-900 mb-3">{lesson.quiz.title || 'Quick Knowledge Check'}</h4>
                     <div className="space-y-3">
-                      <p className="text-blue-800">What did you learn in this lesson?</p>
-                      <div className="space-y-2">
-                        <label className="flex items-center">
-                          <input type="radio" name="quiz" className="mr-2" />
-                          <span className="text-blue-800">Option A</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input type="radio" name="quiz" className="mr-2" />
-                          <span className="text-blue-800">Option B</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input type="radio" name="quiz" className="mr-2" />
-                          <span className="text-blue-800">Option C</span>
-                        </label>
-                      </div>                      <button 
-                        onClick={() => { const selectedRadio = document.querySelector('input[name="quiz"]:checked');
-                          if (selectedRadio) {
-                            const answer = selectedRadio.nextSibling.textContent;
-                            alert(`Answer submitted: ${answer}`);
-                          } else {
-                            alert('Please select an answer first');
-                          }
-                        }}
+                      {lesson.quiz.questions.map((question, qIndex) => (
+                        <div key={qIndex} className="space-y-2">
+                          <p className="text-blue-800">{question.question}</p>
+                          <div className="space-y-2">
+                            {question.options.map((option, oIndex) => (
+                              <label key={oIndex} className="flex items-center">
+                                <input 
+                                  type="radio" 
+                                  name={`quiz-${qIndex}`} 
+                                  value={oIndex}
+                                  className="mr-2" 
+                                />
+                                <span className="text-blue-800">{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <button 
+                        onClick={() => handleQuizSubmit(lesson.quiz)}
                         className="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                       >
                         Submit Answer

@@ -321,8 +321,10 @@ export const DataSyncProvider = ({ children }) => {
         score += 2;
       }
       
-      // Random factor to add variety
-      score += Math.random() * 2;
+      // Add consistency factor based on course rating and category match
+      if (enrolledCategories.includes(course.category)) {
+        score += 1.5;
+      }
       
       return {
         ...course,
@@ -332,7 +334,7 @@ export const DataSyncProvider = ({ children }) => {
           : course.difficulty === 'beginner' && enrolledCourseIds.length <= 2
             ? 'Perfect for getting started'
             : 'Popular with other learners',
-        duration: course.duration || `${Math.floor(Math.random() * 8 + 2)} hours`
+        duration: course.duration || course.estimatedDuration || '4 hours'
       };
     });
 

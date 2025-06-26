@@ -44,47 +44,98 @@ const AdminDashboard = () => {
   const loadAdminData = async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem('token');
       
-      // Load platform analytics
-      const analyticsResponse = await fetch('/api/analytics/platform/overview', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      // Load all admin data from real APIs
+      const [analyticsResponse, systemStatsResponse, userStatsResponse, healthResponse] = await Promise.all([
+        fetch('/api/analytics/platform/overview', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch('/api/admin/system/stats', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch('/api/admin/users/stats', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch('/api/admin/system/health', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
       
       if (analyticsResponse.ok) {
         const analyticsData = await analyticsResponse.json();
         setPlatformAnalytics(analyticsData.data);
       }
 
-      // Mock system data - in real implementation, these would be separate API calls
-      setSystemStats({
-        totalUsers: 15420,
-        activeUsers: 8934,
-        totalCourses: 1247,
-        activeCourses: 892,
-        totalLessons: 12456,
-        systemUptime: '99.97%',
-        serverLoad: 23,
-        databaseSize: '2.1 GB'
-      });
+      if (systemStatsResponse.ok) {
+        const systemData = await systemStatsResponse.json();
+        setSystemStats(systemData.stats);
+      } else {
+        setSystemStats({
+          totalUsers: 0,
+          activeUsers: 0,
+          totalCourses: 0,
+          activeCourses: 0,
+          totalLessons: 0,
+          systemUptime: 'N/A',
+          serverLoad: 0,
+          databaseSize: 'N/A'
+        });
+      }
 
-      setUserStats({
-        students: 13845,
-        instructors: 1289,
-        admins: 286,
-        newUsersToday: 47,
-        activeSessionsNow: 2341
-      });
+      if (userStatsResponse.ok) {
+        const userData = await userStatsResponse.json();
+        setUserStats(userData.stats);
+      } else {
+        setUserStats({
+          students: 0,
+          instructors: 0,
+          admins: 0,
+          newUsersToday: 0,
+          activeSessionsNow: 0
+        });
+      }
 
-      setSystemHealth({
-        webServer: 'healthy',
-        database: 'healthy',
-        aiService: 'healthy',
-        fileStorage: 'healthy',
-        emailService: 'warning'
-      });
+      if (healthResponse.ok) {
+        const healthData = await healthResponse.json();
+        setSystemHealth(healthData.health);
+      } else {
+        setSystemHealth({
+          webServer: 'unknown',
+          database: 'unknown',
+          aiService: 'unknown',
+          fileStorage: 'unknown',
+          emailService: 'unknown'
+        });
+      }
 
     } catch (error) {
       console.error('Admin dashboard data loading error:', error);
+      // Set empty states on error
+      setSystemStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        totalCourses: 0,
+        activeCourses: 0,
+        totalLessons: 0,
+        systemUptime: 'N/A',
+        serverLoad: 0,
+        databaseSize: 'N/A'
+      });
+      setUserStats({
+        students: 0,
+        instructors: 0,
+        admins: 0,
+        newUsersToday: 0,
+        activeSessionsNow: 0
+      });
+      setSystemHealth({
+        webServer: 'error',
+        database: 'error',
+        aiService: 'error',
+        fileStorage: 'error',
+        emailService: 'error'
+      });
     } finally {
       setLoading(false);
     }

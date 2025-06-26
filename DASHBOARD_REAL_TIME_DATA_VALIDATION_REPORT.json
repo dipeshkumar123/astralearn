@@ -1,0 +1,139 @@
+{
+  "timestamp": "2025-06-25T13:35:37.114Z",
+  "summary": {
+    "componentsAnalyzed": 12,
+    "successRate": 33.33333333333333,
+    "mockDataIssues": 4,
+    "integrationIssues": 1,
+    "realTimeDataComponents": 11
+  },
+  "details": {
+    "componentsAnalyzed": 12,
+    "mockDataIssues": [
+      {
+        "component": "InstructorAnalytics",
+        "severity": "LOW",
+        "description": "Fallback data references",
+        "count": 1,
+        "matches": [
+          "Fallback to basic data"
+        ]
+      },
+      {
+        "component": "GamificationDashboard",
+        "severity": "LOW",
+        "description": "Fallback data references",
+        "count": 1,
+        "matches": [
+          "fallback data"
+        ]
+      },
+      {
+        "component": "SocialDashboard",
+        "severity": "LOW",
+        "description": "Fallback data references",
+        "count": 1,
+        "matches": [
+          "fallback social data"
+        ]
+      },
+      {
+        "component": "CourseManagementDashboard",
+        "severity": "LOW",
+        "description": "Fallback data references",
+        "count": 1,
+        "matches": [
+          "fallback mock data"
+        ]
+      }
+    ],
+    "integrationIssues": [
+      {
+        "component": "StudentDashboard",
+        "issue": "Low real data integration score",
+        "score": 4
+      }
+    ],
+    "realTimeDataComponents": [
+      {
+        "component": "InstructorDashboard",
+        "score": 20,
+        "hasApiIntegration": true,
+        "hasDataSync": false,
+        "hasAuth": true
+      },
+      {
+        "component": "AdminDashboard",
+        "score": 8,
+        "hasApiIntegration": true,
+        "hasDataSync": false,
+        "hasAuth": true
+      },
+      {
+        "component": "AnalyticsDashboard",
+        "score": 20,
+        "hasApiIntegration": true,
+        "hasDataSync": false,
+        "hasAuth": false
+      },
+      {
+        "component": "LearningInsights",
+        "score": 19,
+        "hasApiIntegration": true,
+        "hasDataSync": true,
+        "hasAuth": false
+      },
+      {
+        "component": "InstructorAnalytics",
+        "score": 30,
+        "hasApiIntegration": true,
+        "hasDataSync": false,
+        "hasAuth": false
+      },
+      {
+        "component": "GamificationDashboard",
+        "score": 22,
+        "hasApiIntegration": true,
+        "hasDataSync": false,
+        "hasAuth": false
+      },
+      {
+        "component": "Leaderboard",
+        "score": 12,
+        "hasApiIntegration": true,
+        "hasDataSync": false,
+        "hasAuth": false
+      },
+      {
+        "component": "AchievementProgress",
+        "score": 6,
+        "hasApiIntegration": true,
+        "hasDataSync": false,
+        "hasAuth": false
+      },
+      {
+        "component": "SocialDashboard",
+        "score": 27,
+        "hasApiIntegration": true,
+        "hasDataSync": false,
+        "hasAuth": false
+      },
+      {
+        "component": "CourseManagementDashboard",
+        "score": 36,
+        "hasApiIntegration": true,
+        "hasDataSync": false,
+        "hasAuth": true
+      },
+      {
+        "component": "DataSyncProvider",
+        "score": 19,
+        "hasApiIntegration": false,
+        "hasDataSync": true,
+        "hasAuth": true
+      }
+    ],
+    "passedTests": 3,
+    "totalTests": 9
+  }
+}

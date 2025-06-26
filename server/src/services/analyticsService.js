@@ -877,6 +877,305 @@ class AnalyticsService {
     if (score > 70) return 2;   // Average performers
     return 2.5; // Struggling learners need more time
   }
+
+  /**
+   * Calculate progress trends for analytics
+   */
+  calculateProgressTrends(progressData) {
+    try {
+      if (!progressData || !Array.isArray(progressData)) {
+        return {
+          overall: 'stable',
+          weekly: 'stable',
+          monthly: 'stable',
+          velocity: 0
+        };
+      }
+
+      // Sort by date
+      const sortedData = progressData.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      if (sortedData.length < 2) {
+        return {
+          overall: 'stable',
+          weekly: 'stable', 
+          monthly: 'stable',
+          velocity: 0
+        };
+      }
+
+      // Calculate overall trend
+      const firstScore = sortedData[0].score || 0;
+      const lastScore = sortedData[sortedData.length - 1].score || 0;
+      const overallChange = lastScore - firstScore;
+      
+      // Calculate velocity (progress per day)
+      const daysDiff = (new Date(sortedData[sortedData.length - 1].date) - new Date(sortedData[0].date)) / (1000 * 60 * 60 * 24);
+      const velocity = daysDiff > 0 ? overallChange / daysDiff : 0;
+
+      return {
+        overall: overallChange > 5 ? 'improving' : overallChange < -5 ? 'declining' : 'stable',
+        weekly: this.calculateWeeklyTrend(sortedData),
+        monthly: this.calculateMonthlyTrend(sortedData),
+        velocity: Math.round(velocity * 100) / 100
+      };
+    } catch (error) {
+      console.error('Error calculating progress trends:', error);
+      return {
+        overall: 'stable',
+        weekly: 'stable',
+        monthly: 'stable',
+        velocity: 0
+      };
+    }
+  }
+
+  /**
+   * Calculate weekly progress trend
+   */
+  calculateWeeklyTrend(data) {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    const weeklyData = data.filter(d => new Date(d.date) >= oneWeekAgo);
+    
+    if (weeklyData.length < 2) return 'stable';
+    
+    const firstWeekScore = weeklyData[0].score || 0;
+    const lastWeekScore = weeklyData[weeklyData.length - 1].score || 0;
+    const weeklyChange = lastWeekScore - firstWeekScore;
+    
+    return weeklyChange > 3 ? 'improving' : weeklyChange < -3 ? 'declining' : 'stable';
+  }
+
+  /**
+   * Calculate monthly progress trend
+   */
+  calculateMonthlyTrend(data) {
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    
+    const monthlyData = data.filter(d => new Date(d.date) >= oneMonthAgo);
+    
+    if (monthlyData.length < 2) return 'stable';
+    
+    const firstMonthScore = monthlyData[0].score || 0;
+    const lastMonthScore = monthlyData[monthlyData.length - 1].score || 0;
+    const monthlyChange = lastMonthScore - firstMonthScore;
+    
+    return monthlyChange > 10 ? 'improving' : monthlyChange < -10 ? 'declining' : 'stable';
+  }
+
+  /**
+   * Get current session data for a user
+   */
+  async getCurrentSessionData(userId) {
+    try {
+      const sessionData = {
+        userId,
+        sessionId: `session_${Date.now()}`,
+        startTime: new Date(),
+        isActive: true,
+        activities: [],
+        interactions: [],
+        performance: {
+          averageScore: 0,
+          completionRate: 0,
+          timeSpent: 0
+        }
+      };
+
+      // Get recent user progress to populate session
+      const recentProgress = await UserProgress.find({ userId })
+        .sort({ lastUpdated: -1 })
+        .limit(10);
+
+      if (recentProgress.length > 0) {
+        const scores = recentProgress.map(p => p.score || 0).filter(s => s > 0);
+        sessionData.performance.averageScore = scores.length > 0 
+          ? scores.reduce((a, b) => a + b, 0) / scores.length 
+          : 0;
+        
+        sessionData.performance.completionRate = recentProgress.reduce((acc, p) => 
+          acc + (p.completionPercentage || 0), 0) / recentProgress.length;
+      }
+
+      return sessionData;
+    } catch (error) {
+      console.error('Error getting current session data:', error);
+      return {
+        userId,
+        sessionId: `session_${Date.now()}`,
+        startTime: new Date(),
+        isActive: true,
+        activities: [],
+        interactions: [],
+        performance: {
+          averageScore: 0,
+          completionRate: 0,
+          timeSpent: 0
+        }
+      };
+    }
+  }
+
+  /**
+   * Calculate performance trend for a user
+   */
+  async calculatePerformanceTrend(userId, timeframe = '30d') {
+    try {
+      const days = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const progressData = await UserProgress.find({
+        userId,
+        lastUpdated: { $gte: startDate }
+      }).sort({ lastUpdated: 1 });
+
+      if (progressData.length === 0) {
+        return {
+          trend: 'stable',
+          change: 0,
+          dataPoints: [],
+          summary: 'No recent activity'
+        };
+      }
+
+      // Calculate trend
+      const scores = progressData.map(p => p.score || 0).filter(s => s > 0);
+      const completionRates = progressData.map(p => p.completionPercentage || 0);
+      
+      if (scores.length === 0) {
+        return {
+          trend: 'stable',
+          change: 0,
+          dataPoints: [],
+          summary: 'No scored activities'
+        };
+      }
+
+      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+      const avgCompletion = completionRates.reduce((a, b) => a + b, 0) / completionRates.length;
+
+      // Compare with previous period
+      const previousStartDate = new Date(startDate);
+      previousStartDate.setDate(previousStartDate.getDate() - days);
+      
+      const previousData = await UserProgress.find({
+        userId,
+        lastUpdated: { 
+          $gte: previousStartDate,
+          $lt: startDate
+        }
+      });
+
+      let trend = 'stable';
+      let change = 0;
+
+      if (previousData.length > 0) {
+        const prevScores = previousData.map(p => p.score || 0).filter(s => s > 0);
+        if (prevScores.length > 0) {
+          const prevAvgScore = prevScores.reduce((a, b) => a + b, 0) / prevScores.length;
+          change = avgScore - prevAvgScore;
+          trend = change > 5 ? 'improving' : change < -5 ? 'declining' : 'stable';
+        }
+      }
+
+      return {
+        trend,
+        change: Math.round(change * 100) / 100,
+        dataPoints: progressData.map(p => ({
+          date: p.lastUpdated,
+          score: p.score || 0,
+          completion: p.completionPercentage || 0
+        })),
+        summary: `${trend} with ${Math.abs(change).toFixed(1)}% ${change >= 0 ? 'improvement' : 'decline'}`
+      };
+    } catch (error) {
+      console.error('Error calculating performance trend:', error);
+      return {
+        trend: 'stable',
+        change: 0,
+        dataPoints: [],
+        summary: 'Unable to calculate trend'
+      };
+    }
+  }
+
+  /**
+   * Generate content recommendations based on user patterns
+   */
+  async generateContentRecommendations(userId, patterns) {
+    try {
+      // Get user's current progress and preferences
+      const userProgress = await UserProgress.find({ userId }).populate('courseId');
+      const completedCourses = userProgress.filter(p => p.completionPercentage >= 90);
+      const inProgressCourses = userProgress.filter(p => p.completionPercentage > 0 && p.completionPercentage < 90);
+
+      // Get all available courses
+      const allCourses = await Course.find({ isActive: true });
+      
+      // Filter courses the user hasn't started
+      const unStartedCourses = allCourses.filter(course => 
+        !userProgress.some(p => p.courseId?.toString() === course._id.toString())
+      );
+
+      const recommendations = [];
+
+      // Recommend based on patterns
+      if (patterns.preferredDifficulty) {
+        const difficultyMatches = unStartedCourses.filter(course => 
+          course.difficulty === patterns.preferredDifficulty
+        ).slice(0, 3);
+        
+        recommendations.push(...difficultyMatches.map(course => ({
+          courseId: course._id,
+          title: course.title,
+          reason: `Matches your preferred difficulty level: ${patterns.preferredDifficulty}`,
+          confidence: 0.8,
+          type: 'difficulty_match'
+        })));
+      }
+
+      // Recommend based on subject area
+      if (patterns.preferredSubjects && patterns.preferredSubjects.length > 0) {
+        const subjectMatches = unStartedCourses.filter(course =>
+          patterns.preferredSubjects.includes(course.category)
+        ).slice(0, 2);
+        
+        recommendations.push(...subjectMatches.map(course => ({
+          courseId: course._id,
+          title: course.title,
+          reason: `Based on your interest in ${course.category}`,
+          confidence: 0.7,
+          type: 'subject_match'
+        })));
+      }
+
+      // Recommend next steps for in-progress courses
+      for (const progress of inProgressCourses.slice(0, 2)) {
+        if (progress.courseId) {
+          recommendations.push({
+            courseId: progress.courseId._id,
+            title: progress.courseId.title,
+            reason: `Continue your progress - ${Math.round(progress.completionPercentage)}% complete`,
+            confidence: 0.9,
+            type: 'continue_learning'
+          });
+        }
+      }
+
+      // Sort by confidence and return top 5
+      return recommendations
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 5);
+
+    } catch (error) {
+      console.error('Error generating content recommendations:', error);
+      return [];
+    }
+  }
 }
 
 export default new AnalyticsService();

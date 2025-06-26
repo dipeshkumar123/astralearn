@@ -3,7 +3,6 @@ import './App.css'
 import AIAssistant from './components/ai/AIAssistant'
 import AIContextProvider from './contexts/AIContextProvider'
 import DataSyncProvider from './contexts/DataSyncProvider'
-import DemoLearningEnvironment from './components/demo/DemoLearningEnvironment'
 import CourseManagementDashboard from './components/course/CourseManagementDashboard'
 import CoursePreview from './components/course/CoursePreview'
 import ModernCoursePreview from './components/course/ModernCoursePreview'
@@ -28,7 +27,7 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [userDismissedAuth, setUserDismissedAuth] = useState(false);
-  const { user, logout, isAuthenticated, loading, isDemoMode, token } = useAuth();
+  const { user, logout, isAuthenticated, loading, token } = useAuth();
   useEffect(() => {
     checkServerStatus();
   }, []);
@@ -115,10 +114,14 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       );
     }    // Authenticated user views
     switch (currentView) {
-      case 'demo':
-        return <DemoLearningEnvironment onBackToStatus={() => setCurrentView('dashboard')} />;
       case 'course-management':
         return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;      case 'course-preview':
+        // Check if we have a valid course ID
+        if (!selectedCourseId || selectedCourseId === 'undefined' || selectedCourseId === 'null') {
+          console.error('No valid course ID for preview, redirecting to dashboard');
+          setCurrentView('dashboard');
+          return renderCurrentView();
+        }
         return (
           <ModernCoursePreviewWrapper 
             courseId={selectedCourseId} 
@@ -133,6 +136,12 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
           />
         );
       case 'course-detail':
+        // Check if we have a valid course ID
+        if (!selectedCourseId || selectedCourseId === 'undefined' || selectedCourseId === 'null') {
+          console.error('No valid course ID for detail, redirecting to dashboard');
+          setCurrentView('dashboard');
+          return renderCurrentView();
+        }
         return (
           <ModernLessonWrapper 
             courseId={selectedCourseId} 
@@ -167,10 +176,26 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
     // Extract course ID from localStorage when navigating to course views
     if (view === 'course-preview' || view === 'course-detail') {
       const courseId = options.courseId || localStorage.getItem('selectedCourseId');
+      
+      // Validate courseId before setting it
+      if (!courseId || courseId === 'undefined' || courseId === 'null') {
+        console.error('Invalid course ID detected:', courseId);
+        // Fallback to dashboard if no valid course ID
+        setCurrentView('dashboard');
+        return;
+      }
+      
       setSelectedCourseId(courseId);
+      // Preload course data to ensure it exists
+      loadCourseData(courseId).then(courseData => {
+        if (!courseData) {
+          console.error('Course not found, redirecting to dashboard');
+          setCurrentView('dashboard');
+        }
+      });
     }
     setCurrentView(view);
-  }, []);
+  }, [loadCourseData]);
 
   return (
     <AIContextProvider>
@@ -196,17 +221,7 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                         Dashboard
                       </button>
                       
-                      {/* AI Demo - Available to all roles */}
-                      <button
-                        onClick={() => setCurrentView('demo')}
-                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                          currentView === 'demo' 
-                            ? 'bg-blue-100 text-blue-700' 
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                      >
-                        AI Demo
-                      </button>                      {/* Course Management - Only for instructors and admins */}
+                      {/* Course Management - Only for instructors and admins */}
                       {(user.role === 'instructor' || user.role === 'admin') && ( // course-management access
                         <button
                           onClick={() => setCurrentView('course-management')}
@@ -269,11 +284,6 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
                     <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
                       {user.role}
                     </span>
-                    {isDemoMode && (
-                      <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
-                        Demo
-                      </span>
-                    )}
                   </span>
                   <button
                     onClick={logout}

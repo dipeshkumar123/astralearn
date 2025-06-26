@@ -61,7 +61,7 @@ const StudentDashboard = ({ setCurrentView }) => {
   // Get course recommendations based on user's learning pattern
   const recommendations = getRecommendations();
 
-  // Filter courses based on search and category
+  // Filter courses based on search and category (using filteredCourses for catalog)
   const filteredCourses = availableCourses.filter(course => {
     const matchesSearch = !searchTerm || 
       course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -190,18 +190,21 @@ const StudentDashboard = ({ setCurrentView }) => {
               className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => {
                 // Navigate to course detail to continue learning
+                const courseId = enrollment.course?._id;
+                if (!courseId) {
+                  console.error('Invalid course ID for enrollment:', enrollment);
+                  return;
+                }
+                
                 if (typeof setCurrentView === 'function') {
+                  localStorage.setItem('selectedCourseId', courseId);
                   setCurrentView('course-detail');
-                  localStorage.setItem('selectedCourseId', enrollment.course?._id);
                 } else {
                   // Fallback navigation using custom event
-                  const courseId = enrollment.course?._id;
-                  if (courseId) {
-                    localStorage.setItem('selectedCourseId', courseId);
-                    window.dispatchEvent(new CustomEvent('navigateToCourse', { 
-                      detail: { view: 'course-detail', courseId } 
-                    }));
-                  }
+                  localStorage.setItem('selectedCourseId', courseId);
+                  window.dispatchEvent(new CustomEvent('navigateToCourse', { 
+                    detail: { view: 'course-detail', courseId } 
+                  }));
                 }
               }}
             >
@@ -266,9 +269,15 @@ const StudentDashboard = ({ setCurrentView }) => {
                   </div>                  <button 
                     onClick={() => {
                       // Navigate to course detail or continue learning
+                      const courseId = rec.id;
+                      if (!courseId) {
+                        console.error('Invalid course ID for recommendation:', rec);
+                        return;
+                      }
+                      
                       if (setCurrentView) {
+                        localStorage.setItem('selectedCourseId', courseId);
                         setCurrentView('course-preview');
-                        localStorage.setItem('selectedCourseId', rec.id);
                       } else {
                         alert(`Starting course: ${rec.title}`);
                       }
@@ -350,10 +359,13 @@ const StudentDashboard = ({ setCurrentView }) => {
                 <span className="text-sm text-gray-500">
                   {progress.completed} of {progress.total} lessons                </span>
                 <button
-                  onClick={() => setCurrentView(prev => ({
-                    ...prev,
-                    detail: { view: 'course-detail', courseId: course._id || course.id }
-                  }))}
+                  onClick={() => {
+                    const courseId = course._id || course.id;
+                    if (courseId && setCurrentView) {
+                      localStorage.setItem('selectedCourseId', courseId);
+                      setCurrentView('course-detail');
+                    }
+                  }}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
                 >
                   Continue
@@ -409,9 +421,9 @@ const StudentDashboard = ({ setCurrentView }) => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading courses...</p>
         </div>
-      ) : availableCourses.length > 0 ? (
+      ) : filteredCourses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {availableCourses.map((course, index) => (
+          {filteredCourses.map((course, index) => (
             <motion.div
               key={course._id || index}
               initial={{ opacity: 0, y: 20 }}
@@ -469,9 +481,15 @@ const StudentDashboard = ({ setCurrentView }) => {
                   <div className="flex items-center space-x-2">
                     <button 
                       onClick={() => {
+                        const courseId = course._id;
+                        if (!courseId) {
+                          console.error('Invalid course ID for course preview:', course);
+                          return;
+                        }
+                        
                         if (setCurrentView) {
+                          localStorage.setItem('selectedCourseId', courseId);
                           setCurrentView('course-preview');
-                          localStorage.setItem('selectedCourseId', course._id);
                         }
                       }}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium"
@@ -481,11 +499,10 @@ const StudentDashboard = ({ setCurrentView }) => {
                       <button 
                         onClick={() => {
                           // Navigate to continue learning
-                          if (setCurrentView) {
-                            setCurrentView(prev => ({
-                              ...prev,
-                              detail: { view: 'course-detail', courseId: course._id || course.id }
-                            }));
+                          const courseId = course._id || course.id;
+                          if (courseId && setCurrentView) {
+                            localStorage.setItem('selectedCourseId', courseId);
+                            setCurrentView('course-detail');
                           }
                         }}
                         className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"

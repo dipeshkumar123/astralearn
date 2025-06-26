@@ -63,32 +63,8 @@ const AdaptiveLearningDashboard = ({ userId, userRole = 'student', onBackToMain 
         setDashboardData(dashboardResult.dashboard);
       } else {
         console.warn('Failed to load dashboard analytics:', dashboardResponse.status);
-        // Set fallback dashboard data
-        setDashboardData({
-          overview: {
-            learningScore: 85,
-            courseProgress: 67,
-            studyTime: '24h 15m',
-            achievements: 12,
-            streak: 7
-          },
-          quickStats: {
-            totalLessonsCompleted: 45,
-            currentStreak: 7,
-            averageScore: 87,
-            timeSpentToday: 120
-          },
-          recentActivity: [
-            { type: 'lesson', title: 'React Hooks Advanced', completed: true, time: '2h ago' },
-            { type: 'assessment', title: 'JavaScript Quiz', score: 92, time: '1 day ago' },
-            { type: 'achievement', title: 'Problem Solver Badge', time: '2 days ago' }
-          ],
-          upcomingMilestones: [
-            { title: 'Complete Redux Module', progress: 80, deadline: '3 days' },
-            { title: 'Final Project Submission', progress: 45, deadline: '1 week' }
-          ],
-          alerts: []
-        });
+        // Set empty dashboard data instead of mock data
+        setDashboardData(getFallbackDashboardData());
       }
     } catch (dashboardError) {
       console.error('Dashboard analytics loading error:', dashboardError);
@@ -168,6 +144,13 @@ const AdaptiveLearningDashboard = ({ userId, userRole = 'student', onBackToMain 
   };
 
   const getFallbackDashboardData = () => ({
+    overview: {
+      learningScore: 0,
+      courseProgress: 0,
+      studyTime: '0h 0m',
+      achievements: 0,
+      streak: 0
+    },
     quickStats: {
       totalLessonsCompleted: 0,
       currentStreak: 0,
@@ -178,6 +161,8 @@ const AdaptiveLearningDashboard = ({ userId, userRole = 'student', onBackToMain 
       averageScore: 0,
       totalCompleted: 0
     },
+    recentActivity: [],
+    upcomingMilestones: [],
     goalsProgress: [],
     upcomingItems: [],
     alerts: []

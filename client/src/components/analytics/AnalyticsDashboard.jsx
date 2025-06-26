@@ -133,22 +133,27 @@ const AnalyticsDashboard = () => {
     );
   }
 
-  // Generate sample chart data if real data is not available
-  const generateSampleData = () => {
+  // Generate real data structure if analytics data is available
+  const generateChartData = () => {
+    if (dashboardData?.visualizations && Array.isArray(dashboardData.visualizations)) {
+      return dashboardData.visualizations;
+    }
+
+    // If no real data is available, create empty structure
     const days = Array.from({ length: timeframe }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - (timeframe - 1 - i));
       return {
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        performance: Math.random() * 40 + 60,
-        engagement: Math.random() * 30 + 70,
-        studyTime: Math.random() * 60 + 30
+        performance: 0,
+        engagement: 0,
+        studyTime: 0
       };
     });
     return days;
   };
 
-  const chartData = dashboardData?.visualizations || generateSampleData();
+  const chartData = generateChartData();
   const keyMetrics = dashboardData?.keyMetrics || {
     learningVelocity: 0.75,
     performanceScore: 82,

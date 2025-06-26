@@ -426,6 +426,8 @@ router.post('/context/test',
   }
 );
 
+// Demo endpoint disabled for production - use authenticated /chat endpoint instead
+/*
 // Public demo endpoint for testing AI functionality (no authentication required)
 router.post('/demo', 
   [
@@ -490,6 +492,7 @@ router.post('/demo',
     }
   }
 );
+*/
 
 // === PHASE 2 STEP 2: AI ORCHESTRATION LAYER ENDPOINTS ===
 
