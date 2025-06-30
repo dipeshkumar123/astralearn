@@ -528,16 +528,17 @@ router.post('/orchestrated/chat',
 
       res.json({
         success: orchestratedResponse.success,
-        reply: orchestratedResponse.response?.reply || orchestratedResponse.fallbackResponse?.message,
-        response: orchestratedResponse.response,
-        metadata: orchestratedResponse.metadata,
-        personalizedSuggestions: orchestratedResponse.response?.personalizedSuggestions,
-        learningStyleEnhancements: {
-          visual: orchestratedResponse.response?.visualSuggestions,
-          auditory: orchestratedResponse.response?.auditorySuggestions,
-          kinesthetic: orchestratedResponse.response?.kinestheticSuggestions,
-          reading: orchestratedResponse.response?.readingSuggestions,
+        response: {
+          reply: orchestratedResponse.response?.reply || orchestratedResponse.fallbackResponse?.message || 'I apologize, but I am having trouble responding right now.',
+          personalizedSuggestions: orchestratedResponse.response?.personalizedSuggestions,
+          learningStyleEnhancements: {
+            visual: orchestratedResponse.response?.visualSuggestions,
+            auditory: orchestratedResponse.response?.auditorySuggestions,
+            kinesthetic: orchestratedResponse.response?.kinestheticSuggestions,
+            reading: orchestratedResponse.response?.readingSuggestions,
+          },
         },
+        metadata: orchestratedResponse.metadata,
         timestamp: new Date().toISOString(),
       });
 

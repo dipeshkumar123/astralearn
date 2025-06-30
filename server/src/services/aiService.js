@@ -59,13 +59,25 @@ class AIService {
    * Process a context-aware chat message
    */
   async processContextAwareChat(userMessage, context = {}, options = {}) {
-    // Check if services are ready
-    const readiness = await this.isReady();
-    if (!readiness.ready) {
-      throw new Error(`AI services not ready: ${readiness.error || 'Configuration issues'}`);
-    }
-
     try {
+      // Check if services are ready
+      const readiness = await this.isReady();
+      
+      // If not ready, use fallback but don't throw error
+      if (!readiness.ready) {
+        console.warn('AI services not fully ready, using fallback response');
+        return {
+          success: false,
+          reply: this.generateFallbackResponse(userMessage, context),
+          metadata: {
+            fallback: true,
+            reason: 'AI services not ready',
+            readiness: readiness,
+            timestamp: new Date().toISOString(),
+          },
+        };
+      }
+
       // Build context-aware prompt
       const fullPrompt = this.prompts.buildContextAwarePrompt(userMessage, context);
       

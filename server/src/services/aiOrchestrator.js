@@ -764,6 +764,32 @@ class AIOrchestrator {
     
     return adjustments;
   }
+
+  /**
+   * Format array for display in text
+   */
+  formatArrayForDisplay(array) {
+    if (!Array.isArray(array)) return '';
+    if (array.length === 0) return '';
+    if (array.length === 1) return array[0];
+    if (array.length === 2) return `${array[0]} and ${array[1]}`;
+    return `${array.slice(0, -1).join(', ')}, and ${array[array.length - 1]}`;
+  }
+
+  /**
+   * Format objectives for display
+   */
+  formatObjectivesForDisplay(objectives) {
+    if (!objectives) return '';
+    if (Array.isArray(objectives)) {
+      return this.formatArrayForDisplay(objectives);
+    }
+    if (typeof objectives === 'string') return objectives;
+    if (typeof objectives === 'object') {
+      return Object.values(objectives).join(', ');
+    }
+    return '';
+  }
 }
 
 // Create singleton instance
