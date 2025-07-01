@@ -459,7 +459,7 @@ class AnalyticsService {
   }
 
   calculateTimeSpan(progressData) {
-    if (!progressData || progressData.length < 2) return 0;
+    if (!progressData || !Array.isArray(progressData) || progressData.length < 2) return 0;
     const timestamps = progressData.map(p => new Date(p.timestamp || p.createdAt).getTime());
     const span = Math.max(...timestamps) - Math.min(...timestamps);
     return Math.min(span / (30 * 24 * 60 * 60 * 1000), 1); // Normalize to 30 days
@@ -1173,6 +1173,59 @@ class AnalyticsService {
 
     } catch (error) {
       console.error('Error generating content recommendations:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Generate difficulty adjustments based on user performance patterns
+   */
+  async generateDifficultyAdjustments(userId, patterns) {
+    try {
+      const performanceData = patterns.overview?.performance || {};
+      const currentScore = performanceData.averageScore || 0;
+      const recentTrend = performanceData.recentTrend || 'stable';
+      
+      const adjustments = [];
+      
+      // Performance-based adjustments
+      if (currentScore > 90) {
+        adjustments.push({
+          type: 'increase_difficulty',
+          reason: 'High performance indicates readiness for more challenging content',
+          recommendation: 'Consider advancing to more complex topics',
+          confidence: 0.8
+        });
+      } else if (currentScore < 60) {
+        adjustments.push({
+          type: 'decrease_difficulty',
+          reason: 'Low performance suggests current difficulty may be too high',
+          recommendation: 'Review fundamentals and reduce complexity temporarily',
+          confidence: 0.9
+        });
+      }
+      
+      // Trend-based adjustments
+      if (recentTrend === 'declining') {
+        adjustments.push({
+          type: 'provide_support',
+          reason: 'Performance trend is declining',
+          recommendation: 'Offer additional support materials and practice exercises',
+          confidence: 0.7
+        });
+      } else if (recentTrend === 'improving') {
+        adjustments.push({
+          type: 'maintain_pace',
+          reason: 'Performance is improving',
+          recommendation: 'Continue current learning approach',
+          confidence: 0.6
+        });
+      }
+      
+      return adjustments;
+      
+    } catch (error) {
+      console.error('Error generating difficulty adjustments:', error);
       return [];
     }
   }

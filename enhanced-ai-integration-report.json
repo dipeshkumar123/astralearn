@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-07-01T05:40:47.886Z",
+  "results": [
+    {
+      "file": "components/dashboard/StudentDashboard.jsx",
+      "status": "integrated"
+    },
+    {
+      "file": "components/dashboard/InstructorDashboard.jsx",
+      "status": "integrated"
+    },
+    {
+      "file": "components/dashboard/AdminDashboard.jsx",
+      "status": "integrated"
+    },
+    {
+      "file": "components/course/CoursePreview.jsx",
+      "status": "integrated"
+    },
+    {
+      "file": "components/course/CourseManagementDashboard.jsx",
+      "status": "integrated"
+    },
+    {
+      "file": "components/analytics/AnalyticsDashboard.jsx",
+      "status": "integrated"
+    },
+    {
+      "file": "components/adaptive/AdaptiveLearningDashboard.jsx",
+      "status": "integrated"
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "successful": 7,
+    "alreadyIntegrated": 0,
+    "failed": 0
+  }
+}

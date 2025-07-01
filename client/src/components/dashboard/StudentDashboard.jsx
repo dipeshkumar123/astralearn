@@ -26,7 +26,27 @@ import {
 import { useAuth } from '../auth/AuthProvider';
 import { useDataSync } from '../../contexts/DataSyncProvider';
 
+import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
 const StudentDashboard = ({ setCurrentView }) => {
+  // AI Assistant integration
+  const { updateContext, setAssistantMode } = useAIAssistantStore();
+  const location = useLocation();
+  const { user } = useAuth();
+  
+  // Update AI context based on current page and user
+  useEffect(() => {
+    updateContext({
+      page: 'learning-assistant',
+      userId: user?.id,
+      userRole: 'student',
+      sessionData: {
+        path: location.pathname,
+        timestamp: Date.now()
+      }
+    });
+    setAssistantMode('learning-assistant');
+  }, [updateContext, setAssistantMode, location, user]);
+
   const { user, token } = useAuth();  const { 
     courses, 
     userProgress, 

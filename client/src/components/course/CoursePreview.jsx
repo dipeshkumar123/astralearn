@@ -21,7 +21,9 @@ import {
   Minimize,
   X
 } from 'lucide-react';
+import { useAIAssistantStore } from '../../stores/aiAssistantStore';
 
+import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
 const CoursePreview = ({ 
   course, 
   onClose, 
@@ -40,12 +42,47 @@ const CoursePreview = ({
     progress: 0
   });
 
+  // AI Assistant context integration
+  const { updateContext } = useAIAssistantStore();
+
   useEffect(() => {
     if (course && course.modules?.length > 0) {
       // Fetch real progress data from server
       fetchProgressData();
     }
   }, [course]);
+
+  // Update AI context when course/lesson changes
+  useEffect(() => {
+    if (course && updateContext) {
+      const currentLessonData = getCurrentLesson();
+      const currentModuleData = getCurrentModule();
+      
+      updateContext({
+        page: 'course_preview',
+        courseId: course._id,
+        lessonId: currentLessonData?._id,
+        courseData: {
+          title: course.title,
+          description: course.description,
+          category: course.category,
+          difficulty: course.difficulty
+        },
+        lessonData: currentLessonData ? {
+          title: currentLessonData.title,
+          objectives: currentLessonData.objectives,
+          content: currentLessonData.content,
+          type: currentLessonData.type
+        } : null,
+        moduleData: currentModuleData ? {
+          title: currentModuleData.title,
+          index: currentModule
+        } : null,
+        userProgress: progress,
+        mode: mode
+      });
+    }
+  }, [course, currentModule, currentLesson, progress, mode, updateContext]);
 
   const fetchProgressData = async () => {
     try {

@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-07-01T05:34:43.831Z",
+  "totalPages": 6,
+  "successful": 0,
+  "alreadyIntegrated": 0,
+  "failed": 0,
+  "results": [
+    {
+      "page": "student/StudentDashboard.jsx",
+      "status": "not_found"
+    },
+    {
+      "page": "instructor/InstructorDashboard.jsx",
+      "status": "not_found"
+    },
+    {
+      "page": "admin/AdminDashboard.jsx",
+      "status": "not_found"
+    },
+    {
+      "page": "course/CourseView.jsx",
+      "status": "not_found"
+    },
+    {
+      "page": "course/LessonView.jsx",
+      "status": "not_found"
+    },
+    {
+      "page": "course/CoursePreview.jsx",
+      "status": "not_found"
+    }
+  ],
+  "summary": {
+    "completion_rate": 0,
+    "new_integrations": 0,
+    "existing_integrations": 0,
+    "failures": 0
+  }
+}

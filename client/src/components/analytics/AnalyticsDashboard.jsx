@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
 import { 
   LineChart, 
   Line, 

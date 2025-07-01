@@ -33,6 +33,7 @@ import {
 import InteractiveAssessment from './InteractiveAssessment';
 import LearningAnalyticsDashboard from './LearningAnalyticsDashboard';
 
+import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
 const AdaptiveLearningDashboard = ({ userId, userRole = 'student', onBackToMain }) => {  const [dashboardData, setDashboardData] = useState(null);
   const [learningPath, setLearningPath] = useState(null);
   const [recommendations, setRecommendations] = useState([]);

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import './App.css'
-import AIAssistant from './components/ai/AIAssistant'
+import EnhancedAIAssistant from './components/ai/EnhancedAIAssistant'
+import AIToggleButton from './components/ai/AIToggleButton'
 import AIContextProvider from './contexts/AIContextProvider'
 import DataSyncProvider from './contexts/DataSyncProvider'
 import CourseManagementDashboard from './components/course/CourseManagementDashboard'
@@ -325,8 +326,8 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
           />
         )}
         
-        {/* AI Assistant - Always available for authenticated users */}
-        {isAuthenticated && <AIAssistant />}
+        {/* Enhanced AI Assistant - Always available for authenticated users */}
+        {isAuthenticated && <EnhancedAIAssistant />}
       </div>
     </AIContextProvider>
   )
@@ -338,7 +339,7 @@ function App() {
       <DataSyncProvider>
         <AIContextProvider>
           <AppContent />
-          <AIAssistant />
+          <EnhancedAIAssistant />
         </AIContextProvider>
       </DataSyncProvider>
     </AuthProvider>

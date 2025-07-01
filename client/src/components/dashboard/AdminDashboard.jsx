@@ -28,7 +28,27 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 
+import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
 const AdminDashboard = () => {
+  // AI Assistant integration
+  const { updateContext, setAssistantMode } = useAIAssistantStore();
+  const location = useLocation();
+  const { user } = useAuth();
+  
+  // Update AI context based on current page and user
+  useEffect(() => {
+    updateContext({
+      page: 'system-assistant',
+      userId: user?.id,
+      userRole: 'admin',
+      sessionData: {
+        path: location.pathname,
+        timestamp: Date.now()
+      }
+    });
+    setAssistantMode('system-assistant');
+  }, [updateContext, setAssistantMode, location, user]);
+
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [systemStats, setSystemStats] = useState(null);

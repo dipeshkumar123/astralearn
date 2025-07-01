@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   Plus, 
   Search, 
@@ -30,10 +32,32 @@ import RichTextEditor from './RichTextEditor';
 import MetadataManager from './MetadataManager';
 import VersionControlPanel from './VersionControlPanel';
 import CoursePreview from './CoursePreview';
-import { useAuth } from '../auth/AuthProvider';
+
+// Enhanced AI Assistant import
+import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
+import AIToggleButton from '../ai/AIToggleButton';
+import { useAIAssistantStore } from '../../stores/aiAssistantStore';
 
 const CourseManagementDashboard = ({ onBackToStatus }) => {
+  // AI Assistant integration
+  const { updateContext, setAssistantMode } = useAIAssistantStore();
+  const location = useLocation();
   const { user } = useAuth();
+  
+  // Update AI context based on current page and user
+  useEffect(() => {
+    updateContext({
+      page: 'course-management',
+      userId: user?.id,
+      userRole: 'instructor',
+      sessionData: {
+        path: location.pathname,
+        timestamp: Date.now()
+      }
+    });
+    setAssistantMode('course-management');
+  }, [updateContext, setAssistantMode, location, user]);
+
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, create, edit, preview
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -66,25 +90,22 @@ const CourseManagementDashboard = ({ onBackToStatus }) => {
         search: searchTerm,
         ...filters,
         page: 1,
-        limit: 20      });
-      
-      const response = await fetch(`/api/course-management/search?${queryParams}`, {
+        limit: 20
+      });      const response = await fetch(`/api/course-management/search?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || 'demo-token'}`
         }
-      });
-      
-      if (response.ok) {
+      });if (response.ok) {
         const data = await response.json();
         setCourses(data.courses || []);
       } else {
         console.error('Course fetch failed:', response.status, response.statusText);
         // Handle 404 or other errors gracefully
-        if (response.status === 404) {          console.log('Course management API not available, using mock data');
+        if (response.status === 404) {
+          console.log('Course management API not available, using mock data');
           setCourses([]); // Set empty array for now
         }
-      }
-    } catch (error) {
+      }    } catch (error) {
       console.error('Failed to fetch courses:', error);
       // Set fallback mock data for development
       setCourses([
@@ -515,6 +536,19 @@ const CourseManagementDashboard = ({ onBackToStatus }) => {
             setSelectedCourse(null);
           }}
         />
+        
+        {/* Enhanced AI Assistant - Modern, Responsive, Real-time */}
+        <EnhancedAIAssistant />
+        
+        {/* Floating AI Toggle for Mobile */}
+        <div className="md:hidden">
+          <AIToggleButton 
+            variant="floating" 
+            position="bottom-right"
+            size="medium"
+            showLabel={false}
+          />
+        </div>
       </div>
     </div>
   );
