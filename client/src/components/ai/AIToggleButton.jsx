@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Brain, MessageCircle, Sparkles, Zap } from 'lucide-react';
 import { useAIAssistantStore } from '../../stores/aiAssistantStore';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../auth/AuthProvider';
 
 const AIToggleButton = ({ 
   variant = 'floating', // 'floating', 'navbar', 'sidebar'

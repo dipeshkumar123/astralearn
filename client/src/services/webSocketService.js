@@ -122,7 +122,14 @@ class WebSocketService {
     this.socket.on('disconnect', (reason) => {
       console.log('🔌 WebSocket disconnected:', reason);
       this.isConnected = false;
-      this.onDisconnected(reason);
+      
+      // Don't attempt reconnection on manual disconnect
+      if (reason === 'io client disconnect') {
+        console.log('🔌 WebSocket disconnected manually');
+      } else {
+        // For all other disconnects, try to reconnect
+        this.onDisconnected(reason);
+      }
     });    this.socket.on('connect_error', (error) => {
       console.error('❌ WebSocket connection error:', error.message);
       

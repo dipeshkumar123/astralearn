@@ -20,7 +20,7 @@ import {
   Filter,
   Search
 } from 'lucide-react';
-import { useAIAssistantStore } from '../../../stores/aiAssistantStore';
+import { useAIAssistantStore } from '../../stores/aiAssistantStore';
 
 const SmartSuggestions = ({ 
   context = {},

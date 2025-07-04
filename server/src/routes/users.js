@@ -331,6 +331,76 @@ router.get('/progress', flexibleAuthenticate, async (req, res) => {
   }
 });
 
+// Get specific user progress (admin/instructor access)
+router.get('/:userId/progress', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Check if current user can access this data (admin, instructor, or own data)
+    if (req.user.role !== 'admin' && req.user.role !== 'instructor' && req.user._id.toString() !== userId) {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'You can only access your own progress data'
+      });
+    }
+
+    // Get user progress records
+    const userProgressRecords = await UserProgress.find({ 
+      userId: userId 
+    }).populate('courseId', 'title category difficulty');
+
+    // Get user info
+    const user = await User.findById(userId).select('firstName lastName email');
+    
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'The specified user does not exist'
+      });
+    }
+
+    // Format progress data for frontend consumption
+    const progressData = {};
+    userProgressRecords.forEach(record => {
+      if (record.courseId) {
+        progressData[record.courseId._id] = {
+          courseId: record.courseId._id,
+          courseTitle: record.courseId.title,
+          category: record.courseId.category,
+          difficulty: record.courseId.difficulty,
+          progressType: record.progressType,
+          progressData: record.progressData,
+          completionPercentage: record.progressData?.completionPercentage || 0,
+          startedAt: record.createdAt,
+          completedAt: record.progressData?.completionPercentage === 100 ? record.timestamp : null,
+          lastAccessedAt: record.timestamp,
+          totalTimeSpent: record.progressData?.timeSpent || 0
+        };
+      }
+    });
+
+    res.json({
+      success: true,
+      userId,
+      user: {
+        id: user._id,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email
+      },
+      progress: progressData,
+      totalCourses: Object.keys(progressData).length,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error) {
+    console.error('Get user progress error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Could not retrieve user progress',
+    });
+  }
+});
+
 // Helper Functions
 
 /**

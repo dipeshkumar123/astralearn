@@ -244,7 +244,18 @@ router.post('/:id/enroll', flexibleAuthenticate, async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const course = await Course.findById(req.params.id);
+    // Ensure we have a valid course ID string
+    const courseId = String(req.params.id);
+
+    // Check if course ID is valid MongoDB ObjectId format
+    if (!courseId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ 
+        message: 'Invalid course ID format',
+        details: 'The provided course ID is not in a valid format'
+      });
+    }
+
+    const course = await Course.findById(courseId);
     
     if (!course) {
       return res.status(404).json({ message: 'Course not found' });
@@ -340,39 +351,77 @@ router.get('/instructor/:instructorId', flexibleAuthenticate, async (req, res) =
   }
 });
 
-// Get course progress for a user
+// Get course progress
 router.get('/:id/progress', flexibleAuthenticate, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     const { id: courseId } = req.params;
-    const userId = req.user._id;
-    
-    // Get user progress for this course
-    const userProgress = await UserProgress.find({
-      userId,
-      courseId,
-      progressType: { $in: ['lesson', 'quiz', 'module'] }
+
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID format' });
+    }
+
+    // Get all progress records for this course and user
+    const progressRecords = await UserProgress.find({
+      userId: req.user._id,
+      courseId
     }).sort({ lastUpdated: -1 });
 
-    // Convert to progress structure expected by frontend
-    const progress = {};
-    userProgress.forEach(progressItem => {
-      if (progressItem.progressData) {
-        const moduleIndex = progressItem.progressData.moduleIndex || 0;
-        const lessonIndex = progressItem.progressData.lessonIndex || 0;
-        
-        if (!progress[moduleIndex]) {
-          progress[moduleIndex] = {};
-        }
-        
-        progress[moduleIndex][lessonIndex] = {
-          completed: progressItem.progressData.completed || false,
-          timeSpent: progressItem.progressData.timeSpent || 0,
-          score: progressItem.progressData.score || null
+    // Get overall course progress
+    let overallProgress = progressRecords.find(p => 
+      p.progressType === 'course' && !p.moduleId && !p.lessonId
+    );
+    
+    // If no course-level progress found, check for enrollment progress with timeSpent/progress
+    if (!overallProgress) {
+      const enrollmentProgress = progressRecords.find(p => 
+        p.progressType === 'enrollment' && 
+        (p.progressData?.timeSpent > 0 || p.progressData?.completionPercentage > 0)
+      );
+      
+      if (enrollmentProgress) {
+        overallProgress = {
+          courseId,
+          completionPercentage: enrollmentProgress.progressData?.completionPercentage || 0,
+          timeSpent: enrollmentProgress.progressData?.timeSpent || 0,
+          completionStatus: enrollmentProgress.progressData?.completionStatus || 'in-progress'
         };
       }
-    });
+    }
 
-    res.json({ progress });
+    // Get module-level progress
+    const moduleProgress = progressRecords.filter(p => 
+      p.progressType === 'module' && p.moduleId && !p.lessonId
+    );
+
+    // Get lesson-level progress
+    const lessonProgress = progressRecords.filter(p => 
+      p.progressType === 'lesson' && p.lessonId
+    );
+
+    // Structure the response
+    res.status(200).json({
+      success: true,
+      progress: {
+        overall: overallProgress || {
+          courseId,
+          completionPercentage: 0,
+          timeSpent: 0,
+          completionStatus: 'not-started'
+        },
+        modules: moduleProgress,
+        lessons: lessonProgress,
+        lastUpdated: progressRecords.length > 0 
+          ? progressRecords.reduce((latest, record) => {
+              const recordDate = new Date(record.lastUpdated || record.timestamp);
+              return recordDate > latest ? recordDate : latest;
+            }, new Date(0))
+          : null
+      }
+    });
   } catch (error) {
     console.error('Get course progress error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -508,5 +557,175 @@ router.post('/:id/lessons/:lessonId/quiz', flexibleAuthenticate, async (req, res
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+// Update course progress
+router.post('/:id/progress', flexibleAuthenticate, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const { id: courseId } = req.params;
+    const { moduleId, lessonId, progress, timeSpent, completionStatus, quizScore } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID format' });
+    }
+
+    // Verify the course exists
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    // Find existing progress record or create a new one
+    let progressRecord;
+    
+    if (moduleId || lessonId) {
+      // Looking for specific module or lesson progress
+      progressRecord = await UserProgress.findOne({
+        userId: req.user._id,
+        courseId,
+        moduleId: moduleId || null,
+        lessonId: lessonId || null
+      });
+    } else {
+      // Looking for course-level progress (not enrollment)
+      progressRecord = await UserProgress.findOne({
+        userId: req.user._id,
+        courseId,
+        progressType: 'course',
+        moduleId: null,
+        lessonId: null
+      });
+    }
+
+    const now = new Date();
+
+    if (progressRecord) {
+      // Update existing record
+      progressRecord.progressData = {
+        ...progressRecord.progressData,
+        completionPercentage: progress || progressRecord.progressData?.completionPercentage || 0,
+        timeSpent: (progressRecord.progressData?.timeSpent || 0) + (timeSpent || 0),
+        completionStatus: completionStatus || progressRecord.progressData?.completionStatus || 'in-progress',
+        quizScore: quizScore !== undefined ? quizScore : progressRecord.progressData?.quizScore
+      };
+      progressRecord.lastUpdated = now;
+    } else {
+      // Create new progress record
+      progressRecord = new UserProgress({
+        userId: req.user._id,
+        courseId,
+        moduleId: moduleId || null,
+        lessonId: lessonId || null,
+        progressType: lessonId ? 'lesson' : moduleId ? 'module' : 'course',
+        progressData: {
+          completionPercentage: progress || 0,
+          timeSpent: timeSpent || 0,
+          completionStatus: completionStatus || 'in-progress',
+          quizScore: quizScore
+        },
+        timestamp: now,
+        lastUpdated: now
+      });
+    }
+
+    await progressRecord.save();
+
+    // Update overall course progress if this is a lesson completion
+    if (lessonId && (completionStatus === 'completed' || progress === 100)) {
+      await updateOverallCourseProgress(req.user._id, courseId);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Progress updated successfully',
+      progress: progressRecord
+    });
+  } catch (error) {
+    console.error('Update course progress error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Helper function to update overall course progress
+async function updateOverallCourseProgress(userId, courseId) {
+  try {
+    // Get all completed lessons for this course
+    const lessonProgress = await UserProgress.find({
+      userId,
+      courseId,
+      progressType: 'lesson',
+      'progressData.completionStatus': 'completed'
+    });
+    
+    // Get course structure to determine total lessons
+    const course = await Course.findById(courseId);
+    if (!course || !course.modules) {
+      return;
+    }
+    
+    // Count total lessons in the course
+    let totalLessons = 0;
+    course.modules.forEach(module => {
+      totalLessons += (module.lessons?.length || 0);
+    });
+    
+    if (totalLessons === 0) {
+      return;
+    }
+    
+    // Calculate overall progress percentage
+    const completedLessons = lessonProgress.length;
+    const progressPercentage = Math.min(
+      Math.round((completedLessons / totalLessons) * 100),
+      100
+    );
+    
+    // Find or create overall course progress record
+    let courseProgress = await UserProgress.findOne({
+      userId,
+      courseId,
+      progressType: 'course',
+      moduleId: null,
+      lessonId: null
+    });
+    
+    const now = new Date();
+    
+    if (courseProgress) {
+      courseProgress.progressData = {
+        ...courseProgress.progressData,
+        completionPercentage: progressPercentage,
+        completedLessons,
+        totalLessons
+      };
+      courseProgress.lastUpdated = now;
+    } else {
+      courseProgress = new UserProgress({
+        userId,
+        courseId,
+        progressType: 'course',
+        progressData: {
+          completionPercentage: progressPercentage,
+          completedLessons,
+          totalLessons,
+          timeSpent: 0,
+          completionStatus: progressPercentage === 100 ? 'completed' : 'in-progress'
+        },
+        timestamp: now,
+        lastUpdated: now
+      });
+    }
+    
+    await courseProgress.save();
+    
+    return courseProgress;
+  } catch (error) {
+    console.error('Error updating overall course progress:', error);
+    throw error;
+  }
+}
 
 export default router;

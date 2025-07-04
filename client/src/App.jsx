@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { BrowserRouter } from 'react-router-dom'
 import './App.css'
 import EnhancedAIAssistant from './components/ai/EnhancedAIAssistant'
 import AIToggleButton from './components/ai/AIToggleButton'
@@ -335,14 +336,20 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
 
 function App() {
   return (
-    <AuthProvider>
-      <DataSyncProvider>
-        <AIContextProvider>
-          <AppContent />
-          <EnhancedAIAssistant />
-        </AIContextProvider>
-      </DataSyncProvider>
-    </AuthProvider>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
+      <AuthProvider>
+        <DataSyncProvider>
+          <AIContextProvider>
+            <AppContent />
+          </AIContextProvider>
+        </DataSyncProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 

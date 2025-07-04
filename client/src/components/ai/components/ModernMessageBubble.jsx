@@ -33,12 +33,36 @@ const ModernMessageBubble = ({
   showActions = true,
   className = ''
 }) => {
+  // Safety check for message object
+  if (!message || typeof message !== 'object') {
+    return (
+      <div className="p-4 text-red-500 text-sm">
+        Error: Invalid message data
+      </div>
+    );
+  }
+
   const [copied, setCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [feedback, setFeedback] = useState(message?.feedback || null);
   const menuRef = useRef(null);
   const audioRef = useRef(null);
+
+  // Format message content with markdown-like formatting
+  const formatMessageContent = (content) => {
+    // Ensure content is a string first
+    if (!content || typeof content !== 'string') {
+      return String(content || '');
+    }
+    
+    // Simple markdown-like formatting
+    return content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code class="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-sm">$1</code>')
+      .replace(/\n/g, '<br>');
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -140,18 +164,9 @@ const ModernMessageBubble = ({
     // Default text message with markdown-like formatting
     return (
       <div className="prose prose-sm max-w-none dark:prose-invert">
-        <div dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }} />
+        <div dangerouslySetInnerHTML={{ __html: formatMessageContent(message?.content || '') }} />
       </div>
     );
-  };
-
-  const formatMessageContent = (content) => {
-    // Simple markdown-like formatting
-    return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`(.*?)`/g, '<code class="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-sm">$1</code>')
-      .replace(/\n/g, '<br>');
   };
 
   return (

@@ -176,9 +176,29 @@ router.post('/learning-path/generate',
         { learningStyle, currentLevel }
       );
 
+      // Even if success is false, make sure we return a valid response
+      if (!learningPath.success && learningPath.fallbackPath) {
+        return res.status(200).json({
+          success: false,
+          error: learningPath.error || 'Failed to generate learning path',
+          learningPath: learningPath.fallbackPath,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       res.json({
         success: true,
-        learningPath: learningPath.learningPath,
+        learningPath: learningPath.learningPath || {
+          currentPhase: 'Getting Started',
+          progress: 0,
+          nextRecommendation: {
+            type: 'lesson',
+            title: 'Introduction to Learning',
+            difficulty: 'beginner'
+          },
+          nextMilestone: 'Begin your learning journey',
+          totalLessons: 5
+        },
         metadata: learningPath.metadata,
         timestamp: new Date().toISOString()
       });
@@ -196,20 +216,9 @@ router.post('/learning-path/generate',
 // Get current learning path for user
 router.get('/learning-path/current',
   flexibleAuthenticate,
-  [
-    query('userId').optional().isMongoId().withMessage('Invalid user ID format')
-  ],
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          error: 'Validation failed',
-          details: errors.array()
-        });
-      }
-
-      const userId = req.query.userId || req.user._id;
+      let userId = req.query.userId || (req.user && req.user._id);
       
       if (!userId) {
         return res.status(400).json({
@@ -221,26 +230,52 @@ router.get('/learning-path/current',
       // Get user's current learning path
       const learningPath = await adaptiveLearningService.getCurrentLearningPath(userId);
       
+      // Ensure we have valid data to return
+      const validLearningPath = learningPath || {
+        currentStep: 1,
+        totalSteps: 5,
+        progress: 20,
+        nextRecommendation: {
+          type: 'lesson',
+          title: 'Getting Started',
+          difficulty: 'beginner'
+        },
+        completedSteps: []
+      };
+      
+      // Make sure nextRecommendation is properly formatted
+      if (validLearningPath.nextRecommendation && typeof validLearningPath.nextRecommendation === 'object') {
+        if (!validLearningPath.nextRecommendation.title) {
+          validLearningPath.nextRecommendation.title = 'Recommended Lesson';
+        }
+      } else if (typeof validLearningPath.nextRecommendation === 'string') {
+        // Convert string to object
+        validLearningPath.nextRecommendation = {
+          type: 'lesson',
+          title: validLearningPath.nextRecommendation,
+          difficulty: 'intermediate'
+        };
+      } else {
+        // Fallback if nextRecommendation is missing or invalid
+        validLearningPath.nextRecommendation = {
+          type: 'lesson',
+          title: 'Getting Started',
+          difficulty: 'beginner'
+        };
+      }
+      
       res.json({
         success: true,
-        learningPath: learningPath || {
-          currentStep: 1,
-          totalSteps: 5,
-          progress: 20,
-          nextRecommendation: {
-            type: 'lesson',
-            title: 'Getting Started',
-            difficulty: 'beginner'
-          },
-          completedSteps: []
-        },
+        learningPath: validLearningPath,
         timestamp: new Date().toISOString()
       });
 
     } catch (error) {
       console.error('Get current learning path error:', error);
+      // Instead of silently handling the error, provide a fallback but include error info
       res.json({
-        success: true,
+        success: false,
+        error: error.message || 'Failed to retrieve learning path',
         learningPath: {
           currentStep: 1,
           totalSteps: 5,
@@ -250,7 +285,9 @@ router.get('/learning-path/current',
             title: 'Getting Started',
             difficulty: 'beginner'
           },
-          completedSteps: []
+          completedSteps: [],
+          isError: true,
+          errorInfo: process.env.NODE_ENV === 'development' ? error.stack : null
         },
         timestamp: new Date().toISOString()
       });
@@ -676,5 +713,274 @@ async function getUserPerformanceData(userId) {
     sessionCount: 10
   };
 }
+
+/**
+ * Get course progress - real implementation to retrieve actual progress data
+ */
+router.get('/courses/:courseId/progress', flexibleAuthenticate, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    console.log(`🔍 GET progress requested for courseId: ${courseId}, user: ${req.user ? req.user._id : 'unauthenticated'}`);
+    
+    if (!req.user) {
+      console.log('❌ GET progress failed: No authenticated user');
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'You must be logged in to view course progress'
+      });
+    }
+    
+    // Get the user's progress from the database
+    const userProgressDoc = await UserProgress.findOne({
+      userId: req.user._id,
+      courseId: courseId,
+      progressType: 'enrollment'
+    });
+    
+    console.log(`📊 Progress document found: ${userProgressDoc ? 'Yes' : 'No'}, userId: ${req.user._id}, courseId: ${courseId}`);
+    
+    if (!userProgressDoc) {
+      // No progress record found, create initial record
+      console.log('🆕 Creating new progress record for first-time user');
+      const newProgress = new UserProgress({
+        userId: req.user._id,
+        courseId: courseId,
+        progressType: 'enrollment',
+        progressData: {
+          completionPercentage: 0,
+          currentModule: 0,
+          currentLesson: 0,
+          timeSpent: 0,
+          lastUpdated: new Date()
+        },
+        timestamp: new Date()
+      });
+      
+      await newProgress.save();
+      
+      // Return a standard format for the frontend
+      const initialProgressData = {
+        courseId,
+        userId: req.user._id.toString(),
+        completionPercentage: 0,
+        lastActivity: new Date(),
+        startedModules: [],
+        completedModules: [],
+        quizScores: [],
+        averageScore: 0,
+        currentModule: 0,
+        currentLesson: 0,
+        timeSpent: 0
+      };
+      
+      console.log('Returning initial progress data:', initialProgressData);
+      
+      return res.json(initialProgressData);
+    }
+    
+    // Format the progress data for frontend
+    const progressData = {
+      courseId,
+      userId: req.user._id.toString(),
+      completionPercentage: userProgressDoc.progressData?.completionPercentage || 0,
+      lastActivity: userProgressDoc.progressData?.lastUpdated || userProgressDoc.timestamp,
+      startedModules: userProgressDoc.progressData?.startedModules || [],
+      completedModules: userProgressDoc.progressData?.completedModules || [],
+      quizScores: userProgressDoc.progressData?.quizScores || [],
+      averageScore: userProgressDoc.progressData?.averageScore || 0,
+      currentModule: userProgressDoc.progressData?.currentModule || 0,
+      currentLesson: userProgressDoc.progressData?.currentLesson || 0,
+      timeSpent: userProgressDoc.progressData?.timeSpent || 0
+    };
+    
+    console.log('Returning progress data:', progressData);
+    
+    res.json(progressData);
+    
+  } catch (error) {
+    console.error('Course progress retrieval error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Unable to retrieve course progress'
+    });
+  }
+});
+
+// Get AI recommendations by user ID - real implementation
+router.get('/ai/recommendations/:userId', flexibleAuthenticate, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Check if the request user is authorized to access this user's data
+    if (req.user._id.toString() !== userId && req.user.role !== 'admin' && req.user.role !== 'instructor') {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'You can only access your own recommendations'
+      });
+    }
+    
+    // Get user's courses
+    const userEnrollments = await UserProgress.find({
+      userId: userId,
+      progressType: 'enrollment'
+    });
+    
+    const courseIds = userEnrollments.map(enrollment => enrollment.courseId);
+    
+    // Get user's real recommendations using the adaptiveLearningService
+    const recommendations = await adaptiveLearningService.recommendNextContent(
+      userId,
+      [], // completedLessons will be fetched internally
+      { limit: 5, type: 'all' }
+    );
+    
+    // Always return a valid response structure, even if the service had issues
+    const responseData = {
+      success: true,
+      recommendations: recommendations.recommendations || {
+        nextLessons: [],
+        suggestedPractice: [],
+        learningPath: {
+          currentStep: 1,
+          totalSteps: 10,
+          nextMilestone: 'Complete courses',
+          progress: 0
+        }
+      },
+      reasoning: recommendations.reasoning,
+      metadata: recommendations.metadata,
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json(responseData);
+    
+  } catch (error) {
+    console.error('AI recommendations error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Unable to retrieve AI recommendations'
+    });
+  }
+});
+
+// Track and update course progress - handle POST requests
+/**
+ * Update course progress - real implementation to store progress data
+ */
+router.post('/courses/:courseId/progress', flexibleAuthenticate, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { progress, currentModule, currentLesson, timeSpent, completedModules, quizScores } = req.body;
+    
+    console.log(`POST progress received for courseId: ${courseId}`, { 
+      progress, currentModule, currentLesson, timeSpent,
+      completedModulesCount: completedModules ? completedModules.length : 0,
+      quizScoresCount: quizScores ? quizScores.length : 0,
+      user: req.user ? req.user._id : 'unauthenticated'
+    });
+    
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'You must be logged in to update course progress'
+      });
+    }
+    
+    // Get the user's current progress from the database
+    const userProgressDoc = await UserProgress.findOne({
+      userId: req.user._id,
+      courseId: courseId,
+      progressType: 'enrollment'
+    });
+    
+    if (!userProgressDoc) {
+      // Create new progress record if not found
+      const newProgress = new UserProgress({
+        userId: req.user._id,
+        courseId: courseId,
+        progressType: 'enrollment',
+        progressData: {
+          completionPercentage: progress || 0,
+          currentModule: currentModule || 0,
+          currentLesson: currentLesson || 0,
+          timeSpent: timeSpent || 0,
+          completedModules: completedModules || [],
+          quizScores: quizScores || [],
+          lastUpdated: new Date()
+        },
+        timestamp: new Date()
+      });
+      
+      await newProgress.save();
+      
+      // Format the progress data for frontend
+      const formattedProgress = {
+        courseId,
+        userId: req.user._id,
+        completionPercentage: progress || 0,
+        lastActivity: new Date(),
+        startedModules: [],
+        completedModules: completedModules || [],
+        quizScores: quizScores || [],
+        averageScore: 0,
+        currentModule: currentModule || 0,
+        currentLesson: currentLesson || 0,
+        timeSpent: timeSpent || 0
+      };
+      
+      console.log('Created new progress data:', formattedProgress);
+      
+      return res.status(201).json(formattedProgress);
+    }
+    
+    // Update existing progress
+    userProgressDoc.progressData = {
+      ...userProgressDoc.progressData,
+      completionPercentage: progress !== undefined ? progress : userProgressDoc.progressData?.completionPercentage,
+      currentModule: currentModule !== undefined ? currentModule : userProgressDoc.progressData?.currentModule,
+      currentLesson: currentLesson !== undefined ? currentLesson : userProgressDoc.progressData?.currentLesson,
+      timeSpent: (userProgressDoc.progressData?.timeSpent || 0) + (timeSpent || 0),
+      completedModules: completedModules || userProgressDoc.progressData?.completedModules || [],
+      quizScores: quizScores || userProgressDoc.progressData?.quizScores || [],
+      lastUpdated: new Date()
+    };
+    
+    await userProgressDoc.save();
+    
+    // Format the progress data for frontend
+    const formattedProgress = {
+      courseId,
+      userId: req.user._id,
+      completionPercentage: userProgressDoc.progressData.completionPercentage || 0,
+      lastActivity: userProgressDoc.progressData.lastUpdated,
+      startedModules: userProgressDoc.progressData.startedModules || [],
+      completedModules: userProgressDoc.progressData.completedModules || [],
+      quizScores: userProgressDoc.progressData.quizScores || [],
+      averageScore: userProgressDoc.progressData.averageScore || 0,
+      currentModule: userProgressDoc.progressData.currentModule || 0,
+      currentLesson: userProgressDoc.progressData.currentLesson || 0,
+      timeSpent: userProgressDoc.progressData.timeSpent || 0
+    };
+    
+    console.log('Updated progress data:', formattedProgress);
+    
+    // Track the learning event in analytics
+    await learningAnalyticsService.trackLearningEvent(
+      req.user._id,
+      'progress_update',
+      { courseId },
+      { progress, currentModule, currentLesson, timeSpent }
+    ).catch(err => console.error('Failed to track learning event:', err));
+    
+    res.json(formattedProgress);
+    
+  } catch (error) {
+    console.error('Course progress update error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Unable to update course progress'
+    });
+  }
+});
 
 export default router;

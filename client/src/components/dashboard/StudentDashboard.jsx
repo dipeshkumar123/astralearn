@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { 
   BookOpen, 
   Target, 
@@ -25,13 +26,22 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { useDataSync } from '../../contexts/DataSyncProvider';
+import { useAIAssistantStore } from '../../stores/aiAssistantStore';
 
 import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
 const StudentDashboard = ({ setCurrentView }) => {
   // AI Assistant integration
   const { updateContext, setAssistantMode } = useAIAssistantStore();
-  const location = useLocation();
-  const { user } = useAuth();
+  
+  // Safe location access - fallback if not in Router context
+  let location;
+  try {
+    location = useLocation();
+  } catch (error) {
+    location = { pathname: '/dashboard' };
+  }
+  
+  const { user, token } = useAuth();
   
   // Update AI context based on current page and user
   useEffect(() => {
@@ -47,7 +57,7 @@ const StudentDashboard = ({ setCurrentView }) => {
     setAssistantMode('learning-assistant');
   }, [updateContext, setAssistantMode, location, user]);
 
-  const { user, token } = useAuth();  const { 
+  const { 
     courses, 
     userProgress, 
     analytics, 
@@ -95,9 +105,21 @@ const StudentDashboard = ({ setCurrentView }) => {
 
   // Get unique categories for filter
   const categories = [...new Set(courses.map(course => course.category))].filter(Boolean);  // Handle course enrollment
+  // Handle course enrollment
   const handleEnrollCourse = async (courseId) => {
     try {
-      await enrollInCourse(courseId);
+      // Validate the course ID before proceeding
+      if (!courseId) {
+        console.error('Missing course ID for enrollment');
+        return;
+      }
+      
+      // Convert to string if it's an ObjectId (MongoDB ID)
+      const courseIdStr = typeof courseId === 'object' ? 
+        (courseId.toString ? courseId.toString() : JSON.stringify(courseId)) : 
+        String(courseId);
+        
+      await enrollInCourse(courseIdStr);
       // Data will be automatically updated through DataSyncProvider
     } catch (error) {
       console.error('Failed to enroll in course:', error);
@@ -531,7 +553,20 @@ const StudentDashboard = ({ setCurrentView }) => {
                       </button>
                     ) : (
                       <button 
-                        onClick={() => handleEnrollCourse(course._id || course.id)}
+                        onClick={() => {
+                          const id = course._id || course.id;
+                          if (!id) {
+                            console.error('Missing course ID:', course);
+                            return;
+                          }
+                          
+                          // Convert any course ID (string or object) to string format
+                          const courseIdStr = typeof id === 'object' ? 
+                            (id.toString ? id.toString() : JSON.stringify(id)) : 
+                            String(id);
+                            
+                          handleEnrollCourse(courseIdStr);
+                        }}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
                       >                        Enroll
                       </button>

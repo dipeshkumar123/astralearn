@@ -822,4 +822,81 @@ router.get('/orchestrated/health',
   }
 );
 
+// AI Contextual Help endpoint - get contextual help and suggestions
+router.post('/contextual-help',
+  flexibleAuthenticate,
+  [
+    body('context').optional().isObject(),
+    body('courseId').optional().isString(),
+    body('lessonId').optional().isString(),
+    body('currentPage').optional().isString(),
+    body('userAction').optional().isString(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array(),
+        });
+      }
+
+      const { context = {}, courseId, lessonId, currentPage, userAction } = req.body;
+
+      // Gather comprehensive context from database
+      const databaseContext = await aiContextService.getComprehensiveContext(
+        req.user._id, 
+        { courseId, lessonId, ...context }
+      );
+
+      // Enhanced context with user information and current state
+      const enhancedContext = {
+        ...databaseContext,
+        user: {
+          ...databaseContext.user,
+          ...context.user,
+          userId: req.user._id,
+        },
+        course: {
+          ...databaseContext.course,
+          ...context.course,
+        },
+        lesson: {
+          ...databaseContext.lesson,
+          ...context.lesson,
+        },
+        currentPage,
+        userAction,
+        interactionType: 'contextual-help',
+        timestamp: new Date().toISOString(),
+      };
+
+      // Generate contextual help using AI orchestrator
+      const helpResponse = await aiOrchestrator.generateContextualHelp(enhancedContext);
+
+      res.json({
+        success: true,
+        help: helpResponse.suggestions || [],
+        tips: helpResponse.tips || [],
+        nextSteps: helpResponse.nextSteps || [],
+        resources: helpResponse.resources || [],
+        context: enhancedContext,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      console.error('AI Contextual Help error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'Contextual help service temporarily unavailable',
+        help: [],
+        tips: [],
+        nextSteps: [],
+        resources: [],
+      });
+    }
+  }
+);
+
 export default router;

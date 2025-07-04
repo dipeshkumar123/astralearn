@@ -1,7 +1,7 @@
 // Basic Instructor Dashboard - Redirects to Analytics Dashboard
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../auth/AuthProvider';
 import { useAIAssistantStore } from '../../stores/aiAssistantStore';
 import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
 import AIToggleButton from '../ai/AIToggleButton';

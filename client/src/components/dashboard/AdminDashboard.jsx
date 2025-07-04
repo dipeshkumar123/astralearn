@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { 
   Users, 
   BookOpen, 
@@ -27,12 +28,20 @@ import {
   Bell
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
-
+import { useAIAssistantStore } from '../../stores/aiAssistantStore';
 import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
 const AdminDashboard = () => {
   // AI Assistant integration
   const { updateContext, setAssistantMode } = useAIAssistantStore();
-  const location = useLocation();
+  
+  // Safe location access - fallback if not in Router context
+  let location;
+  try {
+    location = useLocation();
+  } catch (error) {
+    location = { pathname: '/admin' };
+  }
+  
   const { user } = useAuth();
   
   // Update AI context based on current page and user
@@ -49,7 +58,6 @@ const AdminDashboard = () => {
     setAssistantMode('system-assistant');
   }, [updateContext, setAssistantMode, location, user]);
 
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [systemStats, setSystemStats] = useState(null);
   const [userStats, setUserStats] = useState(null);

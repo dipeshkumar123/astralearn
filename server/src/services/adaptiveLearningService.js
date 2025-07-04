@@ -440,6 +440,340 @@ class AdaptiveLearningService {
   }
 
   /**
+   * Get the current learning path for a user
+   */
+  async getCurrentLearningPath(userId) {
+    try {
+      // Find the user
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Get user's most recent progress to identify current course
+      const recentProgress = await UserProgress.find({ userId })
+        .sort({ timestamp: -1 })
+        .limit(1)
+        .populate('courseId');
+
+      // If no progress found, return basic starter path
+      if (!recentProgress || recentProgress.length === 0) {
+        return this.generateStarterLearningPath(user);
+      }
+
+      const courseId = recentProgress[0].courseId?._id;
+      if (!courseId) {
+        return this.generateStarterLearningPath(user);
+      }
+
+      // Get all user progress for this course
+      const courseProgress = await UserProgress.find({ userId, courseId })
+        .populate('lessonId')
+        .sort({ timestamp: -1 });
+
+      // Get completed lessons
+      const completedLessons = courseProgress
+        .filter(progress => progress.progressData?.completionPercentage === 100)
+        .map(progress => progress.lessonId?._id?.toString())
+        .filter(Boolean);
+
+      // Calculate current progress
+      const course = recentProgress[0].courseId;
+      const totalLessons = course.lessonCount || 0;
+      const progressPercentage = totalLessons > 0 
+        ? Math.round((completedLessons.length / totalLessons) * 100) 
+        : 0;
+
+      // Get performance analysis
+      const performanceAnalysis = await this.analyzeUserPerformance(userId, courseId);
+
+      // Get next recommendation
+      const recommendations = await this.recommendNextContent(userId, completedLessons);
+      const nextRecommendation = recommendations.success ? recommendations.recommendations[0]?.content : null;
+
+      // Calculate estimated completion time
+      const averageLessonsPerWeek = courseProgress.length > 0 
+        ? courseProgress.length / (Math.max(1, Math.ceil((Date.now() - courseProgress[courseProgress.length - 1].timestamp) / (7 * 24 * 60 * 60 * 1000))))
+        : 1;
+      
+      const remainingLessons = totalLessons - completedLessons.length;
+      const estimatedWeeks = remainingLessons > 0 && averageLessonsPerWeek > 0 
+        ? Math.ceil(remainingLessons / averageLessonsPerWeek)
+        : 1;
+
+      return {
+        userId,
+        courseId,
+        currentPhase: course.title,
+        progress: progressPercentage,
+        nextRecommendation: nextRecommendation || { 
+          title: 'Getting Started', 
+          type: 'lesson',
+          difficulty: 'beginner'
+        },
+        nextMilestone: this.determineNextMilestone(courseProgress, course),
+        completedLessons: completedLessons.length,
+        totalLessons,
+        estimatedDuration: {
+          estimatedWeeks,
+          averageLessonsPerWeek: Math.round(averageLessonsPerWeek * 10) / 10
+        },
+        strategy: performanceAnalysis ? {
+          type: this.determineStrategyType(performanceAnalysis),
+          level: performanceAnalysis.level
+        } : { type: 'standard', level: 'beginner' },
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error getting current learning path:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate a starter learning path for new users
+   */
+  async generateStarterLearningPath(user) {
+    try {
+      // Find starter or popular courses
+      const popularCourse = await Course.findOne({ isActive: true })
+        .sort({ enrollmentCount: -1 });
+
+      if (!popularCourse) {
+        return {
+          currentPhase: 'Getting Started',
+          progress: 0,
+          nextRecommendation: { 
+            title: 'Introduction to Learning', 
+            type: 'lesson',
+            difficulty: 'beginner'
+          },
+          nextMilestone: 'Complete First Lesson',
+          completedLessons: 0,
+          totalLessons: 5,
+          estimatedDuration: {
+            estimatedWeeks: 1,
+            averageLessonsPerWeek: 5
+          },
+          strategy: { type: 'standard', level: 'beginner' },
+          lastUpdated: new Date().toISOString()
+        };
+      }
+
+      return {
+        courseId: popularCourse._id,
+        currentPhase: popularCourse.title,
+        progress: 0,
+        nextRecommendation: { 
+          title: popularCourse.lessons?.[0]?.title || 'Course Introduction', 
+          type: 'lesson',
+          difficulty: 'beginner'
+        },
+        nextMilestone: 'Complete First Module',
+        completedLessons: 0,
+        totalLessons: popularCourse.lessonCount || 5,
+        estimatedDuration: {
+          estimatedWeeks: 2,
+          averageLessonsPerWeek: 3
+        },
+        strategy: { type: 'standard', level: 'beginner' },
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error generating starter learning path:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Determine the next milestone based on course progress
+   */
+  determineNextMilestone(courseProgress, course) {
+    if (!courseProgress || courseProgress.length === 0) {
+      return 'Start your learning journey';
+    }
+
+    if (courseProgress.length < 3) {
+      return 'Complete your first module';
+    }
+
+    const completionPercentage = courseProgress.reduce(
+      (sum, progress) => sum + (progress.progressData?.completionPercentage || 0), 
+      0
+    ) / courseProgress.length;
+
+    if (completionPercentage < 30) {
+      return 'Build your foundation';
+    } else if (completionPercentage < 60) {
+      return `Master ${course.title} basics`;
+    } else if (completionPercentage < 90) {
+      return `Complete advanced ${course.title} topics`;
+    } else {
+      return `Become a ${course.title} expert`;
+    }
+  }
+
+  /**
+   * Determine strategy type based on performance analysis
+   */
+  determineStrategyType(performanceAnalysis) {
+    if (!performanceAnalysis) return 'standard';
+    
+    if (performanceAnalysis.level === 'struggling') {
+      return 'reinforcement';
+    } else if (performanceAnalysis.level === 'excelling') {
+      return 'acceleration';
+    } else {
+      return 'standard';
+    }
+  }
+
+  /**
+   * Generate adaptive learning path when adaptive calculation fails
+   */
+  async generateFallbackPath(courseId) {
+    try {
+      // Try to get basic course information
+      let courseTitle = 'Course';
+      let lessonCount = 5;
+      
+      if (courseId) {
+        const course = await Course.findById(courseId);
+        if (course) {
+          courseTitle = course.title;
+          lessonCount = course.lessonCount || 5;
+        }
+      }
+      
+      // Create a safe fallback path with minimal information
+      return {
+        currentPhase: courseTitle,
+        progress: 0,
+        nextRecommendation: {
+          title: 'Introduction to ' + courseTitle,
+          type: 'lesson',
+          difficulty: 'beginner'
+        },
+        nextMilestone: 'Begin your learning journey',
+        completedLessons: 0,
+        totalLessons: lessonCount,
+        estimatedDuration: {
+          estimatedWeeks: 2,
+          averageLessonsPerWeek: 3
+        },
+        strategy: { type: 'standard', level: 'beginner' },
+        isFallback: true,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error generating fallback path:', error);
+      // Ultimate fallback if everything else fails
+      return {
+        currentPhase: 'Getting Started',
+        progress: 0,
+        nextRecommendation: {
+          title: 'Introduction to Learning',
+          type: 'lesson',
+          difficulty: 'beginner'
+        },
+        nextMilestone: 'Begin your learning journey',
+        completedLessons: 0,
+        totalLessons: 5,
+        estimatedDuration: {
+          estimatedWeeks: 2,
+          averageLessonsPerWeek: 2
+        },
+        strategy: { type: 'standard', level: 'beginner' },
+        isFallback: true,
+        lastUpdated: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Generate a new learning path for a user and course
+   */
+  async generateNewLearningPath(userId, courseId, options = {}) {
+    try {
+      const user = await User.findById(userId);
+      const course = await Course.findById(courseId).populate('modules lessons');
+      
+      if (!user || !course) {
+        throw new Error('User or course not found');
+      }
+      
+      // Override user preferences with provided options
+      const userWithOptions = {
+        ...user.toObject(),
+        learningStyle: options.learningStyle || user.learningStyle || 'visual'
+      };
+      
+      // Clear previous progress if requested
+      if (options.resetProgress) {
+        await UserProgress.deleteMany({ userId, courseId });
+      }
+      
+      // Calculate a fresh learning path
+      const learningPath = await this.calculateLearningPath(userId, courseId, {
+        forceRecalculation: true,
+        currentLevel: options.currentLevel || 'beginner'
+      });
+      
+      // Create initial progress record if it's a new enrollment
+      const existingProgress = await UserProgress.findOne({ userId, courseId });
+      if (!existingProgress) {
+        await UserProgress.create({
+          userId,
+          courseId,
+          progressType: 'course_enrollment',
+          timestamp: new Date(),
+          progressData: {
+            completionPercentage: 0,
+            currentModule: 0,
+            currentLesson: 0
+          }
+        });
+      }
+      
+      // Make sure we have valid, serializable data to return
+      let pathData = learningPath?.learningPath;
+      
+      // Add nextRecommendation if missing
+      if (!pathData.nextRecommendation) {
+        pathData.nextRecommendation = {
+          title: course.lessons && course.lessons.length > 0 
+            ? course.lessons[0].title 
+            : 'Course Introduction',
+          type: 'lesson',
+          difficulty: options.currentLevel || 'beginner'
+        };
+      }
+      
+      return {
+        success: true,
+        learningPath: {
+          ...pathData,
+          isNewPath: true,
+          generatedAt: new Date().toISOString()
+        },
+        metadata: {
+          ...learningPath.metadata,
+          userOptions: options,
+          courseId,
+          userId
+        }
+      };
+    } catch (error) {
+      console.error('Error generating new learning path:', error);
+      return {
+        success: false,
+        error: error.message,
+        fallbackPath: await this.generateFallbackPath(courseId)
+      };
+    }
+  }
+
+  /**
    * Utility methods for adaptive learning calculations
    */
 
@@ -560,101 +894,6 @@ class AdaptiveLearningService {
       estimatedWeeks: Math.ceil(estimatedSessions / (userPreferences?.sessionsPerWeek || 3)),
       averageSessionLength: sessionDuration
     };
-  }
-
-  /**
-   * Generate fallback learning path when adaptive calculation fails
-   */
-  async generateFallbackPath(courseId) {
-    try {
-      const course = await Course.findById(courseId).populate('lessons');
-      
-      return {
-        strategy: { type: 'standard', focus: 'sequential' },
-        phases: [{
-          moduleName: 'Standard Progression',
-          lessons: course.lessons || [],
-          adaptations: { type: 'basic', support: 'standard' }
-        }],
-        isFallback: true
-      };
-    } catch (error) {
-      return {
-        strategy: { type: 'error', focus: 'manual' },
-        phases: [],
-        error: 'Unable to generate learning path'
-      };
-    }
-  }
-
-  /**
-   * Analyze current learning context for a user
-   */
-  async analyzeCurrentLearningContext(userId, userProgress = []) {
-    try {
-      const user = await User.findById(userId);
-      if (!user) {
-        return { error: 'User not found' };
-      }
-      // Get recent progress
-      const recentProgress = userProgress.slice(-10);
-      // Calculate basic metrics
-      const averageScore = recentProgress.length > 0 
-        ? recentProgress.reduce((sum, p) => sum + (p.score || 0), 0) / recentProgress.length
-        : 0;
-      return {
-        userId,
-        recentProgress,
-        averageScore,
-        totalLessonsCompleted: userProgress.length,
-        learningStyle: user.learningStyle || 'visual',
-        currentLevel: this.determineCurrentLevel(averageScore),
-        strugglingAreas: [],
-        strengths: [],
-        timestamp: new Date()
-      };
-    } catch (error) {
-      console.error('Error analyzing learning context:', error);
-      return { error: error.message };
-    }
-  }
-
-  /**
-   * Generate fallback recommendations when main algorithm fails
-   */
-  async generateFallbackRecommendations(userId) {
-    try {
-      // Get basic course recommendations
-      const courses = await Course.find({ isActive: true }).limit(3);
-      return courses.map(course => ({
-        type: 'course',
-        id: course._id,
-        title: course.title,
-        description: course.description,
-        difficulty: course.difficulty || 'beginner',
-        reason: 'General recommendation',
-        confidence: 0.5
-      }));
-    } catch (error) {
-      console.error('Error generating fallback recommendations:', error);
-      return [{
-        type: 'lesson',
-        title: 'Getting Started',
-        description: 'Start your learning journey',
-        difficulty: 'beginner',
-        reason: 'Default recommendation',
-        confidence: 0.3
-      }];
-    }
-  }
-
-  /**
-   * Determine current learning level based on average score
-   */
-  determineCurrentLevel(averageScore) {
-    if (averageScore >= 85) return 'advanced';
-    if (averageScore >= 70) return 'intermediate';
-    return 'beginner';
   }
 
   /**

@@ -38,8 +38,7 @@ import {
   Tablet
 } from 'lucide-react';
 import { useAIAssistantStore } from '../../stores/aiAssistantStore';
-import { useAuth } from '../../contexts/AuthContext';
-import { useLocation, useParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider';
 import ModernMessageBubble from './components/ModernMessageBubble';
 import SmartSuggestions from './SmartSuggestions';
 import ContextualHelp from './ContextualHelp';
@@ -47,6 +46,7 @@ import AIInsightsPanels from './AIInsightsPanels';
 import ConversationHistory from './ConversationHistory';
 
 const EnhancedAIAssistant = () => {
+  const { token, user } = useAuth(); // Add user data to get role and ID
   const {
     isOpen,
     isMinimized,
@@ -91,10 +91,26 @@ const EnhancedAIAssistant = () => {
     setAssistantPersonality
   } = useAIAssistantStore();
 
-  // Real-time context integration
-  const { user } = useAuth();
-  const location = useLocation();
-  const params = useParams();
+  // Router hooks - safely handle when not in Router context
+  const [location, setLocation] = useState({ pathname: '/', search: '', hash: '', state: null });
+  const [params, setParams] = useState({});
+  
+  // Try to get router context safely
+  useEffect(() => {
+    try {
+      // This will be undefined if not in router context
+      const currentPath = window.location.pathname;
+      setLocation({ 
+        pathname: currentPath, 
+        search: window.location.search, 
+        hash: window.location.hash, 
+        state: null 
+      });
+    } catch (error) {
+      // Keep default location
+      console.warn('Router context not available, using default location');
+    }
+  }, []);
   
   // Responsive design state
   const [viewportSize, setViewportSize] = useState('desktop');
@@ -110,11 +126,12 @@ const EnhancedAIAssistant = () => {
   const contextData = useMemo(() => {
     return {
       user: {
-        id: user?.id,
+        id: user?._id || user?.id,
         role: user?.role,
-        name: user?.name,
+        name: user?.firstName + ' ' + user?.lastName || user?.name,
         email: user?.email,
-        preferences: user?.preferences
+        preferences: user?.preferences,
+        learningStyle: user?.learningStyle
       },
       location: {
         pathname: location.pathname,
@@ -181,33 +198,66 @@ const EnhancedAIAssistant = () => {
 
   // Real-time data fetching
   useEffect(() => {
-    if (isOpen && currentContext?.userId) {
+    if (isOpen && user?._id) {
       fetchRealTimeData();
       const interval = setInterval(fetchRealTimeData, 30000); // Update every 30 seconds
       return () => clearInterval(interval);
     }
-  }, [isOpen, currentContext?.userId]);
+  }, [isOpen, user?._id]);
 
   const fetchRealTimeData = async () => {
+    if (!token || !user?._id) return; // Don't fetch if not authenticated or no user data
+    
     try {
-      const responses = await Promise.all([
-        fetch(`/api/users/${currentContext.userId}/progress`),
-        fetch(`/api/analytics/insights/${currentContext.userId}`),
-        fetch(`/api/ai/contextual-help?page=${currentContext.page}`)
-      ]);
+      const authHeaders = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
 
-      const [progress, insights, help] = await Promise.all(
-        responses.map(r => r.json())
+      const promises = [];
+      
+      // Always fetch user's own progress
+      promises.push(
+        fetch(`/api/users/${user._id}/progress`, { headers: authHeaders })
+          .then(res => res.ok ? res.json() : null)
       );
 
-      updateContext({
-        realTimeData: {
-          currentPerformance: progress.performance,
-          strugglingAreas: insights.strugglingAreas,
-          strengths: insights.strengths,
-          recommendations: insights.recommendations
-        }
-      });
+      // Only fetch analytics insights if user is admin or instructor
+      if (user.role === 'admin' || user.role === 'instructor') {
+        promises.push(
+          fetch(`/api/analytics/insights/${user._id}`, { headers: authHeaders })
+            .then(res => res.ok ? res.json() : null)
+        );
+      } else {
+        promises.push(Promise.resolve(null)); // Placeholder for students
+      }
+
+      // Always fetch contextual help
+      promises.push(
+        fetch(`/api/ai/contextual-help`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            context: currentContext,
+            currentPage: currentContext.page || location.pathname,
+            userAction: 'real-time-sync'
+          })
+        }).then(res => res.ok ? res.json() : null)
+      );
+
+      const [progress, insights, help] = await Promise.all(promises);
+
+      if (progress || insights || help) {
+        updateContext({
+          realTimeData: {
+            currentPerformance: progress?.performance || progress?.progressData || {},
+            strugglingAreas: insights?.strugglingAreas || [],
+            strengths: insights?.strengths || [],
+            recommendations: insights?.recommendations || [],
+            contextualHelp: help?.help || help?.suggestions || []
+          }
+        });
+      }
     } catch (error) {
       console.error('Failed to fetch real-time data:', error);
     }

@@ -29,7 +29,6 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-  TreeMap,
   Cell
 } from 'recharts';
 import { 
@@ -55,7 +54,6 @@ import {
   ArrowDown,
   AlertCircle,
   Info,
-  Warning,
   Zap,
   Map,
   Route,
@@ -839,7 +837,7 @@ const PredictiveGapAnalysis = ({ data, courseId }) => {
             <h4 className="font-medium text-gray-900">Risk Predictions</h4>
             {(predictiveData.risks || []).map((risk, index) => (
               <div key={index} className="flex items-start p-3 bg-yellow-50 rounded-lg">
-                <Warning className="w-5 h-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">{risk.student}</p>
                   <p className="text-sm text-gray-600">{risk.prediction}</p>

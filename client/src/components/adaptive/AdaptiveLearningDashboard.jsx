@@ -80,7 +80,27 @@ const AdaptiveLearningDashboard = ({ userId, userRole = 'student', onBackToMain 
 
       if (recommendationsResponse.ok) {
         const recommendationsResult = await recommendationsResponse.json();
-        setRecommendations(recommendationsResult.recommendations || []);
+        // Make sure recommendations is an array of valid objects
+        const validRecommendations = (recommendationsResult.recommendations || []).map(rec => {
+          // Ensure rec.content is always an object with a title
+          if (typeof rec.content === 'string') {
+            rec.content = { title: rec.content };
+          } else if (!rec.content || typeof rec.content !== 'object') {
+            rec.content = { title: 'Recommended Content' };
+          } else if (!rec.content.title) {
+            rec.content.title = 'Recommended Content';
+          }
+          
+          // Ensure reasoning is a string
+          if (typeof rec.reasoning !== 'string') {
+            rec.reasoning = typeof rec.reasoning === 'object' 
+              ? JSON.stringify(rec.reasoning) 
+              : 'Recommended based on your learning path';
+          }
+          
+          return rec;
+        });
+        setRecommendations(validRecommendations);
       } else {
         console.warn('Failed to load recommendations:', recommendationsResponse.status);
         // Set fallback recommendations
@@ -114,7 +134,25 @@ const AdaptiveLearningDashboard = ({ userId, userRole = 'student', onBackToMain 
 
       if (pathResponse.ok) {
         const pathResult = await pathResponse.json();
-        setLearningPath(pathResult.learningPath);
+        // Validate and fix learning path data
+        const path = pathResult.learningPath;
+        
+        // Ensure nextRecommendation is properly formatted
+        if (path.nextRecommendation) {
+          if (typeof path.nextRecommendation === 'object') {
+            if (!path.nextRecommendation.title) {
+              path.nextRecommendation.title = 'Recommended Next Lesson';
+            }
+          } else if (typeof path.nextRecommendation === 'string') {
+            path.nextRecommendation = { title: path.nextRecommendation };
+          } else {
+            path.nextRecommendation = { title: 'Advanced React Patterns' };
+          }
+        } else {
+          path.nextRecommendation = { title: 'Advanced React Patterns' };
+        }
+        
+        setLearningPath(path);
       } else {
         console.warn('Failed to load learning path:', pathResponse.status);
         // Set fallback learning path
@@ -243,7 +281,14 @@ const AdaptiveLearningDashboard = ({ userId, userRole = 'student', onBackToMain 
               <PlayCircle className="w-5 h-5 text-blue-600 mr-3" />
               <div>
                 <p className="font-medium text-gray-900">Next Recommended</p>
-                <p className="text-sm text-gray-600">{learningPath.nextRecommendation?.title || 'No recommendations available'}</p>
+                <p className="text-sm text-gray-600">
+                  {typeof learningPath.nextRecommendation === 'object' 
+                    ? (learningPath.nextRecommendation?.title || 'No title available') 
+                    : typeof learningPath.nextRecommendation === 'string' 
+                      ? learningPath.nextRecommendation 
+                      : 'No recommendations available'
+                  }
+                </p>
               </div>
             </div>
             <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
@@ -304,9 +349,23 @@ const AdaptiveLearningDashboard = ({ userId, userRole = 'student', onBackToMain 
                   rec.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
                 }`}></div>
                 <div>
-                  <p className="font-medium text-gray-900">{rec.content?.title || 'Recommended Content'}</p>
-                  <p className="text-sm text-gray-600">{rec.reasoning}</p>
-                  <p className="text-xs text-gray-500 capitalize">{rec.type?.replace('_', ' ')}</p>
+                  <p className="font-medium text-gray-900">
+                    {typeof rec.content === 'object' 
+                      ? (rec.content.title || rec.content.name || 'Recommended Content') 
+                      : typeof rec.content === 'string'
+                        ? rec.content
+                        : 'Recommended Content'
+                    }
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {typeof rec.reasoning === 'string' 
+                      ? rec.reasoning 
+                      : typeof rec.reasoning === 'object'
+                        ? JSON.stringify(rec.reasoning)
+                        : 'Recommended based on your learning path'
+                    }
+                  </p>
+                  <p className="text-xs text-gray-500 capitalize">{rec.type ? rec.type.replace('_', ' ') : 'recommendation'}</p>
                 </div>
               </div>
               <button className="px-3 py-1 border border-blue-600 text-blue-600 rounded hover:bg-blue-50">

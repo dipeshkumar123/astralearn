@@ -15,7 +15,7 @@ const api = axios.create({
 // Add request interceptor for auth tokens
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -33,15 +33,76 @@ api.interceptors.response.use(
   }
 );
 
-export class AIService {  // Orchestrated Chat - Context-aware conversation
+// Safe serialization helper
+const safeSerialize = (obj) => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+
+  if (typeof obj === 'string') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => safeSerialize(item));
+  }
+
+  if (typeof obj === 'object') {
+    try {
+      // Check if it's a non-plain object (like Date)
+      if (obj.constructor !== Object) {
+        return obj.toString();
+      }
+      
+      // Recursively process each property
+      const serialized = {};
+      Object.keys(obj).forEach(key => {
+        serialized[key] = safeSerialize(obj[key]);
+      });
+      return serialized;
+    } catch (e) {
+      // If object can't be properly processed, stringify it to prevent [object Object] rendering
+      try {
+        return JSON.stringify(obj);
+      } catch (stringifyError) {
+        return `[Error serializing object: ${e.message}]`;
+      }
+    }
+  }
+
+  return obj;
+};
+
+// Safe object rendering helper - converts any object to safe displayable string
+const safeDisplayObject = (obj) => {
+  if (obj === null || obj === undefined) {
+    return '';
+  }
+
+  if (typeof obj === 'string') {
+    return obj;
+  }
+
+  if (typeof obj === 'object') {
+    try {
+      return JSON.stringify(obj, null, 2);
+    } catch (e) {
+      return `[Error displaying object: ${e.message}]`;
+    }
+  }
+  
+  return String(obj);
+};
+
+class AIService {  // Orchestrated Chat - Context-aware conversation
   static async chat({ message, context = {} }) {
     try {
       const response = await api.post('/ai/orchestrated/chat', {
         content: message, // Backend expects 'content' not 'message'
-        context,
+        context: safeSerialize(context),
         timestamp: new Date().toISOString()
       });
-      return response.data;
+      return safeSerialize(response.data);
     } catch (error) {
       throw new Error(`Chat failed: ${error.response?.data?.error || error.message}`);
     }
@@ -52,11 +113,11 @@ export class AIService {  // Orchestrated Chat - Context-aware conversation
     try {
       const response = await api.post('/ai/orchestrated/recommendations', {
         userId,
-        context,
+        context: safeSerialize(context),
         type,
         timestamp: new Date().toISOString()
       });
-      return response.data;
+      return safeSerialize(response.data);
     } catch (error) {
       throw new Error(`Recommendations failed: ${error.response?.data?.error || error.message}`);
     }
@@ -69,10 +130,10 @@ export class AIService {  // Orchestrated Chat - Context-aware conversation
         userId,
         goals,
         timeAvailable,
-        preferences,
+        preferences: safeSerialize(preferences),
         timestamp: new Date().toISOString()
       });
-      return response.data;
+      return safeSerialize(response.data);
     } catch (error) {
       throw new Error(`Study plan creation failed: ${error.response?.data?.error || error.message}`);
     }
@@ -84,10 +145,10 @@ export class AIService {  // Orchestrated Chat - Context-aware conversation
       const response = await api.post('/ai/orchestrated/explain', {
         content,
         level,
-        context,
+        context: safeSerialize(context),
         timestamp: new Date().toISOString()
       });
-      return response.data;
+      return safeSerialize(response.data);
     } catch (error) {
       throw new Error(`Explanation failed: ${error.response?.data?.error || error.message}`);
     }
@@ -99,10 +160,10 @@ export class AIService {  // Orchestrated Chat - Context-aware conversation
       const response = await api.post('/ai/orchestrated/feedback', {
         userResponse,
         correctAnswer,
-        context,
+        context: safeSerialize(context),
         timestamp: new Date().toISOString()
       });
-      return response.data;
+      return safeSerialize(response.data);
     } catch (error) {
       throw new Error(`Feedback failed: ${error.response?.data?.error || error.message}`);
     }
@@ -158,7 +219,8 @@ export class AIService {  // Orchestrated Chat - Context-aware conversation
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`,
-        },        body: JSON.stringify({
+        },        
+        body: JSON.stringify({
           content: message, // Backend expects 'content' not 'message'
           context: {
             ...context,
@@ -194,4 +256,6 @@ export class AIService {  // Orchestrated Chat - Context-aware conversation
   }
 }
 
+// Export all at once to avoid duplication
+export { AIService, safeSerialize, safeDisplayObject };
 export default AIService;

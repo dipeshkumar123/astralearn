@@ -112,15 +112,76 @@ export const DataSyncProvider = ({ children }) => {
 
   // Fetch user progress with real data
   const fetchUserProgress = useCallback(async (refresh = false) => {
+    console.log('🔄 fetchUserProgress called, refresh:', refresh, 'existing keys:', Object.keys(userProgress).length);
     if (!refresh && Object.keys(userProgress).length > 0) return userProgress;
     
     setDataLoading('progress', true);
     clearDataError('progress');
     
     try {
-      const data = await apiCall('/users/progress');
-      setUserProgress(data.progress || data);
-      return data.progress || data;
+      // Fetch enrolled courses first
+      console.log('📚 Fetching enrolled courses...');
+      const enrolledData = await apiCall('/courses/my/enrolled');
+      const enrolled = enrolledData.enrolledCourses || enrolledData.courses || enrolledData || [];
+      console.log('📚 Found enrolled courses:', enrolled.length);
+      console.log('📚 Enrolled data structure:', enrolledData);
+      
+      // Ensure enrolled is an array
+      if (!Array.isArray(enrolled)) {
+        console.error('❌ Enrolled courses is not an array:', enrolled);
+        throw new Error('Invalid enrolled courses data format');
+      }
+      
+      // Initialize progress object with course IDs
+      const progressObj = {};
+      
+      // Fetch progress for each enrolled course
+      console.log('📊 Fetching progress for each course...');
+      await Promise.all(enrolled.map(async (enrollmentData) => {
+        try {
+          // Handle different data structures from enrolled courses endpoint
+          const course = enrollmentData.course || enrollmentData.courseId || enrollmentData;
+          const courseId = course._id || course.id || enrollmentData.courseId;
+          
+          if (!courseId) {
+            console.error('❌ No course ID found in enrollment data:', enrollmentData);
+            return;
+          }
+          
+          console.log(`🔍 Fetching progress for course: ${courseId}`);
+          const progressData = await apiCall(`/courses/${courseId}/progress`);
+          
+          if (progressData && progressData.success && progressData.progress) {
+            console.log(`✅ Progress received for ${courseId}:`, progressData);
+            
+            // Extract the actual progress data from the nested structure
+            const actualProgress = progressData.progress.overall || progressData.progress;
+            
+            // Format the progress data for frontend consumption
+            const formattedProgress = {
+              completionPercentage: actualProgress.completionPercentage || 0,
+              timeSpent: actualProgress.timeSpent || 0,
+              completionStatus: actualProgress.completionStatus || 'not-started',
+              totalLessons: progressData.progress.lessons?.length || 0,
+              completedLessons: progressData.progress.lessons?.filter(l => l.completed) || [],
+              lastUpdated: progressData.progress.lastUpdated,
+              // Keep the original nested structure for reference
+              _original: progressData.progress
+            };
+            
+            progressObj[courseId] = formattedProgress;
+            console.log(`📊 Formatted progress for ${courseId}:`, formattedProgress);
+          } else {
+            console.log(`❌ No progress data for ${courseId}`, progressData);
+          }
+        } catch (err) {
+          console.error(`Failed to fetch progress for course:`, err);
+        }
+      }));
+      
+      console.log('📊 Final progress object:', progressObj);
+      setUserProgress(progressObj);
+      return progressObj;
     } catch (error) {
       console.error('Failed to fetch user progress:', error);
       setDataError('progress', error.message);
@@ -245,13 +306,62 @@ export const DataSyncProvider = ({ children }) => {
     }
   }, [apiCall, fetchUserProgress, fetchCourses]);
 
+  // Update course progress with real-time data
+  const updateCourseProgress = useCallback(async (courseId, progressData) => {
+    if (!courseId) return null;
+    
+    try {
+      const response = await apiCall(`/courses/${courseId}/progress`, {
+        method: 'POST',
+        body: JSON.stringify(progressData)
+      });
+      
+      // Update local state to show progress immediately
+      if (response) {
+        setUserProgress(prev => ({
+          ...prev,
+          [courseId]: {
+            ...prev[courseId],
+            ...response,
+            completionPercentage: progressData.progress || response.completionPercentage || prev[courseId]?.completionPercentage || 0
+          }
+        }));
+      }
+      
+      return response;
+    } catch (error) {
+      console.error(`Failed to update progress for course ${courseId}:`, error);
+      setDataError('progress', error.message);
+      return null;
+    }
+  }, [apiCall, setDataError]);
+
   // Get course progress with real-time calculation
   const getCourseProgress = useCallback((courseId) => {
+    if (!courseId) return { completed: 0, total: 0, percentage: 0 };
+    
     const progress = userProgress[courseId];
     if (!progress) return { completed: 0, total: 0, percentage: 0 };
 
-    const completed = progress.completedLessons?.length || 0;
-    const total = progress.totalLessons || 0;
+    // Handle different progress data formats
+    let completed = 0;
+    let total = 0;
+    
+    if (progress.completedModules && Array.isArray(progress.completedModules)) {
+      completed = progress.completedModules.length;
+    } else if (progress.completedLessons && Array.isArray(progress.completedLessons)) {
+      completed = progress.completedLessons.length;
+    }
+    
+    if (typeof progress.completionPercentage === 'number') {
+      return { 
+        completed, 
+        total: progress.totalLessons || 0, 
+        percentage: progress.completionPercentage 
+      };
+    }
+    
+    total = progress.totalLessons || 0;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return { completed, total, percentage };
@@ -347,11 +457,15 @@ export const DataSyncProvider = ({ children }) => {
   // Initialize data when user authenticates
   useEffect(() => {
     if (isAuthenticated && user) {
+      console.log('🔄 DataSync initializing for authenticated user:', user.email);
       // Fetch all essential data
-      fetchCourses();      fetchUserProgress();
+      fetchCourses();
+      fetchUserProgress();
       fetchAnalytics();
+    } else {
+      console.log('❌ DataSync not initializing - auth status:', isAuthenticated, 'user:', !!user);
     }
-  }, [isAuthenticated, user]); // Remove function dependencies to prevent infinite loop
+  }, [isAuthenticated, user, fetchCourses, fetchUserProgress, fetchAnalytics]);
 
   // Real-time data sync interval
   useEffect(() => {
@@ -397,7 +511,8 @@ export const DataSyncProvider = ({ children }) => {
     // Data mutators
     updateLessonProgress,
     completeLesson,
-    enrollInCourse,    // Data calculators
+    enrollInCourse,
+    updateCourseProgress,    // Data calculators
     getCourseProgress,
     getLearningStats,
     getRecommendations,

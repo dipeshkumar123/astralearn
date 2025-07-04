@@ -2,7 +2,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import { AuthContext } from '../contexts/AuthContext';
+import { AuthContext } from '../components/auth/AuthProvider';
 import EnhancedAIAssistant from '../components/ai/EnhancedAIAssistant';
 import AIToggleButton from '../components/ai/AIToggleButton';
 

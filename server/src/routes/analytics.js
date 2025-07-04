@@ -2134,4 +2134,46 @@ router.get('/summary', flexibleAuthenticate, async (req, res) => {
   }
 });
 
+/**
+ * Get User-Specific Insights
+ * Fetch comprehensive analytics insights for a specific user
+ */
+router.get('/insights/:userId',
+  auth,
+  authorize(['admin', 'instructor']),
+  [
+    param('userId').isMongoId().withMessage('Invalid user ID')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array()
+        });
+      }
+
+      const { userId } = req.params;
+      
+      // Generate comprehensive insights for the user
+      const insights = await analyticsService.generateUserInsights(userId);
+
+      res.json({
+        success: true,
+        userId,
+        insights,
+        generatedAt: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('User insights generation error:', error);
+      res.status(500).json({
+        error: 'Failed to generate user insights',
+        message: error.message
+      });
+    }
+  }
+);
+
 export default router;

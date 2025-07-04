@@ -30,7 +30,6 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-  Treemap,
   Cell
 } from 'recharts';
 import { 

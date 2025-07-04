@@ -240,7 +240,13 @@ export const useAIAssistantStore = create(
         // Add AI response
         const aiMessage = {
           type: 'assistant',
-          content: response.response,
+          content: typeof response.response === 'object' 
+            ? JSON.stringify(response.response, null, 2) 
+            : typeof response.response === 'string'
+              ? response.response
+              : typeof response.response === 'undefined'
+                ? 'I don\'t have a response for that.'
+                : String(response.response),
           metadata: response.metadata || {},
           suggestions: response.suggestions || [],
           timestamp: new Date(),
@@ -495,10 +501,17 @@ export const useAIAssistantStore = create(
       try {
         set({ connectionStatus: 'syncing' });
         
+        // Get authentication token
+        const token = localStorage.getItem('token');
+        const authHeaders = token ? { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        } : {};
+        
         const promises = [
-          fetch(`/api/users/${currentContext.userId}/progress`),
-          fetch(`/api/analytics/insights/${currentContext.userId}`),
-          fetch(`/api/ai/recommendations/${currentContext.userId}`)
+          fetch(`/api/users/${currentContext.userId}/progress`, { headers: authHeaders }),
+          fetch(`/api/analytics/insights/${currentContext.userId}`, { headers: authHeaders }),
+          fetch(`/api/ai/recommendations/${currentContext.userId}`, { headers: authHeaders })
         ];
         
         const responses = await Promise.all(promises);
