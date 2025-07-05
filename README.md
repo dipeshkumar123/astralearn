@@ -107,10 +107,16 @@ We welcome contributions! To get started:
 ---
 
 ## 📫 Contact
-- **Project Lead:** Panji (panji@example.com)
-- **Issues & Support:** Please use the [GitHub Issues](https://github.com/your-org/astralearn/issues) page for bug reports and feature requests.
-- **General Inquiries:** astralearn-support@example.com
+- **Project Lead:** Dipesh Kumar Panjiyar (panjiyardipesh123@gmail.com)
+- **Issues & Support:** Please use the [GitHub Issues](https://github.com/dipeshkumar123/astralearn/issues) page for bug reports and feature requests.
+- **General Inquiries:** panjiyardipesh123@gmail.com
 
 ---
+
+## Test Data
+
+Test/demo JSON files have been moved into the `data/` directory:
+- `data/test-login.json`
+- `data/test-progress.json`
 
 © 2025 AstraLearn. All rights reserved.
