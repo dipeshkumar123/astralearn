@@ -13,6 +13,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
+import analyticsService from '../../services/analyticsService';
 import { 
   LineChart, 
   Line, 
@@ -72,41 +73,24 @@ const AnalyticsDashboard = () => {
   const loadAnalyticsData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
       
-      const [dashboardRes, behaviorRes, insightsRes, metricsRes] = await Promise.all([
-        fetch(`/api/analytics/dashboard/realtime?timeframe=${timeframe}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/analytics/behavior/history?timeframe=${timeframe}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/analytics/insights/personalized', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/analytics/metrics/performance?timeframe=${timeframe}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+      // Use the analytics service instead of direct fetch calls
+      const [dashboardData, insightsData, metricsData] = await Promise.all([
+        analyticsService.getDashboardData(timeframe, true),
+        analyticsService.getPersonalizedInsights(true),
+        analyticsService.getPerformanceMetrics(timeframe, null, true)
       ]);
 
-      if (dashboardRes.ok) {
-        const data = await dashboardRes.json();
-        setDashboardData(data.dashboard);
+      if (dashboardData?.success) {
+        setDashboardData(dashboardData.dashboard || {});
       }
 
-      if (behaviorRes.ok) {
-        const data = await behaviorRes.json();
-        setBehaviorHistory(data.behaviorHistory);
+      if (insightsData?.success) {
+        setPersonalizedInsights(insightsData.insights || {});
       }
 
-      if (insightsRes.ok) {
-        const data = await insightsRes.json();
-        setPersonalizedInsights(data.insights);
-      }
-
-      if (metricsRes.ok) {
-        const data = await metricsRes.json();
-        setPerformanceMetrics(data.metrics);
+      if (metricsData?.success) {
+        setPerformanceMetrics(metricsData.metrics || {});
       }
 
     } catch (error) {

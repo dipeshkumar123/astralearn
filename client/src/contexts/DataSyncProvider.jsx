@@ -6,6 +6,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../components/auth/AuthProvider';
+import analyticsService from '../services/analyticsService';
 
 const DataSyncContext = createContext();
 
@@ -199,9 +200,21 @@ export const DataSyncProvider = ({ children }) => {
     clearDataError('analytics');
     
     try {
-      const data = await apiCall('/analytics/summary');
-      setAnalytics(data);
-      return data;
+      // Use the new analytics service
+      const summaryData = await analyticsService.getSummary(refresh);
+      const performanceData = await analyticsService.getPerformanceMetrics(30, null, refresh);
+      const patternsData = await analyticsService.getLearningPatterns(30, 'overview', refresh);
+      
+      // Combine all analytics data
+      const combinedData = {
+        summary: summaryData,
+        performance: performanceData?.metrics || {},
+        patterns: patternsData?.patterns || {},
+        lastUpdated: new Date().toISOString()
+      };
+      
+      setAnalytics(combinedData);
+      return combinedData;
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
       setDataError('analytics', error.message);
@@ -209,7 +222,7 @@ export const DataSyncProvider = ({ children }) => {
     } finally {
       setDataLoading('analytics', false);
     }
-  }, [apiCall, analytics]);
+  }, []);
 
   // Fetch lessons for a course
   const fetchLessons = useCallback(async (courseId, refresh = false) => {

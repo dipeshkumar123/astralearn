@@ -686,6 +686,129 @@ class AnalyticsService {
   }
 
   /**
+   * Calculate performance trend based on user progress data
+   * @param {Array} progressData - User's progress data
+   * @returns {Object} Performance trend analysis
+   */
+  calculatePerformanceTrend(progressData) {
+    if (!progressData || !Array.isArray(progressData) || progressData.length < 2) {
+      return {
+        current: 0,
+        direction: 'neutral',
+        volatility: 0,
+        weeklyChange: 0,
+        monthlyChange: 0
+      };
+    }
+
+    // Sort by timestamp
+    const sortedData = [...progressData].sort((a, b) => 
+      new Date(a.timestamp || a.createdAt) - new Date(b.timestamp || b.createdAt)
+    );
+    
+    // Extract scores with timestamps
+    const scores = sortedData
+      .filter(p => p.progressData && typeof p.progressData.score !== 'undefined')
+      .map(p => ({
+        date: new Date(p.timestamp || p.createdAt),
+        score: p.progressData.score
+      }));
+    
+    if (scores.length < 2) {
+      return {
+        current: scores.length > 0 ? scores[0].score : 0,
+        direction: 'neutral',
+        volatility: 0,
+        weeklyChange: 0,
+        monthlyChange: 0
+      };
+    }
+    
+    // Calculate current performance (average of most recent 3 scores or fewer)
+    const recentScores = scores.slice(-Math.min(3, scores.length));
+    const current = recentScores.reduce((sum, item) => sum + item.score, 0) / recentScores.length;
+    
+    // Calculate direction by comparing recent vs earlier performance
+    const halfIndex = Math.floor(scores.length / 2);
+    const olderHalf = scores.slice(0, halfIndex);
+    const newerHalf = scores.slice(halfIndex);
+    
+    const olderAvg = olderHalf.reduce((sum, item) => sum + item.score, 0) / olderHalf.length;
+    const newerAvg = newerHalf.reduce((sum, item) => sum + item.score, 0) / newerHalf.length;
+    
+    const percentChange = ((newerAvg - olderAvg) / olderAvg) * 100;
+    let direction = 'neutral';
+    
+    if (percentChange > 10) direction = 'increasing';
+    else if (percentChange > 3) direction = 'slightly_increasing';
+    else if (percentChange < -10) direction = 'decreasing';
+    else if (percentChange < -3) direction = 'slightly_decreasing';
+    
+    // Calculate volatility (standard deviation of differences)
+    let volatility = 0;
+    if (scores.length > 2) {
+      const diffs = [];
+      for (let i = 1; i < scores.length; i++) {
+        diffs.push(scores[i].score - scores[i-1].score);
+      }
+      
+      const avgDiff = diffs.reduce((sum, diff) => sum + diff, 0) / diffs.length;
+      const squaredDiffs = diffs.map(diff => Math.pow(diff - avgDiff, 2));
+      const variance = squaredDiffs.reduce((sum, sqDiff) => sum + sqDiff, 0) / squaredDiffs.length;
+      volatility = Math.sqrt(variance) / 100; // Normalize to 0-1 scale
+    }
+    
+    // Calculate weekly and monthly changes if possible
+    let weeklyChange = 0;
+    let monthlyChange = 0;
+    
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    // Find scores closest to week and month ago
+    const weekAgoScore = this.findClosestScoreByDate(scores, oneWeekAgo);
+    const monthAgoScore = this.findClosestScoreByDate(scores, oneMonthAgo);
+    
+    if (weekAgoScore && current) {
+      weeklyChange = ((current - weekAgoScore) / weekAgoScore) * 100;
+    }
+    
+    if (monthAgoScore && current) {
+      monthlyChange = ((current - monthAgoScore) / monthAgoScore) * 100;
+    }
+    
+    return {
+      current: parseFloat(current.toFixed(2)),
+      direction,
+      volatility: parseFloat(volatility.toFixed(2)),
+      weeklyChange: parseFloat(weeklyChange.toFixed(2)),
+      monthlyChange: parseFloat(monthlyChange.toFixed(2))
+    };
+  }
+
+  /**
+   * Find score closest to a given date
+   * @private
+   */
+  findClosestScoreByDate(scores, targetDate) {
+    if (!scores || scores.length === 0) return null;
+    
+    // Sort by distance to target date
+    const sortedByCloseness = [...scores].sort((a, b) => 
+      Math.abs(a.date - targetDate) - Math.abs(b.date - targetDate)
+    );
+    
+    // If closest is within 3 days of target, use it
+    const closest = sortedByCloseness[0];
+    if (Math.abs(closest.date - targetDate) <= 3 * 24 * 60 * 60 * 1000) {
+      return closest.score;
+    }
+    
+    return null;
+  }
+  
+  /**
    * Analyze content preferences based on user activity
    */
   analyzeContentPreferences(progressData) {
@@ -800,1518 +923,674 @@ class AnalyticsService {
     };
   }
   
-  // Cache management
-  getFromCache(key) {
-    const cached = this.analyticsCache.get(key);
-    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-      return cached.data;
-    }
-    return null;
-  }
-
-  setCache(key, data, timeout = null) {
-    this.analyticsCache.set(key, {
-      data,
-      timestamp: Date.now(),
-      timeout: timeout || this.cacheTimeout
-    });
-  }
-
-  // Fallback methods for error scenarios
-  generateDefaultMetrics(userId) {
-    return {
-      overall: {
-        totalActivities: 0,
+  /**
+   * Analyze path effectiveness from adaptive learning statistics
+   * @param {Object} adaptiveStats - User's adaptive learning statistics
+   * @returns {Object} Path effectiveness analysis
+   */
+  analyzePathEffectiveness(adaptiveStats) {
+    if (!adaptiveStats || !adaptiveStats.adaptivePath) {
+      return {
+        pathLevel: 'standard',
+        effectiveness: 0,
         completionRate: 0,
-        averageScore: 0,
-        timeSpent: 0,
-        consistencyScore: 0
-      },
-      trends: {
-        performanceTrend: { current: 0, direction: 'neutral' },
-        engagementTrend: { current: 0, direction: 'neutral' },
-        velocityTrend: { current: 0, direction: 'neutral' }
-      },
-      breakdown: {},
-      predictions: {}
+        recommendation: 'Complete more adaptive learning content for personalized recommendations'
+      };
+    }
+    
+    // Default values for minimal implementation
+    return {
+      pathLevel: adaptiveStats.adaptivePath || 'standard',
+      effectiveness: adaptiveStats.personalizationAccuracy || 0.7,
+      completionRate: adaptiveStats.recommendationSuccess || 0.75,
+      recommendation: 'Continue following your adaptive learning path for optimal results'
     };
   }
 
-  generateFallbackPatterns(userId, timeframe) {
+  /**
+   * Analyze difficulty progression from adaptive learning statistics
+   * @param {Object} adaptiveStats - User's adaptive learning statistics
+   * @returns {Object} Difficulty progression analysis
+   */
+  analyzeDifficultyProgression(adaptiveStats) {
+    if (!adaptiveStats) {
+      return {
+        currentDifficulty: 'beginner',
+        adaptationSpeed: 0,
+        plateaus: [],
+        regressions: [],
+        recommendation: 'Begin with foundational content to establish skill baselines'
+      };
+    }
+    
+    // Default values for minimal implementation
     return {
+      currentDifficulty: adaptiveStats.currentDifficulty || 'intermediate',
+      adaptationSpeed: adaptiveStats.learningVelocity || 0.65,
+      plateaus: adaptiveStats.plateaus || [],
+      regressions: adaptiveStats.regressions || [],
+      recommendation: 'Your current difficulty level is appropriate for your skill level'
+    };
+  }
+
+  /**
+   * Analyze personalization accuracy from adaptive learning statistics
+   * @param {Object} adaptiveStats - User's adaptive learning statistics
+   * @returns {Object} Personalization accuracy analysis
+   */
+  analyzePersonalizationAccuracy(adaptiveStats) {
+    if (!adaptiveStats) {
+      return {
+        accuracy: 0,
+        confidenceLevel: 'low',
+        dataPoints: 0,
+        recommendation: 'Complete the learning style assessment to improve personalization'
+      };
+    }
+    
+    // Default values for minimal implementation
+    const accuracy = adaptiveStats.personalizationAccuracy || 0.7;
+    let confidenceLevel = 'medium';
+    
+    if (accuracy > 0.8) confidenceLevel = 'high';
+    else if (accuracy < 0.5) confidenceLevel = 'low';
+    
+    return {
+      accuracy,
+      confidenceLevel,
+      dataPoints: adaptiveStats.dataPoints || 24,
+      recommendation: confidenceLevel === 'high' 
+        ? 'The system has a good understanding of your learning preferences'
+        : 'Provide more feedback on content to improve personalization accuracy'
+    };
+  }
+
+  /**
+   * Analyze recommendation success from adaptive learning statistics
+   * @param {Object} adaptiveStats - User's adaptive learning statistics
+   * @returns {Object} Recommendation success analysis
+   */
+  analyzeRecommendationSuccess(adaptiveStats) {
+    if (!adaptiveStats) {
+      return {
+        successRate: 0,
+        engagementImpact: 'unknown',
+        completionImpact: 'unknown',
+        recommendation: 'Try recommended content to help us improve suggestions'
+      };
+    }
+    
+    // Default values for minimal implementation
+    const successRate = adaptiveStats.recommendationSuccess || 0.75;
+    
+    return {
+      successRate,
+      engagementImpact: successRate > 0.7 ? 'positive' : 'neutral',
+      completionImpact: successRate > 0.7 ? 'positive' : 'neutral',
+      recommendation: successRate > 0.7
+        ? 'The recommendation system is working well for your learning style'
+        : 'Try exploring different content types to help us improve recommendations'
+    };
+  }
+
+  /**
+   * Predict future performance based on user progress data
+   * @param {string} userId - User ID
+   * @param {Array} progressData - User's progress data
+   * @returns {Object} Performance prediction analysis
+   */
+  async predictFuturePerformance(userId, progressData) {
+    if (!progressData || !Array.isArray(progressData) || progressData.length < 5) {
+      return {
+        nextWeekPrediction: {
+          score: 70,
+          confidence: 'low'
+        },
+        longTermTrajectory: 'steady',
+        potentialImprovements: [
+          'Establish a regular learning schedule',
+          'Complete practice exercises regularly'
+        ],
+        confidence: 0.4
+      };
+    }
+    
+    // Extract performance metrics for prediction
+    const performanceTrend = this.calculatePerformanceTrend(progressData);
+    const engagementTrend = this.calculateEngagementTrend(progressData);
+    const completionRate = this.calculateCompletionRate(progressData);
+    
+    // Simple prediction based on current trends
+    let predictedScore = performanceTrend.current || 70;
+    
+    // Adjust based on trends
+    if (performanceTrend.direction === 'increasing') {
+      predictedScore += 5;
+    } else if (performanceTrend.direction === 'decreasing') {
+      predictedScore -= 5;
+    }
+    
+    // Adjust based on engagement
+    if (engagementTrend.current > 0.7) {
+      predictedScore += 3;
+    } else if (engagementTrend.current < 0.4) {
+      predictedScore -= 3;
+    }
+    
+    // Cap the predicted score
+    predictedScore = Math.min(Math.max(predictedScore, 50), 100);
+    
+    // Determine confidence based on data quality
+    const dataConsistency = this.calculateDataConsistency(progressData);
+    let confidenceLabel = 'medium';
+    let confidenceScore = 0.6;
+    
+    if (progressData.length > 15 && dataConsistency > 0.7) {
+      confidenceLabel = 'high';
+      confidenceScore = 0.8;
+    } else if (progressData.length < 8 || dataConsistency < 0.4) {
+      confidenceLabel = 'low';
+      confidenceScore = 0.4;
+    }
+    
+    // Determine trajectory
+    let trajectory = 'steady';
+    if (performanceTrend.direction === 'increasing' && engagementTrend.direction === 'increasing') {
+      trajectory = 'improving';
+    } else if (performanceTrend.direction === 'decreasing' && engagementTrend.direction === 'decreasing') {
+      trajectory = 'declining';
+    } else if (performanceTrend.volatility > 0.2) {
+      trajectory = 'variable';
+    }
+    
+    // Generate potential improvements
+    const potentialImprovements = [];
+    
+    if (engagementTrend.current < 0.6) {
+      potentialImprovements.push('Increase engagement with learning materials');
+    }
+    
+    if (completionRate < 70) {
+      potentialImprovements.push('Complete more learning activities to mastery');
+    }
+    
+    if (performanceTrend.volatility > 0.2) {
+      potentialImprovements.push('Establish more consistent study habits');
+    }
+    
+    // If no specific improvements, add general ones
+    if (potentialImprovements.length === 0) {
+      potentialImprovements.push(
+        'Continue your current effective learning practices',
+        'Challenge yourself with more advanced content'
+      );
+    }
+    
+    return {
+      nextWeekPrediction: {
+        score: Math.round(predictedScore),
+        confidence: confidenceLabel
+      },
+      longTermTrajectory: trajectory,
+      potentialImprovements: potentialImprovements.slice(0, 3),
+      confidence: confidenceScore
+    };
+  }
+
+  /**
+   * Assess learning risks based on user progress data
+   * @param {string} userId - User ID
+   * @param {Array} progressData - User's progress data
+   * @returns {Object} Learning risk assessment
+   */
+  async assessLearningRisks(userId, progressData) {
+    if (!progressData || !Array.isArray(progressData) || progressData.length < 3) {
+      return {
+        overallRisk: 'indeterminate',
+        disengagementRisk: 'medium',
+        knowledgeGapRisk: 'medium',
+        completionRisk: 'medium',
+        recommendedInterventions: [
+          'Establish regular learning schedule',
+          'Set specific, achievable learning goals'
+        ],
+        confidence: 0.4
+      };
+    }
+    
+    // Calculate key risk indicators
+    const engagementTrend = this.calculateEngagementTrend(progressData);
+    const performanceTrend = this.calculatePerformanceTrend(progressData);
+    const consistencyScore = this.calculateConsistencyScore(progressData);
+    const completionRate = this.calculateCompletionRate(progressData);
+    
+    // Assess disengagement risk
+    let disengagementRisk = 'low';
+    if (engagementTrend.forecast === 'at_risk' || engagementTrend.trend === 'decreasing_rapidly') {
+      disengagementRisk = 'high';
+    } else if (engagementTrend.trend === 'decreasing' || engagementTrend.currentLevel === 'low') {
+      disengagementRisk = 'medium';
+    } else if (consistencyScore < 30) {
+      disengagementRisk = 'medium';
+    }
+    
+    // Assess knowledge gap risk
+    let knowledgeGapRisk = 'low';
+    if (performanceTrend.direction === 'decreasing' && performanceTrend.current < 60) {
+      knowledgeGapRisk = 'high';
+    } else if (performanceTrend.volatility > 0.3 || performanceTrend.current < 70) {
+      knowledgeGapRisk = 'medium';
+    }
+    
+    // Assess completion risk
+    let completionRisk = 'low';
+    if (completionRate < 30) {
+      completionRisk = 'high';
+    } else if (completionRate < 60) {
+      completionRisk = 'medium';
+    }
+    
+    return {
+      overallRisk: 'low',
+      disengagementRisk,
+      knowledgeGapRisk,
+      completionRisk,
+      recommendedInterventions: [],
+      confidence: 0.6
+    };
+  }
+
+  /**
+   * Track real-time learning patterns and update analytics
+   */
+  async processRealTimePatterns(userId, behaviorEvent) {
+    // For future implementation - real-time pattern processing
+    console.log('Processing real-time patterns for user:', userId);
+  }
+
+  /**
+   * Generate fallback patterns when real analytics can't be generated
+   * @param {string} userId - The user ID
+   * @param {number} timeframe - Timeframe in days
+   * @returns {Object} Basic patterns object with fallback values
+   */
+  async generateFallbackPatterns(userId, timeframe) {
+    console.log(`Generating fallback patterns for user ${userId} for the last ${timeframe} days`);
+    
+    const now = new Date();
+    const fallbackPatterns = {
       overview: {
         userId,
         timeframe,
-        analysisDate: new Date(),
-        dataQuality: 'limited',
-        confidenceScore: 0.1
-      },
-      learningBehavior: {},
-      gamificationImpact: {},
-      adaptiveLearning: {},
-      predictiveInsights: {}
-    };
-  }
-  generateFallbackDashboard(userId, dashboardType) {
-    return {
-      overview: {
-        userId,
-        dashboardType,
-        lastUpdated: new Date(),
-        status: 'limited_data'
-      },
-      keyMetrics: {
-        learningVelocity: 0,
-        performanceScore: 0,
-        engagementLevel: 'new_user',
-        consistencyRating: 0
-      },
-      visualizations: {},
-      insights: {},
-      recommendations: {}
-    };
-  }
-  generateFallbackUserInsights(userId) {
-    return {
-      userInfo: {
-        id: userId,
-        name: 'Unknown User',
-        email: 'N/A',
-        role: 'learner',
-        learningStyle: 'not_specified',
-        preferences: {}
+        analysisDate: now,
+        dataQuality: 'poor',
+        confidenceScore: 0
       },
       learningBehavior: {
-        patterns: {},
-        performance: this.generateDefaultMetrics(userId),
-        adaptiveMetrics: {},
-        engagementLevel: 'low',
-        learningEfficiency: 0
-      },
-      courseProgress: {
-        totalCourses: 0,
-        completedCourses: 0,
-        inProgressCourses: 0,
-        averageProgress: 0,
-        detailedProgress: []
-      },
-      gamification: {
-        status: {},
-        engagement: {}
-      },
-      recommendations: {
-        improvementAreas: [],
-        interventionSuggestions: [],
-        resourceRecommendations: [],
-        motivationStrategies: []
-      },
-      riskAssessment: {
-        dropoutRisk: 'low',
-        strugglingAreas: [],
-        interventionUrgency: 'none'
-      },
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  generateFallbackInsights(userId) {
-    return {
-      message: "Not enough data for personalized insights. Keep learning to receive tailored recommendations!",
-      personalizedRecommendations: {
-        studySchedule: [
-          {
-            day: "Any day",
-            timeSlot: "Any time",
-            recommendedDuration: 30,
-            message: "Start with a short learning session to build momentum"
-          }
-        ],
-        contentRecommendations: [
-          {
-            type: "general",
-            message: "Explore available courses to find topics that interest you"
-          }
-        ],
-        difficultyAdjustments: {
-          current: "beginner",
-          recommendation: "Start with beginner content to build a strong foundation"
+        studyPatterns: {
+          preferredTime: 'unknown',
+          sessionLength: 0,
+          intensity: 0
         },
-        socialLearningOpportunities: [
-          {
-            type: "study_group",
-            message: "Join a study group to enhance your learning experience"
-          }
-        ]
-      },
-      strengthsAndWeaknesses: {
-        cognitiveStrengths: [],
-        improvementAreas: [],
-        learningStyleOptimization: {
-          detectedStyle: "unknown",
-          recommendation: "Complete more activities to help us identify your learning style"
+        engagementTrends: {
+          overall: 'insufficient data',
+          trends: [],
+          patterns: []
         },
-        skillGapAnalysis: {
-          gaps: [],
-          recommendedFocus: "Explore courses to discover your interests and strengths"
+        performanceEvolution: {
+          trend: 'insufficient_data',
+          improvement: 0,
+          stability: 'unknown',
+          volatility: 0
+        },
+        contentPreferences: {
+          preferredFormats: [],
+          preferredTopics: [],
+          preferredDifficulty: 'unknown',
+          diversityScore: 0
         }
       },
-      motivationAndEngagement: {
-        motivationProfile: {
-          primary: "intrinsic",
-          recommendation: "Set personal learning goals to stay motivated"
+      gamificationImpact: {
+        motivationFactors: {
+          primaryMotivators: ['progress', 'learning'],
+          responseToRewards: 'moderate',
+          motivationPattern: 'intrinsic',
+          sustainabilityScore: 0.5
         },
-        engagementDrivers: [],
-        gamificationOptimization: {
-          recommendation: "Complete activities to earn your first achievements"
-        },
-        socialMotivationFactors: []
-      },
-      futureOutlook: {
-        progressPredictions: {
-          message: "Complete more activities for personalized progress predictions"
-        },
-        timeToGoalEstimates: {
-          message: "Set learning goals to receive time estimates"
-        },
-        challengesPrediction: [],
-        successFactors: [
-          "Regular engagement with learning materials",
-          "Setting clear learning goals",
-          "Participating in interactive learning activities"
-        ]
-      }
-    };
-  }
-
-  // Additional helper methods for comprehensive analytics
-
-  async processRealTimePatterns(userId, behaviorEvent) {
-    // Process patterns in real-time and trigger notifications if needed
-    try {
-      const patterns = behaviorEvent.learningPatterns;
-      
-      // Check for significant pattern changes
-      if (patterns.studyRhythm.intensity < 0.3) {
-        await this.triggerLowEngagementAlert(userId);
-      }
-      
-      if (patterns.difficultyPreference.successRate < 0.5) {
-        await this.triggerDifficultyAlert(userId);
-      }
-      
-      return { processed: true, alerts: 0 };
-    } catch (error) {
-      console.error('Error processing real-time patterns:', error);
-      return { processed: false, error: error.message };
-    }
-  }
-
-  async generateBehaviorRecommendations(userId, behaviorEvent) {
-    const recommendations = [];
-    
-    // Safely handle missing or malformed data
-    if (!behaviorEvent || !behaviorEvent.learningPatterns) {
-      return [{
-        type: 'initial_recommendation',
-        priority: 'low',
-        message: 'Welcome! Start your learning journey by exploring available courses.',
-        actionable: true
-      }];
-    }
-    
-    const patterns = behaviorEvent.learningPatterns;
-    
-    // Initialize studyRhythm if it doesn't exist
-    if (!patterns.studyRhythm) {
-      patterns.studyRhythm = {};
-    }
-    
-    // Initialize properties of studyRhythm if they don't exist
-    if (!patterns.studyRhythm.intensity) {
-      patterns.studyRhythm.intensity = 0.5;
-    }
-    if (!patterns.studyRhythm.consistency) {
-      patterns.studyRhythm.consistency = 'moderate';
-    }
-    if (!patterns.studyRhythm.preferredTimes) {
-      patterns.studyRhythm.preferredTimes = ['evening'];
-    }
-    if (!patterns.studyRhythm.sessionDuration) {
-      patterns.studyRhythm.sessionDuration = 'medium';
-    }
-    
-    // Study time recommendations - with null safety
-    if (typeof patterns.studyRhythm.intensity === 'number' && patterns.studyRhythm.intensity < 0.5) {
-      recommendations.push({
-        type: 'study_optimization',
-        priority: 'medium',
-        message: 'Consider taking more frequent breaks to maintain focus',
-        actionable: true
-      });
-    }
-    
-    // Initialize contentPreference if it doesn't exist
-    if (!patterns.contentPreference) {
-      patterns.contentPreference = {
-        variety: 3,
-        preferredFormats: ['video', 'text']
-      };
-    }
-    
-    // Content recommendations - with null safety
-    if (patterns.contentPreference && typeof patterns.contentPreference.variety === 'number' && patterns.contentPreference.variety < 3) {
-      recommendations.push({
-        type: 'content_variety',
-        priority: 'low',
-        message: 'Try exploring different types of learning materials to enhance your understanding',
-        actionable: true
-      });
-    }
-    
-    // Social learning recommendations - with null safety
-    if (patterns.socialBehavior && patterns.socialBehavior.socialPreference === 'independent' && 
-        behaviorEvent.behaviorMetrics && typeof behaviorEvent.behaviorMetrics.focusScore === 'number' && 
-        behaviorEvent.behaviorMetrics.focusScore < 0.6) {
-      recommendations.push({
-        type: 'social_learning',
-        priority: 'high',
-        message: 'Consider joining a study group to improve focus and engagement',
-        actionable: true
-      });
-    }
-    
-    // If we don't have enough recommendations, add a default one
-    if (recommendations.length === 0) {
-      recommendations.push({
-        type: 'general_improvement',
-        priority: 'medium',
-        message: 'Keep up the good work! Regular practice leads to mastery.',
-        actionable: false
-      });
-    }
-    
-    return recommendations;
-  }
-
-  async getUserProgressData(userId, startDate, endDate) {
-    try {
-      // Create query for user progress with date range if provided
-      const query = { userId };
-      if (startDate && endDate) {
-        query.timestamp = { $gte: startDate, $lte: endDate };
-      }
-      
-      // Get real-time progress data from database
-      const progressData = await UserProgress.find(query)
-        .populate(['courseId', 'lessonId'])
-        .sort({ timestamp: -1 });
-      
-      if (!progressData || progressData.length === 0) {
-        console.log(`No progress data found for user ${userId}`);
-        return null;
-      }
-      
-      console.log(`Retrieved ${progressData.length} progress records for user ${userId}`);
-      
-      // Process and return structured data
-      return {
-        rawData: progressData, // Include raw data for detailed analysis
-        totalDataPoints: progressData.length,
-        totalTimeSpent: progressData.reduce((sum, p) => sum + (p.progressData?.timeSpent || 0), 0),
-        completedActivities: progressData.filter(p => p.progressData?.completionPercentage === 100).length,
-        averageScore: this.calculateAverageScore(progressData),
-        sessions: this.groupProgressBySessions(progressData),
-        trends: this.calculateProgressTrends(progressData)
-      };
-    } catch (error) {
-      console.error('Error fetching user progress data:', error);
-      return { totalDataPoints: 0, totalTimeSpent: 0, completedActivities: 0, averageScore: 0 };
-    }
-  }
-
-  async getGamificationAnalytics(userId, timeframe) {
-    try {
-      const gamificationData = await gamificationService.getUserGamificationProfile(userId);
-      
-      return {
-        pointsEarned: gamificationData.totalPoints || 0,
-        achievementsUnlocked: gamificationData.achievements?.length || 0,
-        badgesEarned: gamificationData.badges?.length || 0,
-        currentStreak: gamificationData.currentStreak || 0,
-        level: gamificationData.level || 1,
-        rankingPosition: gamificationData.ranking?.position || 0
-      };
-    } catch (error) {
-      console.error('Error fetching gamification analytics:', error);
-      return { pointsEarned: 0, achievementsUnlocked: 0, badgesEarned: 0 };
-    }
-  }
-  async getCollaborationAnalytics(userId, timeframe) {
-    try {
-      // Import socialLearningService locally to avoid circular dependency
-      const { default: socialLearningService } = await import('./socialLearningService.js');
-      const socialData = await socialLearningService.getSocialLearningAnalytics(userId);
-      
-      return {
-        studyGroupsJoined: socialData.overview?.activeStudyGroups || 0,
-        collaborativeSessions: socialData.weeklyStats?.collaborativeSessions || 0,
-        helpProvided: socialData.overview?.helpfulnessRating || 0,
-        socialInteractions: socialData.overview?.totalSocialInteractions || 0,
-        peerFeedbackScore: socialData.peerFeedback?.averageRating || 0
-      };
-    } catch (error) {
-      console.error('Error fetching collaboration analytics:', error);
-      return { studyGroupsJoined: 0, collaborativeSessions: 0, helpProvided: 0, socialInteractions: 0, peerFeedbackScore: 0 };
-    }
-  }
-
-  async getAdaptiveAnalytics(userId, timeframe) {
-    try {
-      const adaptiveData = await adaptiveLearningService.analyzeUserPerformance(userId);
-      
-      return {
-        adaptivePath: adaptiveData.level || 'standard',
-        difficultyAdjustments: 0, // Will be enhanced when adaptive service is extended
-        personalizationAccuracy: adaptiveData.engagementScore || 0,
-        recommendationSuccess: 0.75, // Mock data for now
-        learningVelocity: adaptiveData.learningVelocity || 0
-      };
-    } catch (error) {
-      console.error('Error fetching adaptive analytics:', error);
-      return { adaptivePath: 'standard', difficultyAdjustments: 0 };
-    }
-  }
-
-  calculateAverageScore(progressData) {
-    const scores = progressData
-      .map(p => p.progressData?.score)
-      .filter(score => score !== null && score !== undefined);
-    
-    return scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
-  }
-
-  calculateCompletionRate(progressData) {
-    if (progressData.length === 0) return 0;
-    const completed = progressData.filter(p => p.progressData?.completionPercentage === 100).length;
-    return (completed / progressData.length) * 100;
-  }
-
-  calculateTotalTimeSpent(progressData) {
-    return progressData.reduce((sum, p) => sum + (p.progressData?.timeSpent || 0), 0);
-  }
-
-  calculateConsistencyScore(progressData) {
-    if (progressData.length < 2) return 0;
-    
-    // Calculate day-to-day consistency
-    const dailyActivity = this.groupProgressByDay(progressData);
-    const activeDays = Object.keys(dailyActivity).length;
-    const totalDays = this.calculateDaysBetween(progressData);
-    
-    return totalDays > 0 ? (activeDays / totalDays) * 100 : 0;
-  }
-
-  groupProgressByDay(progressData) {
-    return progressData.reduce((groups, progress) => {
-      const date = new Date(progress.timestamp || progress.createdAt).toDateString();
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(progress);
-      return groups;
-    }, {});
-  }
-
-  calculateDaysBetween(progressData) {
-    if (progressData.length < 2) return 1;
-    
-    const timestamps = progressData.map(p => new Date(p.timestamp || p.createdAt).getTime());
-    const minTime = Math.min(...timestamps);
-    const maxTime = Math.max(...timestamps);
-    
-    return Math.ceil((maxTime - minTime) / (24 * 60 * 60 * 1000)) + 1;
-  }
-
-  async triggerLowEngagementAlert(userId) {
-    // In a real implementation, this would send notifications
-    console.log(`Low engagement alert for user ${userId}`);
-  }
-
-  async triggerDifficultyAlert(userId) {
-    // In a real implementation, this would suggest difficulty adjustments
-    console.log(`Difficulty adjustment suggestion for user ${userId}`);
-  }
-
-  /**
-   * Generate social recommendations based on user patterns
-   */
-  async generateSocialRecommendations(userId, socialBehavior) {
-    // Check if socialBehavior exists
-    if (!socialBehavior) {
-      return this.generateFallbackSocialRecommendations();
-    }
-
-    const recommendations = [];
-    
-    // Ensure socialPreference exists
-    const socialPreference = socialBehavior.socialPreference || 'mixed';
-    const collaborationLevel = socialBehavior.collaborationLevel || 0;
-    
-    if (socialPreference === 'independent' && collaborationLevel < 2) {
-      recommendations.push({
-        type: 'social',
-        title: 'Collaborate with Peers',
-        description: 'Working with others can provide new perspectives. Try joining a study group or discussion forum.',
-        action: { type: 'navigate', target: '/social/groups' }
-      });
-    }
-    
-    // Add fallback recommendation if none were generated
-    if (recommendations.length === 0) {
-      recommendations.push({
-        type: 'social',
-        title: 'Enhance Your Learning Experience',
-        description: 'Connect with other learners to share ideas and insights.',
-        action: { type: 'navigate', target: '/social/discover' }
-      });
-    }
-    
-    return recommendations;
-  }
-
-  generateFallbackSocialRecommendations() {
-    return [
-      {
-        type: 'social_learning',
-        priority: 'medium',
-        message: 'Try joining a study group to enhance your learning experience',
-        actionable: true
-      },
-      {
-        type: 'collaboration',
-        priority: 'low',
-        message: 'Sharing your knowledge by answering questions can reinforce your learning',
-        actionable: true
-      }
-    ];
-  }
-
-  calculateDataFreshness(patterns) {
-    const lastUpdate = patterns.overview?.analysisDate || new Date();
-    const hoursSinceUpdate = (Date.now() - new Date(lastUpdate).getTime()) / (1000 * 60 * 60);
-    
-    if (hoursSinceUpdate < 1) return 'fresh';
-    if (hoursSinceUpdate < 6) return 'recent';
-    if (hoursSinceUpdate < 24) return 'stale';
-    return 'outdated';
-  }
-
-  categorizeEngagementLevel(score) {
-    if (score >= 80) return 'high';
-    if (score >= 60) return 'medium';
-    if (score >= 40) return 'low';
-    return 'very_low';
-  }
-
-  generatePerformanceChartData(metrics) {
-    return {
-      chartType: 'line',
-      data: {
-        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-        datasets: [{
-          label: 'Performance Score',
-          data: [metrics.overall.averageScore * 0.8, metrics.overall.averageScore * 0.9, 
-                 metrics.overall.averageScore, metrics.overall.averageScore * 1.05]
-        }]
-      }
-    };
-  }
-
-  generateEngagementHeatmap(patterns) {
-    return {
-      chartType: 'heatmap',
-      data: {
-        days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        hours: Array.from({ length: 24 }, (_, i) => i),
-        values: Array(7).fill().map(() => Array(24).fill(Math.random() * 100))
-      }
-    };
-  }
-
-  async calculateGoalProgress(userId) {
-    // Mock implementation - would fetch actual user goals
-    return {
-      currentGoals: 3,
-      completedGoals: 2,
-      progressPercentage: 67
-    };
-  }
-
-  /**
-   * Group progress data by sessions for analysis
-   */
-  groupProgressBySessions(progressData) {
-    if (!Array.isArray(progressData)) return [];
-    
-    // Group progress by day/session
-    const sessions = {};
-    progressData.forEach(progress => {
-      const dateKey = progress.timestamp ? new Date(progress.timestamp).toDateString() : 'unknown';
-      if (!sessions[dateKey]) {
-        sessions[dateKey] = [];
-      }
-      sessions[dateKey].push(progress);
-    });
-    
-    return Object.entries(sessions).map(([date, data]) => ({
-      date,
-      activities: data.length,
-      totalTime: data.reduce((sum, p) => sum + (p.progressData?.timeSpent || 0), 0),
-      averageScore: data.reduce((sum, p) => sum + (p.progressData?.score || 0), 0) / data.length
-    }));
-  }
-
-  /**
-   * Generate optimal study schedule recommendation
-   */
-  async generateOptimalStudySchedule(userId, patterns) {
-    try {
-      const userPreferences = patterns?.learningBehavior?.studyPatterns || {};
-      const performanceData = patterns?.learningBehavior?.performanceEvolution || {};
-      
-      const schedule = {
-        dailySchedule: {},
-        weeklyGoals: {},
-        recommendations: []
-      };
-      
-      // Default schedule based on performance patterns
-      const optimalHours = this.calculateOptimalStudyHours(performanceData);
-      
-      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].forEach(day => {
-        schedule.dailySchedule[day] = {
-          recommendedHours: optimalHours,
-          bestTimeSlots: ['9:00-11:00', '14:00-16:00', '19:00-21:00'],
-          breakIntervals: 15,
-          focusBlocks: 45
-        };
-      });
-      
-      schedule.recommendations.push('Take regular breaks to maintain focus');
-      schedule.recommendations.push('Study during your peak performance hours');
-      
-      return schedule;
-    } catch (error) {
-      console.error('Error generating optimal study schedule:', error);
-      return {
-        dailySchedule: {},
-        weeklyGoals: {},
-        recommendations: ['Focus on consistent daily study habits']
-      };
-    }
-  }
-
-  /**
-   * Calculate optimal study hours based on performance
-   */
-  calculateOptimalStudyHours(performanceData) {
-    // Default to 2 hours if no performance data
-    if (!performanceData || !performanceData.averageScore) {
-      return 2;
-    }
-    
-    // Adjust hours based on performance
-    const score = performanceData.averageScore;
-    if (score > 85) return 1.5; // High performers need less time
-    if (score > 70) return 2;   // Average performers
-    return 2.5; // Struggling learners need more time
-  }
-
-  /**
-   * Calculate progress trends for analytics
-   */
-  calculateProgressTrends(progressData) {
-    try {
-      if (!progressData || !Array.isArray(progressData)) {
-        return {
-          overall: 'stable',
-          weekly: 'stable',
-          monthly: 'stable',
-          velocity: 0
-        };
-      }
-
-      // Sort by date
-      const sortedData = progressData.sort((a, b) => new Date(a.date) - new Date(b.date));
-      
-      if (sortedData.length < 2) {
-        return {
-          overall: 'stable',
-          weekly: 'stable', 
-          monthly: 'stable',
-          velocity: 0
-        };
-      }
-
-      // Calculate overall trend
-      const firstScore = sortedData[0].score || 0;
-      const lastScore = sortedData[sortedData.length - 1].score || 0;
-      const overallChange = lastScore - firstScore;
-      
-      // Calculate velocity (progress per day)
-      const daysDiff = (new Date(sortedData[sortedData.length - 1].date) - new Date(sortedData[0].date)) / (1000 * 60 * 60 * 24);
-      const velocity = daysDiff > 0 ? overallChange / daysDiff : 0;
-
-      return {
-        overall: overallChange > 5 ? 'improving' : overallChange < -5 ? 'declining' : 'stable',
-        weekly: this.calculateWeeklyTrend(sortedData),
-        monthly: this.calculateMonthlyTrend(sortedData),
-        velocity: Math.round(velocity * 100) / 100
-      };
-    } catch (error) {
-      console.error('Error calculating progress trends:', error);
-      return {
-        overall: 'stable',
-        weekly: 'stable',
-        monthly: 'stable',
-        velocity: 0
-      };
-    }
-  }
-
-  /**
-   * Calculate weekly progress trend
-   */
-  calculateWeeklyTrend(data) {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    
-    const weeklyData = data.filter(d => new Date(d.date) >= oneWeekAgo);
-    
-    if (weeklyData.length < 2) return 'stable';
-    
-    const firstWeekScore = weeklyData[0].score || 0;
-    const lastWeekScore = weeklyData[weeklyData.length - 1].score || 0;
-    const weeklyChange = lastWeekScore - firstWeekScore;
-    
-    return weeklyChange > 3 ? 'improving' : weeklyChange < -3 ? 'declining' : 'stable';
-  }
-
-  /**
-   * Calculate monthly progress trend
-   */
-  calculateMonthlyTrend(data) {
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    
-    const monthlyData = data.filter(d => new Date(d.date) >= oneMonthAgo);
-    
-    if (monthlyData.length < 2) return 'stable';
-    
-    const firstMonthScore = monthlyData[0].score || 0;
-    const lastMonthScore = monthlyData[monthlyData.length - 1].score || 0;
-    const monthlyChange = lastMonthScore - firstMonthScore;
-    
-    return monthlyChange > 10 ? 'improving' : monthlyChange < -10 ? 'declining' : 'stable';
-  }
-
-  /**
-   * Get current session data for a user
-   */
-  async getCurrentSessionData(userId) {
-    try {
-      const sessionData = {
-        userId,
-        sessionId: `session_${Date.now()}`,
-        startTime: new Date(),
-        isActive: true,
-        activities: [],
-        interactions: [],
-        performance: {
-          averageScore: 0,
+        achievementEffectiveness: {
           completionRate: 0,
-          timeSpent: 0
+          impactOnEngagement: 'low',
+          mostEffectiveAchievements: [],
+          motivationalValue: 0.5
+        },
+        socialLearningBehavior: {
+          collaborationLevel: 'low',
+          peerInteractions: 0,
+          communityContributions: 0,
+          socialInfluence: 'minimal'
+        },
+        streakInfluence: {
+          streakMaxLength: 0,
+          streakCurrentLength: 0,
+          streakImpact: 'low',
+          consistencyScore: 0
         }
-      };
-
-      // Get recent user progress to populate session
-      const recentProgress = await UserProgress.find({ userId })
-        .sort({ lastUpdated: -1 })
-        .limit(10);
-
-      if (recentProgress.length > 0) {
-        const scores = recentProgress.map(p => p.score || 0).filter(s => s > 0);
-        sessionData.performance.averageScore = scores.length > 0 
-          ? scores.reduce((a, b) => a + b, 0) / scores.length 
-          : 0;
-        
-        sessionData.performance.completionRate = recentProgress.reduce((acc, p) => 
-          acc + (p.completionPercentage || 0), 0) / recentProgress.length;
-      }
-
-      return sessionData;
-    } catch (error) {
-      console.error('Error getting current session data:', error);
-      return {
-        userId,
-        sessionId: `session_${Date.now()}`,
-        startTime: new Date(),
-        isActive: true,
-        activities: [],
-        interactions: [],
-        performance: {
-          averageScore: 0,
+      },
+      adaptiveLearning: {
+        pathEffectiveness: {
+          pathLevel: 'standard',
+          effectiveness: 0,
           completionRate: 0,
-          timeSpent: 0
+          recommendation: 'Complete more adaptive learning content for personalized recommendations'
+        },
+        difficultyProgression: {
+          currentDifficulty: 'beginner',
+          adaptationSpeed: 0,
+          plateaus: [],
+          regressions: [],
+          recommendation: 'Begin with foundational content to establish skill baselines'
+        },
+        personalizationAccuracy: {
+          accuracy: 0,
+          confidenceLevel: 'low',
+          dataPoints: 0,
+          recommendation: 'Complete the learning style assessment to improve personalization'
+        },
+        recommendationSuccess: {
+          successRate: 0,
+          engagementImpact: 'unknown',
+          completionImpact: 'unknown',
+          recommendation: 'Try recommended content to help us improve suggestions'
         }
-      };
-    }
-  }
-
-  /**
-   * Calculate performance trend for a user
-   */
-  async calculatePerformanceTrend(userId, timeframe = '30d') {
-    try {
-      const days = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const progressData = await UserProgress.find({
-        userId,
-        lastUpdated: { $gte: startDate }
-      }).sort({ lastUpdated: 1 });
-
-      if (progressData.length === 0) {
-        return {
-          trend: 'stable',
-          change: 0,
-          dataPoints: [],
-          summary: 'No recent activity'
-        };
-      }
-
-      // Calculate trend
-      const scores = progressData.map(p => p.score || 0).filter(s => s > 0);
-      const completionRates = progressData.map(p => p.completionPercentage || 0);
-      
-      if (scores.length === 0) {
-        return {
-          trend: 'stable',
-          change: 0,
-          dataPoints: [],
-          summary: 'No scored activities'
-        };
-      }
-
-      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-      const avgCompletion = completionRates.reduce((a, b) => a + b, 0) / completionRates.length;
-
-      // Compare with previous period
-      const previousStartDate = new Date(startDate);
-      previousStartDate.setDate(previousStartDate.getDate() - days);
-      
-      const previousData = await UserProgress.find({
-        userId,
-        lastUpdated: { 
-          $gte: previousStartDate,
-          $lt: startDate
-        }
-      });
-
-      let trend = 'stable';
-      let change = 0;
-
-      if (previousData.length > 0) {
-        const prevScores = previousData.map(p => p.score || 0).filter(s => s > 0);
-        if (prevScores.length > 0) {
-          const prevAvgScore = prevScores.reduce((a, b) => a + b, 0) / prevScores.length;
-          change = avgScore - prevAvgScore;
-          trend = change > 5 ? 'improving' : change < -5 ? 'declining' : 'stable';
+      },
+      predictiveInsights: {
+        performancePrediction: {
+          nextWeekPrediction: {
+            score: 70,
+            confidence: 'low'
+          },
+          longTermTrajectory: 'steady',
+          potentialImprovements: [
+            'Establish a regular learning schedule',
+            'Complete practice exercises regularly'
+          ],
+          confidence: 0.4
+        },
+        riskAssessment: {
+          overallRisk: 'indeterminate',
+          disengagementRisk: 'medium',
+          knowledgeGapRisk: 'medium',
+          completionRisk: 'medium',
+          recommendedInterventions: [
+            'Establish regular learning schedule',
+            'Set specific, achievable learning goals'
+          ],
+          confidence: 0.4
         }
       }
-
-      return {
-        trend,
-        change: Math.round(change * 100) / 100,
-        dataPoints: progressData.map(p => ({
-          date: p.lastUpdated,
-          score: p.score || 0,
-          completion: p.completionPercentage || 0
-        })),
-        summary: `${trend} with ${Math.abs(change).toFixed(1)}% ${change >= 0 ? 'improvement' : 'decline'}`
-      };
-    } catch (error) {
-      console.error('Error calculating performance trend:', error);
-      return {
-        trend: 'stable',
-        change: 0,
-        dataPoints: [],
-        summary: 'Unable to calculate trend'
-      };
-    }
-  }
-
-  /**
-   * Generate content recommendations based on user patterns
-   */
-  async generateContentRecommendations(userId, patterns) {
-    try {
-      // Get user's current progress and preferences
-      const userProgress = await UserProgress.find({ userId }).populate('courseId');
-      const completedCourses = userProgress.filter(p => p.completionPercentage >= 90);
-      const inProgressCourses = userProgress.filter(p => p.completionPercentage > 0 && p.completionPercentage < 90);
-
-      // Get all available courses
-      const allCourses = await Course.find({ isActive: true });
-      
-      // Filter courses the user hasn't started
-      const unStartedCourses = allCourses.filter(course => 
-        !userProgress.some(p => p.courseId?.toString() === course._id.toString())
-      );
-
-      const recommendations = [];
-
-      // Recommend based on patterns
-      if (patterns.preferredDifficulty) {
-        const difficultyMatches = unStartedCourses.filter(course => 
-          course.difficulty === patterns.preferredDifficulty
-        ).slice(0, 3);
-        
-        recommendations.push(...difficultyMatches.map(course => ({
-          courseId: course._id,
-          title: course.title,
-          reason: `Matches your preferred difficulty level: ${patterns.preferredDifficulty}`,
-          confidence: 0.8,
-          type: 'difficulty_match'
-        })));
-      }
-
-      // Recommend based on subject area
-      if (patterns.preferredSubjects && patterns.preferredSubjects.length > 0) {
-        const subjectMatches = unStartedCourses.filter(course =>
-          patterns.preferredSubjects.includes(course.category)
-        ).slice(0, 2);
-        
-        recommendations.push(...subjectMatches.map(course => ({
-          courseId: course._id,
-          title: course.title,
-          reason: `Based on your interest in ${course.category}`,
-          confidence: 0.7,
-          type: 'subject_match'
-        })));
-      }
-
-      // Recommend next steps for in-progress courses
-      for (const progress of inProgressCourses.slice(0, 2)) {
-        if (progress.courseId) {
-          recommendations.push({
-            courseId: progress.courseId._id,
-            title: progress.courseId.title,
-            reason: `Continue your progress - ${Math.round(progress.completionPercentage)}% complete`,
-            confidence: 0.9,
-            type: 'continue_learning'
-          });
-        }
-      }
-
-      // Sort by confidence and return top 5
-      return recommendations
-        .sort((a, b) => b.confidence - a.confidence)
-        .slice(0, 5);
-
-    } catch (error) {
-      console.error('Error generating content recommendations:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Generate difficulty adjustments based on user performance patterns
-   */
-  async generateDifficultyAdjustments(userId, patterns) {
-    try {
-      const performanceData = patterns.overview?.performance || {};
-      const currentScore = performanceData.averageScore || 0;
-      const recentTrend = performanceData.recentTrend || 'stable';
-      
-      const adjustments = [];
-      
-      // Performance-based adjustments
-      if (currentScore > 90) {
-        adjustments.push({
-          type: 'increase_difficulty',
-          reason: 'High performance indicates readiness for more challenging content',
-          recommendation: 'Consider advancing to more complex topics',
-          confidence: 0.8
-        });
-      } else if (currentScore < 60) {
-        adjustments.push({
-          type: 'decrease_difficulty',
-          reason: 'Low performance suggests current difficulty may be too high',
-          recommendation: 'Review fundamentals and reduce complexity temporarily',
-          confidence: 0.9
-        });
-      }
-      
-      // Trend-based adjustments
-      if (recentTrend === 'declining') {
-        adjustments.push({
-          type: 'provide_support',
-          reason: 'Performance trend is declining',
-          recommendation: 'Offer additional support materials and practice exercises',
-          confidence: 0.7
-        });
-      } else if (recentTrend === 'improving') {
-        adjustments.push({
-          type: 'maintain_pace',
-          reason: 'Performance is improving',
-          recommendation: 'Continue current learning approach',
-          confidence: 0.6
-        });
-      }
-      
-      return adjustments;
-      
-    } catch (error) {
-      console.error('Error generating difficulty adjustments:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Analyze effectiveness of learning paths for adaptive learning
-   * @param {Object} adaptiveStats - Adaptive learning statistics
-   * @returns {Object} Path effectiveness metrics
-   */
-  analyzePathEffectiveness(adaptiveStats) {
-    if (!adaptiveStats || !adaptiveStats.paths) {
-      return {
-        overallEffectiveness: 'moderate',
-        effectivenessScore: 0.65,
-        completionRate: 75,
-        deviationRate: 15,
-        optimizationScore: 68,
-        strengths: ['conceptual flow', 'topic coverage'],
-        weaknesses: ['pace variation', 'difficulty jumps'],
-        recommendedChanges: [
-          'Smoother difficulty progression',
-          'Additional practice opportunities'
-        ]
-      };
-    }
-    
-    // Calculate path effectiveness metrics from real data
-    const completionRate = adaptiveStats.paths.reduce((sum, p) => sum + (p.completionRate || 0), 0) / 
-                        Math.max(adaptiveStats.paths.length, 1);
-    
-    let effectiveness = 'moderate';
-    let effectivenessScore = completionRate / 100;
-    
-    if (completionRate > 85) effectiveness = 'high';
-    else if (completionRate < 50) effectiveness = 'low';
-    
-    return {
-      overallEffectiveness: effectiveness,
-      effectivenessScore: parseFloat(effectivenessScore.toFixed(2)),
-      completionRate: Math.round(completionRate),
-      deviationRate: adaptiveStats.overallDeviationRate || 15,
-      optimizationScore: adaptiveStats.optimizationScore || 68,
-      strengths: adaptiveStats.strengths || ['conceptual flow', 'topic coverage'],
-      weaknesses: adaptiveStats.weaknesses || ['pace variation', 'difficulty jumps'],
-      recommendedChanges: adaptiveStats.recommendedChanges || [
-        'Smoother difficulty progression',
-        'Additional practice opportunities'
-      ]
     };
-  }
-  
-  /**
-   * Identify cognitive strengths and learning style from learning patterns
-   * @param {Object} patterns - User learning patterns
-   * @returns {Object} Cognitive strengths and learning style analysis
-   */
-  identifyCognitiveStrengths(patterns) {
-    if (!patterns || typeof patterns !== 'object' || Object.keys(patterns).length === 0) {
-      return {
-        analyticalThinking: 'moderate',
-        criticalReasoning: 'moderate',
-        creativeThinking: 'moderate',
-        problemSolving: 'moderate',
-        memoryRecall: 'moderate',
-        learningStyle: 'balanced',
-        recommendedContentTypes: ['video', 'interactive', 'text']
-      };
-    }
-    
-    // Extract relevant data from patterns
-    const learningBehavior = patterns.learningBehavior || {};
-    const performanceEvolution = learningBehavior.performanceEvolution || {};
-    const contentPreferences = learningBehavior.contentPreferences || {};
-    
-    // Analyze strengths based on available patterns
-    const analyticalThinking = performanceEvolution.improvement > 10 ? 'high' : 
-                              performanceEvolution.improvement > 0 ? 'moderate' : 'developing';
-    
-    const criticalReasoning = performanceEvolution.stability === 'very_stable' ? 'high' :
-                              performanceEvolution.stability === 'stable' ? 'moderate' : 'developing';
-    
-    // Determine learning style based on content preferences
-    let learningStyle = 'balanced';
-    let preferredFormats = contentPreferences.preferredFormats || ['video', 'interactive', 'text'];
-    
-    if (preferredFormats.includes('visual') || preferredFormats.includes('video')) {
-      learningStyle = 'visual';
-    } else if (preferredFormats.includes('interactive') || preferredFormats.includes('practical')) {
-      learningStyle = 'kinesthetic';
-    } else if (preferredFormats.includes('audio') || preferredFormats.includes('podcast')) {
-      learningStyle = 'auditory';
-    }
-    
-    return {
-      analyticalThinking,
-      criticalReasoning,
-      creativeThinking: 'moderate', // Default without sufficient data
-      problemSolving: analyticalThinking === 'high' ? 'high' : 'moderate',
-      memoryRecall: criticalReasoning === 'high' ? 'high' : 'moderate',
-      learningStyle,
-      recommendedContentTypes: preferredFormats
-    };
+
+    return fallbackPatterns;
   }
 
   /**
-   * Identify improvement areas based on learning patterns
+   * Generate fallback insights when real analytics can't be generated
+   * @param {string} userId - The user ID
+   * @returns {Object} Basic insights object with fallback values
    */
-  identifyImprovementAreas(patterns) {
-    if (!patterns || typeof patterns !== 'object' || Object.keys(patterns).length === 0) {
-      return {
-        areas: [],
-        prioritized: [],
-        reasonsForIdentification: {},
-        suggestionTypes: []
-      };
-    }
-    
-    const improvementAreas = [];
-    const reasonsForIdentification = {};
-    
-    // Check for learning behavior issues
-    if (patterns.learningBehavior) {
-      // Check study patterns
-      if (patterns.learningBehavior.studyPatterns && 
-          patterns.learningBehavior.studyPatterns.intensity < 0.4) {
-        improvementAreas.push('study_consistency');
-        reasonsForIdentification['study_consistency'] = 'Low study intensity and irregular patterns detected';
-      }
-      
-      // Check engagement trends
-      if (patterns.learningBehavior.engagementTrends && 
-          ['decreasing', 'at_risk', 'insufficient_data'].includes(
-            patterns.learningBehavior.engagementTrends.overallTrend || 
-            patterns.learningBehavior.engagementTrends.forecast
-          )) {
-        improvementAreas.push('engagement_level');
-        reasonsForIdentification['engagement_level'] = 'Decreasing or at-risk engagement trend detected';
-      }
-      
-      // Check performance evolution
-      if (patterns.learningBehavior.performanceEvolution && 
-          (patterns.learningBehavior.performanceEvolution.trend === 'declining' || 
-           patterns.learningBehavior.performanceEvolution.improvement < 0)) {
-        improvementAreas.push('performance_level');
-        reasonsForIdentification['performance_level'] = 'Declining performance trend detected';
-      }
-    }
-    
-    // Check for adaptive learning issues
-    if (patterns.adaptiveLearning) {
-      // Check path effectiveness
-      if (patterns.adaptiveLearning.pathEffectiveness && 
-          patterns.adaptiveLearning.pathEffectiveness.effectivenessScore < 0.6) {
-        improvementAreas.push('learning_path_alignment');
-        reasonsForIdentification['learning_path_alignment'] = 'Current learning path shows suboptimal effectiveness';
-      }
-      
-      // Check difficulty progression
-      if (patterns.adaptiveLearning.difficultyProgression && 
-          patterns.adaptiveLearning.difficultyProgression.optimality < 0.5) {
-        improvementAreas.push('difficulty_adaptation');
-        reasonsForIdentification['difficulty_adaptation'] = 'Difficulty progression is not optimal for learning progress';
-      }
-    }
-    
-    // Check for gamification impact issues
-    if (patterns.gamificationImpact) {
-      if (patterns.gamificationImpact.motivationFactors && 
-          patterns.gamificationImpact.motivationFactors.sustainabilityScore < 0.5) {
-        improvementAreas.push('motivation_sustainability');
-        reasonsForIdentification['motivation_sustainability'] = 'Low sustainability in motivation factors';
-      }
-    }
-    
-    // Add default areas if none were identified but we have some data
-    if (improvementAreas.length === 0 && patterns.overview && patterns.overview.dataQuality !== 'poor') {
-      improvementAreas.push('study_consistency');
-      reasonsForIdentification['study_consistency'] = 'General improvement in study habits recommended';
-      
-      improvementAreas.push('engagement_diversity');
-      reasonsForIdentification['engagement_diversity'] = 'Diversifying content interaction could improve learning outcomes';
-    }
-    
-    // Prioritize improvement areas
-    const prioritized = [...improvementAreas].sort((a, b) => {
-      const priorities = {
-        'performance_level': 1,
-        'engagement_level': 2,
-        'study_consistency': 3,
-        'learning_path_alignment': 4,
-        'difficulty_adaptation': 5,
-        'motivation_sustainability': 6,
-        'engagement_diversity': 7
-      };
-      return (priorities[a] || 99) - (priorities[b] || 99);
-    });
-    
-    // Generate suggestion types based on identified areas
-    const suggestionMap = {
-      'study_consistency': ['schedule_optimization', 'reminder_system'],
-      'engagement_level': ['interactive_content', 'gamification_boost'],
-      'performance_level': ['targeted_practice', 'concept_review'],
-      'learning_path_alignment': ['path_adjustment', 'interest_alignment'],
-      'difficulty_adaptation': ['challenge_calibration', 'scaffolding'],
-      'motivation_sustainability': ['goal_refreshment', 'reward_diversification'],
-      'engagement_diversity': ['content_variety', 'format_exploration']
-    };
-    
-    const suggestionTypes = improvementAreas.flatMap(area => suggestionMap[area] || []);
-    
-    return {
-      areas: improvementAreas,
-      prioritized,
-      reasonsForIdentification,
-      suggestionTypes: [...new Set(suggestionTypes)] // Remove duplicates
-    };
-  }
-
-  /**
-   * Calculate engagement trend based on user progress data
-   * @param {Array} progressData - User's progress data over time
-   * @returns {Object} Engagement trend analysis
-   */
-  calculateEngagementTrend(progressData) {
-    if (!progressData || !Array.isArray(progressData) || progressData.length === 0) {
-      return {
-        trend: 'stable',
-        currentScore: 65,
-        previousScore: 65,
-        changePercent: 0,
-        forecastScore: 65,
-        riskLevel: 'low',
-        stabilityFactor: 'moderate'
-      };
-    }
+  async generateFallbackInsights(userId) {
+    console.log(`Generating fallback insights for user ${userId}`);
     
     try {
-      // Sort progress data by date
-      const sortedData = [...progressData].sort((a, b) => {
-        return new Date(a.timestamp || a.date) - new Date(b.timestamp || b.date);
-      });
-      
-      // Calculate engagement metrics
-      const dataPoints = Math.min(sortedData.length, 10); // Use up to 10 most recent data points
-      const recentData = sortedData.slice(-dataPoints);
-      
-      // Extract engagement metrics from progress data
-      const engagementScores = recentData.map(item => {
-        const interactionScore = item.interactions ? item.interactions.length * 5 : 0;
-        const completionScore = item.activitiesCompleted ? item.activitiesCompleted * 10 : 0;
-        const durationScore = item.duration ? Math.min(item.duration / 60, 10) * 6 : 0;
-        
-        return Math.min(interactionScore + completionScore + durationScore, 100);
-      });
-      
-      // Calculate current and previous scores
-      const currentScore = engagementScores.length > 0 ? 
-        engagementScores[engagementScores.length - 1] : 65;
-      
-      const previousScore = engagementScores.length > 1 ? 
-        engagementScores[engagementScores.length - 2] : currentScore;
-      
-      // Calculate change percentage
-      const changePercent = previousScore > 0 ? 
-        ((currentScore - previousScore) / previousScore) * 100 : 0;
-      
-      // Determine trend
-      let trend = 'stable';
-      if (changePercent > 5) trend = 'increasing';
-      else if (changePercent < -5) trend = 'decreasing';
-      
-      // Simple forecast based on recent trend
-      const forecastScore = Math.max(0, Math.min(100, currentScore + (changePercent / 2)));
-      
-      // Determine risk level
-      let riskLevel = 'low';
-      if (currentScore < 30) riskLevel = 'high';
-      else if (currentScore < 50) riskLevel = 'medium';
-      
-      // Calculate stability factor
-      const scoreVariance = this.calculateVariance(engagementScores);
-      const stabilityFactor = scoreVariance < 5 ? 'high' : 
-                             scoreVariance < 15 ? 'moderate' : 'low';
+      // Try to get basic user info to personalize the fallback
+      const user = await User.findById(userId).select('name email createdAt').lean();
+      const registrationDate = user ? user.createdAt : new Date();
       
       return {
-        trend,
-        currentScore,
-        previousScore,
-        changePercent: parseFloat(changePercent.toFixed(1)),
-        forecastScore: Math.round(forecastScore),
-        riskLevel,
-        stabilityFactor
+        success: true,
+        message: "Limited analytics available - continue learning to generate insights",
+        summary: {
+          learningActivity: {
+            activitiesCompleted: 0,
+            timeSpent: 0,
+            lastActive: registrationDate,
+            consistency: 0
+          },
+          performance: {
+            averageScore: 0,
+            trend: "neutral",
+            strengths: [],
+            areasForImprovement: []
+          },
+          progress: {
+            overallProgress: 0,
+            courseCompletions: 0,
+            milestones: []
+          },
+          recommendations: {
+            courses: [],
+            nextSteps: ["Begin your learning journey", "Complete your first course"],
+            studyTips: ["Set a regular study schedule", "Try different learning materials"]
+          }
+        },
+        insights: {
+          key: "Start your learning journey to unlock personalized insights",
+          patterns: [],
+          actions: ["Explore available courses", "Complete your profile for better recommendations"]
+        },
+        dataAvailable: false
       };
     } catch (error) {
-      console.error('Error calculating engagement trend:', error);
+      console.error('Error generating fallback insights:', error);
+      // Return very basic structure if there's an error
       return {
-        trend: 'stable',
-        currentScore: 65,
-        previousScore: 65,
-        changePercent: 0,
-        forecastScore: 65,
-        riskLevel: 'low',
-        stabilityFactor: 'moderate',
-        error: true
+        success: true,
+        message: "Limited analytics available",
+        summary: {
+          learningActivity: { activitiesCompleted: 0, timeSpent: 0 },
+          performance: { averageScore: 0, trend: "neutral" },
+          progress: { overallProgress: 0 },
+          recommendations: { nextSteps: ["Begin your learning journey"] }
+        },
+        dataAvailable: false
       };
     }
-  }
-
-  /**
-   * Calculate variance of an array of numbers
-   * @private
-   */
-  calculateVariance(array) {
-    if (!array || array.length === 0) return 0;
-    
-    const mean = array.reduce((sum, val) => sum + val, 0) / array.length;
-    const squareDiffs = array.map(value => {
-      const diff = value - mean;
-      return diff * diff;
-    });
-    
-    return Math.sqrt(squareDiffs.reduce((sum, val) => sum + val, 0) / array.length);
   }
 
   /**
    * Analyze engagement trends from user progress data
-   * @param {Array} progressData - User's progress data over time
-   * @returns {Object} Comprehensive engagement trends analysis
+   * @param {Array} progressData - Array of user progress data
+   * @returns {Object} Engagement trend analysis
    */
   analyzeEngagementTrends(progressData) {
     if (!progressData || !Array.isArray(progressData) || progressData.length === 0) {
       return {
-        overallTrend: 'stable',
-        forecast: 'stable',
-        currentEngagement: 'moderate',
-        periodComparison: {
-          current:  65,
-          previous: 65,
-          changePercent: 0
-        },
-        contentTypeEngagement: {
-          video: 'high',
-          interactive: 'moderate',
-          text: 'moderate',
-          quiz: 'high'
-        },
-        timeOfDayPattern: {
-          morning: 20,
-          afternoon: 45,
-          evening: 35,
-          night: 0
-        },
-        sessionMetrics: {
-          averageDuration: 25,
-          frequency: 'regular',
-          completionRate: 72
-        }
+        overall: 'insufficient data',
+        trends: [],
+        patterns: []
       };
-    } 
+    }
+
     try {
-      // Sort progress data by date
-      const sortedData = [...progressData].sort((a, b) => {
-        return new Date(a.timestamp || a.date) - new Date(b.timestamp || b.date);
+      // Sort by date
+      const sortedData = [...progressData].sort((a, b) => 
+        new Date(a.timestamp || a.createdAt) - new Date(b.timestamp || b.createdAt)
+      );
+
+      // Calculate engagement metrics
+      const trends = sortedData.map(item => {
+        const date = new Date(item.timestamp || item.createdAt);
+        return {
+          date,
+          value: item.timeSpent || 0,
+          completionRate: item.completionRate || 0,
+          interactionCount: item.interactions?.length || 0
+        };
       });
-      
-      // Get basic engagement trend using the helper method
-      const basicTrend = this.calculateEngagementTrend(progressData);
-      
-      // Analyze engagement by content type
-      const contentTypeStats = {};
-      sortedData.forEach(item => {
-        const interactions = item.interactions || [];
-        interactions.forEach(interaction => {
-          if (!interaction.contentType) return;
-          
-          if (!contentTypeStats[interaction.contentType]) {
-            contentTypeStats[interaction.contentType] = {
-              count: 0,
-              duration: 0,
-              completion: 0
-            };
+
+      // Analyze patterns
+      const engagement = {
+        overall: trends.length >= 3 ? 'engaged' : 'limited data',
+        trends,
+        patterns: []
+      };
+
+      // Identify engagement patterns
+      if (trends.length >= 3) {
+        // Calculate average engagement
+        const avgEngagement = trends.reduce((sum, item) => sum + item.value, 0) / trends.length;
+        
+        // Determine trend direction
+        const firstHalf = trends.slice(0, Math.floor(trends.length / 2));
+        const secondHalf = trends.slice(Math.floor(trends.length / 2));
+        
+        const firstHalfAvg = firstHalf.reduce((sum, item) => sum + item.value, 0) / firstHalf.length;
+        const secondHalfAvg = secondHalf.reduce((sum, item) => sum + item.value, 0) / secondHalf.length;
+        
+        if (secondHalfAvg > firstHalfAvg * 1.2) {
+          engagement.overall = 'increasing';
+          engagement.patterns.push('Engagement is trending upward');
+        } else if (secondHalfAvg < firstHalfAvg * 0.8) {
+          engagement.overall = 'decreasing';
+          engagement.patterns.push('Engagement is trending downward');
+        } else {
+          engagement.overall = 'steady';
+          engagement.patterns.push('Engagement is relatively consistent');
+        }
+        
+        // Check for spikes and drops
+        const threshold = avgEngagement * 0.5;
+        let spikes = 0;
+        let drops = 0;
+        
+        for (let i = 1; i < trends.length; i++) {
+          if (trends[i].value > trends[i-1].value + threshold) {
+            spikes++;
+          } else if (trends[i].value < trends[i-1].value - threshold) {
+            drops++;
           }
-          
-          contentTypeStats[interaction.contentType].count++;
-          contentTypeStats[interaction.contentType].duration += interaction.duration || 0;
-          contentTypeStats[interaction.contentType].completion += interaction.completed ? 1 : 0;
-        });
-      });
-      
-      // Calculate engagement level for each content type
-      const contentTypeEngagement = {};
-      Object.keys(contentTypeStats).forEach(type => {
-        const stats = contentTypeStats[type];
-        const completionRate = stats.count > 0 ? (stats.completion / stats.count) * 100 : 0;
-        const averageDuration = stats.count > 0 ? stats.duration / stats.count : 0;
-        
-        let engagementLevel = 'moderate';
-        if (completionRate > 80 && averageDuration > 5) engagementLevel = 'high';
-        else if (completionRate < 40 || averageDuration < 1) engagementLevel = 'low';
-        
-        contentTypeEngagement[type] = engagementLevel;
-      });
-      
-      // Ensure we have values for common content types
-      const defaultContentTypes = ['video', 'interactive', 'text', 'quiz'];
-      defaultContentTypes.forEach(type => {
-        if (!contentTypeEngagement[type]) contentTypeEngagement[type] = 'moderate';
-      });
-      
-      // Analyze time of day patterns
-      const timeOfDayPattern = {
-        morning: 0,   // 6am - 12pm
-        afternoon: 0, // 12pm - 6pm
-        evening: 0,   // 6pm - 10pm
-        night: 0      // 10pm - 6am
-      };
-      
-      // Default distribution if we can't calculate
-      let totalSessions = 0;
-      
-      sortedData.forEach(item => {
-        if (!item.timestamp) return;
-        
-        const date = new Date(item.timestamp);
-        const hour = date.getHours();
-        
-        if (hour >= 6 && hour < 12) timeOfDayPattern.morning++;
-        else if (hour >= 12 && hour < 18) timeOfDayPattern.afternoon++;
-        else if (hour >= 18 && hour < 22) timeOfDayPattern.evening++;
-        else timeOfDayPattern.night++;
-        
-        totalSessions++;
-      });
-      
-      // Convert to percentages
-      if (totalSessions > 0) {
-        Object.keys(timeOfDayPattern).forEach(key => {
-          timeOfDayPattern[key] = Math.round((timeOfDayPattern[key] / totalSessions) * 100);
-        });
-      } else {
-        // Default distribution
-        timeOfDayPattern.morning = 20;
-        timeOfDayPattern.afternoon = 45;
-        timeOfDayPattern.evening = 35;
-        timeOfDayPattern.night = 0;
-      }
-      
-      // Calculate session metrics
-      const sessionDurations = sortedData
-        .filter(item => item.duration)
-        .map(item => item.duration);
-      
-      const averageDuration = sessionDurations.length > 0 
-        ? sessionDurations.reduce((sum, duration) => sum + duration, 0) / sessionDurations.length / 60 
-        : 25;
-      
-      // Determine frequency based on days between sessions
-      let frequency = 'irregular';
-      if (sortedData.length >= 3) {
-        const sessions = sortedData.filter(item => item.timestamp || item.date);
-        const daysBetween = [];
-        
-        for (let i = 1; i < sessions.length; i++) {
-          const current = new Date(sessions[i].timestamp || sessions[i].date);
-          const previous = new Date(sessions[i-1].timestamp || sessions[i-1].date);
-          const diffTime = Math.abs(current - previous);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          daysBetween.push(diffDays);
         }
         
-        const avgDaysBetween = daysBetween.length > 0 
-          ? daysBetween.reduce((sum, days) => sum + days, 0) / daysBetween.length 
-          : 0;
-        
-        const dayVariance = this.calculateVariance(daysBetween);
-        
-        if (avgDaysBetween <= 2 && dayVariance < 1) frequency = 'consistent';
-        else if (avgDaysBetween <= 3) frequency = 'regular';
-        else if (avgDaysBetween <= 5) frequency = 'occasional';
-        else frequency = 'irregular';
-      }
-      
-      // Calculate overall completion rate
-      const completionRate = sortedData.reduce((sum, item) => {
-        const activities = item.activitiesCompleted || 0;
-        const totalActivities = item.totalActivities || activities;
-        return sum + (totalActivities > 0 ? (activities / totalActivities) * 100 : 0);
-      }, 0) / Math.max(sortedData.length, 1);
-      
-      return {
-        overallTrend: basicTrend.trend,
-        forecast: basicTrend.riskLevel === 'high' ? 'at_risk' : basicTrend.trend,
-        currentEngagement: basicTrend.currentScore > 75 ? 'high' : 
-                           basicTrend.currentScore > 45 ? 'moderate' : 'low',
-        periodComparison: {
-          current: Math.round(basicTrend.currentScore),
-          previous: Math.round(basicTrend.previousScore),
-          changePercent: basicTrend.changePercent
-        },
-        contentTypeEngagement,
-        timeOfDayPattern,
-        sessionMetrics: {
-          averageDuration: Math.round(averageDuration),
-          frequency,
-          completionRate: Math.round(completionRate)
+        if (spikes > Math.floor(trends.length / 4)) {
+          engagement.patterns.push('Shows sporadic high engagement periods');
         }
-      };
+        
+        if (drops > Math.floor(trends.length / 4)) {
+          engagement.patterns.push('Shows inconsistent engagement with significant drops');
+        }
+      }
+
+      return engagement;
     } catch (error) {
       console.error('Error analyzing engagement trends:', error);
       return {
-        overallTrend: 'stable',
-        forecast: 'stable',
-        currentEngagement: 'moderate',
-        periodComparison: {
-          current: 65,
-          previous: 65,
-          changePercent: 0
+        overall: 'error',
+        trends: [],
+        patterns: ['Error analyzing engagement data']
+      };
+    }
+  }
+
+  /**
+   * Generate default metrics when no user progress data is available
+   * @param {string} userId - User ID to generate default metrics for
+   * @returns {Object} Default metrics object with placeholder values
+   */
+  async generateDefaultMetrics(userId) {
+    console.log(`Generating default metrics for user ${userId} due to insufficient data`);
+    
+    try {
+      // Try to get basic user info to personalize the default metrics
+      const user = await User.findById(userId).select('name email createdAt').lean();
+      const registrationDate = user ? user.createdAt : new Date();
+      const daysSinceRegistration = Math.max(1, Math.floor((new Date() - registrationDate) / (24 * 60 * 60 * 1000)));
+      
+      return {
+        overall: {
+          totalActivities: 0,
+          completionRate: 0,
+          averageScore: 0,
+          timeSpent: 0,
+          consistencyScore: 0
         },
-        contentTypeEngagement: {
-          video: 'high',
-          interactive: 'moderate',
-          text: 'moderate',
-          quiz: 'high'
+        trends: {
+          performanceTrend: [
+            { date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), value: 0 },
+            { date: new Date(), value: 0 }
+          ],
+          engagementTrend: [
+            { date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), value: 0 },
+            { date: new Date(), value: 0 }
+          ],
+          velocityTrend: [
+            { date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), value: 0 },
+            { date: new Date(), value: 0 }
+          ],
+          difficultyProgression: [
+            { date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), value: 1 },
+            { date: new Date(), value: 1 }
+          ]
         },
-        timeOfDayPattern: {
-          morning: 20,
-          afternoon: 45,
-          evening: 35,
-          night: 0
+        breakdown: {
+          bySubject: [],
+          byDifficulty: [
+            { difficulty: 'Beginner', percentage: 100 },
+            { difficulty: 'Intermediate', percentage: 0 },
+            { difficulty: 'Advanced', percentage: 0 }
+          ],
+          byTimeOfDay: [
+            { timeOfDay: 'Morning', percentage: 0 },
+            { timeOfDay: 'Afternoon', percentage: 0 },
+            { timeOfDay: 'Evening', percentage: 0 },
+            { timeOfDay: 'Night', percentage: 0 }
+          ],
+          byDeviceType: [
+            { device: 'Desktop', percentage: 100 },
+            { device: 'Mobile', percentage: 0 },
+            { device: 'Tablet', percentage: 0 }
+          ]
         },
-        sessionMetrics: {
-          averageDuration: 25,
-          frequency: 'regular',
-          completionRate: 72
+        predictions: {
+          nextWeekPerformance: {
+            prediction: 0,
+            confidence: 0,
+            message: 'Complete more activities to unlock performance predictions'
+          },
+          goalAchievementLikelihood: {
+            likelihood: 0,
+            timeEstimate: daysSinceRegistration + 7,
+            message: 'Set learning goals and complete activities to track progress'
+          },
+          optimalStudyTime: {
+            timeOfDay: 'Afternoon',
+            duration: 30,
+            message: 'Need more data to determine your optimal study time'
+          },
+          recommendedFocus: {
+            areas: [],
+            reasoning: 'Complete more activities to get personalized recommendations',
+            priority: 'Start with introductory courses to build a foundation'
+          }
         },
-        error: true
+        message: 'Start learning to generate personalized analytics!',
+        dataAvailable: false
+      };
+    } catch (error) {
+      console.error('Error generating default metrics:', error);
+      // Return a very basic structure if there's an error
+      return {
+        overall: { totalActivities: 0, completionRate: 0, averageScore: 0, timeSpent: 0 },
+        trends: { performanceTrend: [], engagementTrend: [], velocityTrend: [] },
+        breakdown: { bySubject: [], byDifficulty: [], byTimeOfDay: [] },
+        predictions: { message: 'Start learning to generate personalized analytics!' },
+        dataAvailable: false,
+        error: 'Failed to generate default metrics'
       };
     }
   }
 }
 
-export default new AnalyticsService();
+// Create an instance and export it
+const analyticsService = new AnalyticsService();
+export default analyticsService;
+export { analyticsService };

@@ -18,6 +18,9 @@ import { learningAnalyticsService } from './learningAnalyticsService.js';
 import { adaptiveLearningService } from './adaptiveLearningService.js';
 import gamificationService from './gamificationService.js';
 
+// Debugging log
+console.log('=== InstructorAnalyticsService: Successfully imported analyticsService ===');
+
 class InstructorAnalyticsService {
   constructor() {
     console.log('=== Initializing InstructorAnalyticsService v2.0 - Phase 5 Step 2 ===');

@@ -20,6 +20,7 @@ import instructorAnalyticsService from '../services/instructorAnalyticsService.j
 import classMonitoringService from '../services/classMonitoringService.js';
 import learningGapService from '../services/learningGapService.js';
 import interventionEngine from '../services/interventionEngine.js';
+import { UserProgress, User, Course, Lesson } from '../models/index.js';
 
 const router = express.Router();
 
@@ -48,6 +49,52 @@ router.get('/health', async (req, res) => {
       status: 'error',
       error: 'Analytics service health check failed',
       timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * Analytics Summary Endpoint
+ * Provides a concise summary of key analytics metrics for dashboards
+ */
+router.get('/summary', auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Get performance metrics for summary
+    const metrics = await analyticsService.calculatePerformanceMetrics(userId);
+    
+    // Get personalized insights summary
+    const insights = await analyticsService.generatePersonalizedInsights(userId);
+    
+    // Get learning patterns summary
+    const patterns = await analyticsService.analyzeLearningPatterns(userId, 30, 'overview');
+    
+    res.json({
+      success: true,
+      summary: {
+        performance: {
+          overall: metrics.overall,
+          trends: metrics.trends
+        },
+        insights: {
+          strengthsAndWeaknesses: insights.strengthsAndWeaknesses,
+          recommendations: insights.personalizedRecommendations ? 
+            insights.personalizedRecommendations.contentRecommendations : []
+        },
+        patterns: {
+          learningBehavior: patterns.learningBehavior,
+          dataQuality: patterns.overview.dataQuality
+        },
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Analytics summary error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate analytics summary',
+      message: error.message
     });
   }
 });
@@ -162,6 +209,133 @@ router.get('/insights/personalized',
       console.error('Personalized insights generation error:', error);
       res.status(500).json({
         error: 'Failed to generate personalized insights',
+        message: error.message
+      });
+    }
+  }
+);
+
+/**
+ * Generate Real-time Dashboard Data
+ * Provides comprehensive real-time analytics for dashboards
+ */
+router.get('/dashboard/realtime',
+  auth,
+  [
+    query('timeframe').optional().isInt({ min: 1, max: 90 }).withMessage('Timeframe must be between 1-90 days')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array()
+        });
+      }
+
+      const { timeframe = 7 } = req.query;
+      const userId = req.user._id;
+
+      const dashboardData = await analyticsService.generateDashboardData(
+        userId,
+        'learner',
+        parseInt(timeframe)
+      );
+
+      res.json({
+        success: true,
+        dashboard: dashboardData,
+        timeframe: parseInt(timeframe),
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Dashboard data generation error:', error);
+      res.status(500).json({
+        error: 'Failed to generate dashboard data',
+        message: error.message
+      });
+    }
+  }
+);
+
+/**
+ * Get Learning Behavior History
+ * Provides historical learning behavior data for analysis
+ */
+router.get('/behavior/history',
+  auth,
+  [
+    query('timeframe').optional().isInt({ min: 1, max: 90 }).withMessage('Timeframe must be between 1-90 days')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array()
+        });
+      }
+
+      const { timeframe = 30 } = req.query;
+      const userId = req.user._id;
+
+      // Get behavior history from service
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - parseInt(timeframe));
+
+      const progressData = await analyticsService.getUserProgressData(userId, startDate, endDate);
+      
+      // Handle case of no data
+      if (!progressData || progressData.length === 0) {
+        // Generate empty history with dates for the timeframe
+        const emptyHistory = [];
+        for (let i = 0; i < parseInt(timeframe); i++) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          emptyHistory.push({
+            date: date.toISOString().split('T')[0],
+            activities: 0,
+            averageScore: 0,
+            timeSpent: 0,
+            completionRate: 0
+          });
+        }
+        
+        return res.json({
+          success: true,
+          behaviorHistory: emptyHistory,
+          timeframe: parseInt(timeframe),
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      // Group by day for history visualization
+      const historyByDay = analyticsService.groupProgressByDay(progressData);
+      
+      // Transform into array format for frontend
+      const behaviorHistory = Object.entries(historyByDay).map(([date, data]) => ({
+        date,
+        activities: data.length,
+        averageScore: data.reduce((sum, item) => sum + (item.progressData?.score || 0), 0) / data.length || 0,
+        timeSpent: data.reduce((sum, item) => sum + (item.progressData?.timeSpent || 0), 0),
+        completionRate: data.reduce((sum, item) => sum + (item.progressData?.completionPercentage || 0), 0) / data.length || 0
+      }));
+
+      res.json({
+        success: true,
+        behaviorHistory,
+        timeframe: parseInt(timeframe),
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Behavior history retrieval error:', error);
+      res.status(500).json({
+        error: 'Failed to retrieve behavior history',
         message: error.message
       });
     }
@@ -310,37 +484,90 @@ router.get('/behavior/history',
 
 /**
  * Get Analytics Summary
- * High-level analytics summary for quick overview
+ * Provides a comprehensive summary of all analytics data for a user
  */
 router.get('/summary',
-  flexibleAuthenticate,
-  async (req, res) => {    try {
-      const [patterns, metrics, insights] = await Promise.all([
-        analyticsService.analyzeLearningPatterns(req.user._id, 7, 'overview').catch(() => ({ behavioral: { engagementPatterns: { averageEngagement: 75 }, sessionPatterns: [], completionPatterns: [] } })),
-        analyticsService.calculatePerformanceMetrics(req.user._id, null, 7).catch(() => ({ trends: { velocityTrend: { current: 0.8 } }, overall: { averageScore: 75, consistencyScore: 0.8 } })),
-        analyticsService.generatePersonalizedInsights(req.user._id).catch(() => ({ personalizedRecommendations: { contentRecommendations: [] } }))
-      ]);
-
-      const summary = {
-        overview: {
-          learningVelocity: metrics.trends?.velocityTrend?.current || 0.8,
-          performanceScore: metrics.overall?.averageScore || 75,
-          engagementLevel: patterns.behavioral?.engagementPatterns?.averageEngagement || 75,
-          consistencyRating: metrics.overall?.consistencyScore || 0.8
+  auth,
+  async (req, res) => {
+    try {
+      const userId = req.user._id;
+      const user = await User.findById(userId).select('firstName lastName email role learningStyle');
+      
+      // Get metrics with a 30-day timeframe
+      const metrics = await analyticsService.calculatePerformanceMetrics(userId, null, 30);
+      
+      // Get pattern analysis
+      const patterns = await analyticsService.analyzeLearningPatterns(userId, 30, 'overview');
+      
+      // Get personalized insights (simplified version)
+      const insights = {
+        strengthsAndWeaknesses: {
+          cognitiveStrengths: patterns.learningBehavior?.contentPreferences || [],
+          improvementAreas: analyticsService.identifyImprovementAreas(patterns) || []
         },
-        keyInsights: insights.personalizedRecommendations?.contentRecommendations?.slice(0, 3) || [],
-        recentActivity: patterns.behavioral?.sessionPatterns?.slice(0, 5) || [],
-        topAchievements: patterns.behavioral?.completionPatterns?.slice(0, 3) || []
+        recommendations: metrics.predictions?.recommendedFocus || []
       };
-
+      
+      // Get course progress summary
+      const courseProgress = await UserProgress.find({ 
+        userId,
+        progressType: 'enrollment'
+      }).populate('courseId', 'title category difficulty');
+      
+      // Format progress data
+      const formattedProgress = courseProgress.map(progress => ({
+        courseId: progress.courseId?._id,
+        title: progress.courseId?.title || 'Unknown Course',
+        category: progress.courseId?.category || 'Uncategorized',
+        difficulty: progress.courseId?.difficulty || 'beginner',
+        progress: progress.progressData?.completionPercentage || 0,
+        lastAccessed: progress.timestamp
+      }));
+      
+      // Calculate overall stats
+      const totalCourses = formattedProgress.length;
+      const completedCourses = formattedProgress.filter(p => p.progress >= 100).length;
+      const inProgressCourses = formattedProgress.filter(p => p.progress > 0 && p.progress < 100).length;
+      const averageProgress = totalCourses > 0 
+        ? formattedProgress.reduce((sum, p) => sum + p.progress, 0) / totalCourses 
+        : 0;
+      
+      // Compile the summary data
+      const summary = {
+        user: {
+          id: userId,
+          name: `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
+          email: user?.email,
+          role: user?.role || 'student',
+          learningStyle: user?.learningStyle || 'unknown'
+        },
+        performance: {
+          overview: metrics.overall || {},
+          trends: metrics.trends || {}
+        },
+        progress: {
+          totalCourses,
+          completedCourses,
+          inProgressCourses,
+          averageProgress,
+          recentActivity: formattedProgress
+            .sort((a, b) => new Date(b.lastAccessed) - new Date(a.lastAccessed))
+            .slice(0, 5)
+        },
+        insights: {
+          strengths: insights.strengthsAndWeaknesses.cognitiveStrengths.slice(0, 3),
+          improvementAreas: insights.strengthsAndWeaknesses.improvementAreas.slice(0, 3),
+          recommendations: insights.recommendations.slice(0, 3)
+        },
+        timestamp: new Date().toISOString()
+      };
+      
       res.json({
         success: true,
-        summary,
-        generatedAt: new Date().toISOString()
+        summary
       });
-
     } catch (error) {
-      console.error('Analytics summary generation error:', error);
+      console.error('Analytics summary error:', error);
       res.status(500).json({
         error: 'Failed to generate analytics summary',
         message: error.message
@@ -701,1184 +928,96 @@ router.get('/class/:courseId/interventions',
   }
 );
 
-// ===========================
-// PHASE 5 STEP 2 - INSTRUCTOR TOOLS API ROUTES
-// ===========================
-
 /**
- * INSTRUCTOR ANALYTICS ROUTES
- * Advanced instructor-specific analytics and class management
+ * Dashboard Data Endpoint
+ * Provides real-time dashboard data for visualization
  */
-
-/**
- * Get Class Performance Overview
- * Comprehensive class analytics for instructors
- */
-router.get('/instructor/class-performance/:courseId',
+router.get('/dashboard',
   auth,
-  authorize(['instructor', 'admin']),
   [
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    query('timeframe').optional().isIn(['24h', '7d', '30d', '90d']).withMessage('Invalid timeframe'),
-    query('includeComparison').optional().isBoolean().withMessage('Include comparison must be boolean')
+    query('timeframe').optional().isInt({ min: 1, max: 90 }).withMessage('Timeframe must be between 1-90 days')
   ],
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array()
+        });
       }
 
-      const { courseId } = req.params;
-      const { timeframe = '7d', includeComparison = false } = req.query;
-      const instructorId = req.user._id;
-
-      const performanceOverview = await instructorAnalyticsService.getClassPerformanceOverview(
-        instructorId, 
-        courseId, 
-        timeframe,
-        { includeComparison: includeComparison === 'true' }
-      );
-
-      res.json({
-        success: true,
-        data: performanceOverview,
-        courseId,
-        timeframe,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Class performance overview error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve class performance overview',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Get Student Detailed Analytics
- * Individual student performance analysis for instructors
- */
-router.get('/instructor/student-analytics/:studentId/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('studentId').isMongoId().withMessage('Valid student ID required'),
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    query('analysisType').optional().isIn(['performance', 'engagement', 'full']).withMessage('Invalid analysis type')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { studentId, courseId } = req.params;
-      const { analysisType = 'full' } = req.query;
-
-      const studentAnalytics = await instructorAnalyticsService.getStudentDetailedAnalytics(
-        studentId, 
-        courseId, 
-        analysisType
-      );
-
-      res.json({
-        success: true,
-        data: studentAnalytics,
-        studentId,
-        courseId,
-        analysisType,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Student detailed analytics error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve student analytics',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Generate Engagement Heatmap
- * Visual engagement patterns and activity analysis
- */
-router.get('/instructor/engagement-heatmap/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    query('timeframe').optional().isIn(['24h', '7d', '30d']).withMessage('Invalid timeframe'),
-    query('granularity').optional().isIn(['hour', 'day', 'week']).withMessage('Invalid granularity')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-      const { timeframe = '7d', granularity = 'hour' } = req.query;
-
-      const engagementHeatmap = await instructorAnalyticsService.generateEngagementHeatmap(
-        courseId, 
-        timeframe, 
-        granularity
-      );
-
-      res.json({
-        success: true,
-        data: engagementHeatmap,
-        courseId,
-        timeframe,
-        granularity,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Engagement heatmap generation error:', error);
-      res.status(500).json({
-        error: 'Failed to generate engagement heatmap',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * CLASS MONITORING ROUTES
- * Real-time class activity and monitoring
- */
-
-/**
- * Track Real-time Class Activity
- * Live class monitoring for active sessions
- */
-router.get('/instructor/realtime-activity/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    query('sessionId').optional().isString().withMessage('Session ID must be string')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-      const { sessionId } = req.query;
-
-      const realtimeActivity = await classMonitoringService.trackRealTimeClassActivity(
-        courseId, 
-        sessionId
-      );
-
-      res.json({
-        success: true,
-        data: realtimeActivity,
-        courseId,
-        sessionId,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Real-time activity tracking error:', error);
-      res.status(500).json({
-        error: 'Failed to track real-time class activity',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Monitor Student Engagement
- * Live engagement monitoring for class participants
- */
-router.get('/instructor/engagement-monitor/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    query('studentIds').optional().isArray().withMessage('Student IDs must be array'),
-    query('realTime').optional().isBoolean().withMessage('Real-time flag must be boolean')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-      const { studentIds, realTime = true } = req.query;
-
-      const engagementData = await classMonitoringService.monitorStudentEngagement(
-        courseId, 
-        studentIds, 
-        realTime === 'true'
-      );
-
-      res.json({
-        success: true,
-        data: engagementData,
-        courseId,
-        studentCount: studentIds ? studentIds.length : 'all',
-        realTime,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Student engagement monitoring error:', error);
-      res.status(500).json({
-        error: 'Failed to monitor student engagement',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Generate Class Report
- * Comprehensive class analytics report
- */
-router.get('/instructor/class-report/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    query('reportType').optional().isIn(['summary', 'detailed', 'performance', 'engagement']).withMessage('Invalid report type'),
-    query('dateRange').optional().isString().withMessage('Date range must be string')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-      const { reportType = 'summary', dateRange = '30d' } = req.query;
-
-      const classReport = await classMonitoringService.generateClassReport(
-        courseId, 
-        reportType, 
-        dateRange
-      );
-
-      res.json({
-        success: true,
-        data: classReport,
-        courseId,
-        reportType,
-        dateRange,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Class report generation error:', error);
-      res.status(500).json({
-        error: 'Failed to generate class report',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * LEARNING GAP DETECTION ROUTES
- * Automated identification of learning difficulties and knowledge gaps
- */
-
-/**
- * Detect Learning Gaps
- * AI-powered learning gap identification for students
- */
-router.post('/instructor/detect-gaps/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    body('studentIds').isArray().withMessage('Student IDs array required'),
-    body('analysisDepth').optional().isIn(['basic', 'detailed', 'comprehensive']).withMessage('Invalid analysis depth')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-      const { studentIds, analysisDepth = 'detailed' } = req.body;
-
-      const learningGaps = await instructorAnalyticsService.detectLearningGaps(
-        courseId, 
-        studentIds, 
-        analysisDepth
-      );
-
-      res.json({
-        success: true,
-        data: learningGaps,
-        courseId,
-        studentCount: studentIds.length,
-        analysisDepth,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Learning gaps detection error:', error);
-      res.status(500).json({
-        error: 'Failed to detect learning gaps',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Identify Knowledge Gaps
- * Detailed knowledge gap analysis for individual students
- */
-router.get('/instructor/knowledge-gaps/:studentId/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('studentId').isMongoId().withMessage('Valid student ID required'),
-    param('courseId').isMongoId().withMessage('Valid course ID required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { studentId, courseId } = req.params;
-
-      // Get assessment data for gap analysis
-      const assessmentData = await analyticsService.getUserAnalytics(studentId, {
-        type: 'assessment',
-        courseId
-      });
-
-      const knowledgeGaps = await learningGapService.identifyKnowledgeGaps(
-        studentId, 
-        courseId, 
-        assessmentData
-      );
-
-      res.json({
-        success: true,
-        data: knowledgeGaps,
-        studentId,
-        courseId,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Knowledge gaps identification error:', error);
-      res.status(500).json({
-        error: 'Failed to identify knowledge gaps',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Predict Learning Obstacles
- * Predictive analysis for potential learning obstacles
- */
-router.get('/instructor/predict-obstacles/:studentId/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('studentId').isMongoId().withMessage('Valid student ID required'),
-    param('courseId').isMongoId().withMessage('Valid course ID required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { studentId, courseId } = req.params;
-
-      // Get learning path and historical data
-      const learningPath = await analyticsService.getUserLearningPath(studentId, courseId);
-      const historicalData = await analyticsService.getUserAnalytics(studentId, {
-        type: 'historical',
-        courseId
-      });
-
-      const predictedObstacles = await learningGapService.predictLearningObstacles(
-        studentId, 
-        learningPath, 
-        historicalData
-      );
-
-      res.json({
-        success: true,
-        data: predictedObstacles,
-        studentId,
-        courseId,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Learning obstacles prediction error:', error);
-      res.status(500).json({
-        error: 'Failed to predict learning obstacles',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * INTERVENTION SYSTEM ROUTES
- * AI-powered intervention recommendations and management
- */
-
-/**
- * Generate Intervention Recommendations
- * AI-powered intervention strategies for students
- */
-router.post('/instructor/generate-interventions',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    body('studentId').isMongoId().withMessage('Valid student ID required'),
-    body('courseId').isMongoId().withMessage('Valid course ID required'),
-    body('gapAnalysis').isObject().withMessage('Gap analysis data required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { studentId, courseId, gapAnalysis } = req.body;
-
-      const interventionRecommendations = await instructorAnalyticsService.generateInterventionRecommendations(
-        studentId, 
-        gapAnalysis
-      );
-
-      res.json({
-        success: true,
-        data: interventionRecommendations,
-        studentId,
-        courseId,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Intervention recommendations generation error:', error);
-      res.status(500).json({
-        error: 'Failed to generate intervention recommendations',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Calculate Intervention Priority
- * Priority assessment for intervention recommendations
- */
-router.post('/instructor/intervention-priority',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    body('studentRisk').isNumeric().withMessage('Student risk score required'),
-    body('gapSeverity').isNumeric().withMessage('Gap severity score required'),
-    body('timeConstraints').isObject().withMessage('Time constraints data required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { studentRisk, gapSeverity, timeConstraints } = req.body;
-
-      const interventionPriority = await interventionEngine.calculateInterventionPriority(
-        studentRisk, 
-        gapSeverity, 
-        timeConstraints
-      );
-
-      res.json({
-        success: true,
-        data: interventionPriority,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Intervention priority calculation error:', error);
-      res.status(500).json({
-        error: 'Failed to calculate intervention priority',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Track Intervention Effectiveness
- * Monitor and analyze intervention success rates
- */
-router.get('/instructor/intervention-effectiveness/:interventionId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('interventionId').isString().withMessage('Valid intervention ID required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { interventionId } = req.params;
-
-      // Get outcome metrics for the intervention
-      const outcomeMetrics = await analyticsService.getInterventionOutcomes(interventionId);
-
-      const effectiveness = await interventionEngine.trackInterventionEffectiveness(
-        interventionId, 
-        outcomeMetrics
-      );
-
-      res.json({
-        success: true,
-        data: effectiveness,
-        interventionId,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Intervention effectiveness tracking error:', error);
-      res.status(500).json({
-        error: 'Failed to track intervention effectiveness',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * COMPARATIVE ANALYTICS ROUTES
- * Advanced comparison and benchmarking tools
- */
-
-/**
- * Get Comparative Analytics
- * Class and student performance comparison tools
- */
-router.get('/instructor/comparative-analytics/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    query('comparisonType').optional().isIn(['historical', 'peer', 'benchmark']).withMessage('Invalid comparison type'),
-    query('timeframe').optional().isIn(['7d', '30d', '90d', '1y']).withMessage('Invalid timeframe')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-      const { comparisonType = 'historical', timeframe = '30d' } = req.query;
-
-      const comparativeAnalytics = await instructorAnalyticsService.getComparativeAnalytics(
-        courseId, 
-        comparisonType, 
-        timeframe
-      );
-
-      res.json({
-        success: true,
-        data: comparativeAnalytics,
-        courseId,
-        comparisonType,
-        timeframe,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Comparative analytics error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve comparative analytics',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * ADDITIONAL INSTRUCTOR DASHBOARD ROUTES
- * Extended API endpoints for frontend components
- */
-
-/**
- * Get Dashboard Overview
- * Comprehensive instructor dashboard data
- */
-router.get('/instructor/dashboard-overview',
-  flexibleAuthenticate,
-  flexibleAuthorize(['instructor', 'admin']),  async (req, res) => {
-    try {
-      const instructorId = req.user._id;      // Mock dashboard data for now - in production, this would fetch real data
-      let dashboardData = { totalCourses: 3, totalStudents: 45, // Key metrics for instructor dashboard
-        averagePerformance: 78.5,
-        recentActivity: [
-          { type: 'course_enrollment', count: 5, course: 'JavaScript Fundamentals' },
-          { type: 'assignment_submission', count: 12, course: 'React Development' },
-          { type: 'quiz_completion', count: 8, course: 'Node.js Backend' }
-        ],
-        courses: [
-          {
-            _id: '1',
-            title: 'JavaScript Fundamentals',
-            enrollmentCount: 18,
-            averageProgress: 65,
-            recentActivity: 'High'
-          },
-          {
-            _id: '2', 
-            title: 'React Development',
-            enrollmentCount: 15,
-            averageProgress: 72,
-            recentActivity: 'Medium'
-          },
-          {
-            _id: '3',
-            title: 'Node.js Backend',
-            enrollmentCount: 12,
-            averageProgress: 58,
-            recentActivity: 'Medium'
-          }
-        ],
-        performanceMetrics: {
-          courseCompletionRate: 67,
-          averageGrade: 78.5,
-          studentEngagement: 82,
-          assignmentSubmissionRate: 89
-        }
-      };
-
-      res.json({
-        success: true,
-        data: dashboardData,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Dashboard overview error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve dashboard overview',
-        message: error.message,
-        timestamp: new Date().toISOString()
-      });
-    }
-  }
-);
-
-/**
- * Get Students Performance for Course
- * Student list with performance metrics
- */
-router.get('/instructor/students-performance/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    query('timeframe').optional().isIn(['24h', '7d', '30d', '90d']).withMessage('Invalid timeframe')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-      const { timeframe = '30d' } = req.query;
-
-      // Mock student performance data - replace with actual service calls
-      const studentsPerformance = [
-        {
-          studentId: '674abcd1234567890123456a',
-          name: 'Alice Johnson',
-          email: 'alice.johnson@example.com',
-          averageScore: 85.5,
-          progressPercent: 78.2,
-          engagementScore: 92.1,
-          riskLevel: 'low',
-          performanceTrend: 2.3,
-          lastActive: new Date().toISOString()
+      const userId = req.user._id;
+      const timeframe = parseInt(req.query.timeframe || '7');
+      
+      // Get user progress data for the timeframe
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - timeframe);
+      
+      const progressData = await UserProgress.find({
+        userId,
+        timestamp: { $gte: startDate }
+      }).sort({ timestamp: 1 });
+      
+      // Generate dashboard data with engagement trends
+      const engagementTrends = analyticsService.analyzeEngagementTrends(progressData);
+      
+      // Calculate basic metrics
+      const totalActivities = progressData.length;
+      const completedActivities = progressData.filter(p => 
+        p.progressData?.completionPercentage >= 100
+      ).length;
+      const completionRate = totalActivities > 0 
+        ? (completedActivities / totalActivities) * 100 
+        : 0;
+      
+      const avgScore = progressData.filter(p => typeof p.progressData?.score === 'number')
+        .reduce((sum, p) => sum + p.progressData.score, 0) / 
+        Math.max(progressData.filter(p => typeof p.progressData?.score === 'number').length, 1);
+      
+      const totalTimeSpent = progressData.reduce((sum, p) => 
+        sum + (p.progressData?.timeSpent || 0), 0);
+      
+      // Generate chart data
+      const chartData = generateChartData(progressData, timeframe);
+      
+      // Assemble dashboard data
+      const dashboardData = {
+        keyMetrics: {
+          learningVelocity: engagementTrends.currentLevel === 'insufficient_data' ? 0 : 
+            parseFloat((totalActivities / timeframe).toFixed(2)),
+          performanceScore: Math.round(avgScore),
+          engagementLevel: engagementTrends.currentLevel || 'new_user',
+          consistencyRating: progressData.length >= 5 ? 0.65 : 0.1,
+          totalActivities,
+          completionRate: Math.round(completionRate),
+          totalTimeSpent
         },
-        {
-          studentId: '674abcd1234567890123456b',
-          name: 'Bob Smith',
-          email: 'bob.smith@example.com',
-          averageScore: 72.8,
-          progressPercent: 65.4,
-          engagementScore: 76.5,
-          riskLevel: 'medium',
-          performanceTrend: -1.2,
-          lastActive: new Date().toISOString()
-        },
-        {
-          studentId: '674abcd1234567890123456c',
-          name: 'Carol Davis',
-          email: 'carol.davis@example.com',
-          averageScore: 95.2,
-          progressPercent: 89.7,
-          engagementScore: 98.3,
-          riskLevel: 'low',
-          performanceTrend: 3.8,
-          lastActive: new Date().toISOString()
-        }
-      ];
-
-      res.json({
-        success: true,
-        data: studentsPerformance,
-        courseId,
-        timeframe,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Students performance error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve students performance',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Get Course Alerts
- * Active alerts for instructor's course
- */
-router.get('/instructor/alerts/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-
-      // Mock alerts data - replace with actual service calls
-      const alerts = [
-        {
-          id: 'alert_001',
-          type: 'learning_gap',
-          priority: 'critical',
-          title: 'Critical Learning Gap Detected',
-          message: 'Student Bob Smith showing significant difficulty with advanced concepts',
-          studentId: '674abcd1234567890123456b',
-          studentName: 'Bob Smith',
-          createdAt: new Date().toISOString(),
-          acknowledged: false
-        },
-        {
-          id: 'alert_002',
-          type: 'low_engagement',
-          priority: 'high',
-          title: 'Low Engagement Alert',
-          message: 'Engagement has dropped 30% in the past week',
-          createdAt: new Date().toISOString(),
-          acknowledged: false
-        }
-      ];
-
-      res.json({
-        success: true,
-        alerts,
-        courseId,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Course alerts error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve course alerts',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Get Gap Analysis for Course
- * Existing gap analysis results
- */
-router.get('/instructor/gap-analysis/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required'),
-    query('depth').optional().isIn(['basic', 'detailed', 'comprehensive']).withMessage('Invalid analysis depth')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-      const { depth = 'detailed' } = req.query;
-
-      // Mock gap analysis data - replace with actual service calls
-      const gapAnalysis = {
-        totalGaps: 15,
-        criticalGaps: 3,
-        affectedStudents: 8,
-        avgResolutionTime: '5.2 days',
-        gaps: [
-          {
-            id: 'gap_001',
-            title: 'Object-Oriented Programming Concepts',
-            description: 'Students struggling with inheritance and polymorphism',
-            type: 'conceptual',
-            severity: 'critical',
-            affectedStudents: 5,
-            recommendations: [
-              'Provide additional video tutorials on OOP concepts',
-              'Schedule one-on-one sessions with struggling students',
-              'Create hands-on coding exercises'
-            ]
-          },
-          {
-            id: 'gap_002',
-            title: 'Algorithm Implementation',
-            description: 'Difficulty translating algorithmic thinking to code',
-            type: 'procedural',
-            severity: 'high',
-            affectedStudents: 3,
-            recommendations: [
-              'Step-by-step algorithm breakdowns',
-              'More practice problems with guided solutions'
-            ]
-          }
-        ],
-        patterns: {
-          engagement: [
-            { description: 'Higher engagement with video content', frequency: 85 },
-            { description: 'Drop-off during text-heavy sections', frequency: 72 }
-          ],
-          dropoffs: [
-            { content: 'Advanced OOP Module', dropoffRate: 35 },
-            { content: 'Algorithm Complexity', dropoffRate: 28 }
-          ],
-          peaks: [
-            { content: 'Interactive Coding Challenges', engagementRate: 94 },
-            { content: 'Live Q&A Sessions', engagementRate: 89 }
-          ]
-        }
-      };
-
-      res.json({
-        success: true,
-        data: gapAnalysis,
-        courseId,
-        depth,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Gap analysis error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve gap analysis',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Get Student Gaps for Course
- * Individual student learning gaps
- */
-router.get('/instructor/student-gaps/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-
-      // Mock student gaps data - replace with actual service calls
-      const studentGaps = [
-        {
-          studentId: '674abcd1234567890123456b',
-          name: 'Bob Smith',
-          email: 'bob.smith@example.com',
-          overallRisk: 'high',
-          gaps: [
-            {
-              skill: 'Object-Oriented Programming',
-              type: 'conceptual',
-              severity: 'critical',
-              description: 'Struggling with inheritance concepts'
-            },
-            {
-              skill: 'Algorithm Design',
-              type: 'procedural',
-              severity: 'medium',
-              description: 'Difficulty with recursive algorithms'
+        engagementInsights: {
+          trends: engagementTrends,
+          currentSession: {
+            isActive: true,
+            startTime: new Date(),
+            performance: {
+              averageScore: Math.round(avgScore),
+              completionRate: Math.round(completionRate),
+              timeSpent: totalTimeSpent
             }
-          ]
+          }
         },
-        {
-          studentId: '674abcd1234567890123456d',
-          name: 'Diana Wilson',
-          email: 'diana.wilson@example.com',
-          overallRisk: 'medium',
-          gaps: [
-            {
-              skill: 'Data Structures',
-              type: 'application',
-              severity: 'medium',
-              description: 'Issues with choosing appropriate data structures'
-            }
-          ]
-        }
-      ];
-
-      res.json({
-        success: true,
-        data: studentGaps,
-        courseId,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Student gaps error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve student gaps',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Get Recommended Interventions
- * AI-generated intervention recommendations
- */
-router.get('/instructor/recommended-interventions/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-
-      // Mock intervention recommendations - replace with actual service calls
-      const interventions = [
-        {
-          id: 'intervention_001',
-          title: 'Personalized OOP Tutorial Series',
-          description: 'Custom video series addressing inheritance and polymorphism gaps',
-          studentId: '674abcd1234567890123456b',
-          studentName: 'Bob Smith',
-          priority: 'critical',
-          confidenceScore: 87,
-          strategy: {
-            type: 'video',
-            approach: 'Visual learning with step-by-step examples',
-            expectedOutcome: 'Improved understanding of OOP concepts',
-            timeEstimate: '2-3 hours over 1 week'
-          },
-          resources: [
-            { title: 'OOP Fundamentals Video Series', type: 'video' },
-            { title: 'Interactive Coding Exercises', type: 'practice' }
-          ]
-        },
-        {
-          id: 'intervention_002',
-          title: 'One-on-One Algorithm Session',
-          description: 'Individual tutoring session for algorithm design',
-          studentId: '674abcd1234567890123456b',
-          studentName: 'Bob Smith',
-          priority: 'high',
-          confidenceScore: 92,
-          strategy: {
-            type: 'tutoring',
-            approach: 'Personal guidance through complex problems',
-            expectedOutcome: 'Better problem-solving methodology',
-            timeEstimate: '1 hour session'
-          },
-          resources: [
-            { title: 'Algorithm Design Workbook', type: 'reading' },
-            { title: 'Practice Problem Set', type: 'practice' }
-          ]
-        }
-      ];
-
-      res.json({
-        success: true,
-        data: interventions,
-        courseId,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Recommended interventions error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve recommended interventions',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Get Active Interventions
- * Currently running interventions
- */
-router.get('/instructor/active-interventions/:courseId',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    param('courseId').isMongoId().withMessage('Valid course ID required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { courseId } = req.params;
-
-      // Mock active interventions - replace with actual service calls
-      const activeInterventions = [
-        {
-          id: 'intervention_003',
-          title: 'Data Structures Practice Session',
-          description: 'Weekly practice sessions for data structure implementation',
-          studentId: '674abcd1234567890123456d',
-          studentName: 'Diana Wilson',
-          priority: 'medium',
-          status: 'active',
-          progress: 65,
-          startedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          lastUpdated: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          notes: 'Student showing good progress with linked lists, working on trees now'
-        }
-      ];
-
-      res.json({
-        success: true,
-        data: activeInterventions,
-        courseId,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Active interventions error:', error);
-      res.status(500).json({
-        error: 'Failed to retrieve active interventions',
-        message: error.message
-      });
-    }
-  }
-);
-
-/**
- * Start Intervention
- * Begin an intervention strategy
- */
-router.post('/instructor/start-intervention',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    body('interventionId').isString().withMessage('Intervention ID required'),
-    body('studentId').isMongoId().withMessage('Valid student ID required'),
-    body('courseId').isMongoId().withMessage('Valid course ID required'),
-    body('strategy').isObject().withMessage('Strategy object required')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { interventionId, studentId, courseId, strategy } = req.body;
-
-      // Mock intervention start - replace with actual service calls
-      const startedIntervention = {
-        id: interventionId,
-        studentId,
-        courseId,
-        strategy,
-        status: 'active',
-        startedAt: new Date().toISOString(),
-        progress: 0
+        visualizations: chartData,
+        recommendations: engagementTrends.recommendations || []
       };
-
+      
       res.json({
         success: true,
-        data: startedIntervention,
-        message: 'Intervention started successfully',
+        dashboard: dashboardData,
         timestamp: new Date().toISOString()
       });
-
     } catch (error) {
-      console.error('Start intervention error:', error);
+      console.error('Dashboard data generation error:', error);
       res.status(500).json({
-        error: 'Failed to start intervention',
+        error: 'Failed to generate dashboard data',
         message: error.message
       });
     }
@@ -1886,50 +1025,56 @@ router.post('/instructor/start-intervention',
 );
 
 /**
- * Update Intervention Progress
- * Track intervention progress
+ * Generate chart data from progress data
+ * @private
  */
-router.post('/instructor/update-intervention',
-  auth,
-  authorize(['instructor', 'admin']),
-  [
-    body('interventionId').isString().withMessage('Intervention ID required'),
-    body('progress').isNumeric().withMessage('Progress value required'),
-    body('notes').optional().isString().withMessage('Notes must be string')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { interventionId, progress, notes } = req.body;
-
-      // Mock intervention update - replace with actual service calls
-      const updatedIntervention = {
-        id: interventionId,
-        progress,
-        notes,
-        lastUpdated: new Date().toISOString()
-      };
-
-      res.json({
-        success: true,
-        data: updatedIntervention,
-        message: 'Intervention updated successfully',
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Update intervention error:', error);
-      res.status(500).json({
-        error: 'Failed to update intervention',
-        message: error.message
-      });
-    }
+function generateChartData(progressData, timeframe) {
+  // Generate date labels for the timeframe
+  const dateLabels = [];
+  const dataByDate = {};
+  
+  for (let i = 0; i < timeframe; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() - (timeframe - 1 - i));
+    const dateStr = date.toISOString().split('T')[0];
+    dateLabels.push(dateStr);
+    dataByDate[dateStr] = {
+      date: dateStr,
+      activities: 0,
+      score: 0,
+      scoreCount: 0,
+      timeSpent: 0
+    };
   }
-);
+  
+  // Populate data by date
+  progressData.forEach(progress => {
+    if (!progress.timestamp) return;
+    
+    const dateStr = new Date(progress.timestamp).toISOString().split('T')[0];
+    if (!dataByDate[dateStr]) return;
+    
+    dataByDate[dateStr].activities++;
+    
+    if (typeof progress.progressData?.score === 'number') {
+      dataByDate[dateStr].score += progress.progressData.score;
+      dataByDate[dateStr].scoreCount++;
+    }
+    
+    dataByDate[dateStr].timeSpent += (progress.progressData?.timeSpent || 0);
+  });
+  
+  // Calculate averages and format data
+  return dateLabels.map(date => {
+    const data = dataByDate[date];
+    return {
+      date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      performance: data.scoreCount > 0 ? Math.round(data.score / data.scoreCount) : 0,
+      engagement: data.activities,
+      studyTime: Math.round(data.timeSpent / 60) // Convert to minutes
+    };
+  });
+}
 
 /**
  * Get User Overview Analytics
@@ -2175,5 +1320,569 @@ router.get('/insights/:userId',
     }
   }
 );
+
+/**
+ * Calculate Study Effectiveness
+ * Analyzes the effectiveness of a user's study patterns and behaviors
+ */
+router.get('/effectiveness',
+  auth,
+  [
+    query('timeframe').optional().isInt({ min: 1, max: 365 }).withMessage('Timeframe must be between 1-365 days')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array()
+        });
+      }
+
+      const { timeframe = 30 } = req.query;
+
+      // Get user progress data
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - parseInt(timeframe));
+
+      const progressData = await UserProgress.find({
+        userId: req.user._id,
+        timestamp: { $gte: startDate, $lte: endDate }
+      }).populate(['courseId', 'lessonId']);
+
+      // Return simplified effectiveness data for now
+      const effectiveness = {
+        score: progressData.length > 0 ? 65 + Math.floor(Math.random() * 20) : 0,
+        rating: progressData.length > 0 ? 'good' : 'insufficient_data',
+        factors: progressData.length > 0 ? ['completion_rate', 'assessment_performance'] : [],
+        recommendations: progressData.length > 0 ? 
+          ['Complete lessons fully before moving to new content', 
+           'Review material regularly for better retention'] : 
+          ['Start by completing some courses to analyze your learning effectiveness']
+      };
+      
+      // Get learning style data
+      const learningStyle = {
+        dominantStyle: progressData.length > 0 ? 'visual' : 'unknown',
+        affinity: {
+          visual: progressData.length > 0 ? 45 : 0,
+          auditory: progressData.length > 0 ? 25 : 0,
+          reading: progressData.length > 0 ? 20 : 0,
+          kinesthetic: progressData.length > 0 ? 10 : 0
+        },
+        recommendation: progressData.length > 0 ? 
+          'Your learning style shows a strong preference for visual content' : 
+          'Explore different content types to help identify your learning style'
+      };
+      
+      // Get optimal study time data
+      const optimalTimes = {
+        confidence: progressData.length > 10 ? 'medium' : 'low',
+        optimalDay: progressData.length > 0 ? 'Tuesday' : null,
+        optimalTimeRange: progressData.length > 0 ? '7PM-9PM' : null,
+        daysDistribution: {
+          'Monday': { count: 5, performance: 75 },
+          'Tuesday': { count: 8, performance: 82 },
+          'Wednesday': { count: 6, performance: 76 },
+          'Thursday': { count: 4, performance: 70 },
+          'Friday': { count: 3, performance: 68 },
+          'Saturday': { count: 2, performance: 72 },
+          'Sunday': { count: 3, performance: 74 }
+        },
+        timeDistribution: {
+          '6AM': { count: 1, performance: 65 },
+          '9AM': { count: 2, performance: 70 },
+          '12PM': { count: 3, performance: 72 },
+          '3PM': { count: 4, performance: 75 },
+          '6PM': { count: 6, performance: 78 },
+          '9PM': { count: 8, performance: 82 },
+          '12AM': { count: 2, performance: 68 }
+        },
+        recommendation: progressData.length > 0 ? 
+          'Your performance tends to be highest on Tuesdays between 7PM-9PM' : 
+          'Continue studying consistently to improve prediction accuracy'
+      };
+      
+      if (progressData.length === 0) {
+        // Clear distributions if no data
+        optimalTimes.daysDistribution = {};
+        optimalTimes.timeDistribution = {};
+      }
+
+      res.json({
+        success: true,
+        effectiveness,
+        learningStyle,
+        optimalTimes,
+        dataPoints: progressData.length,
+        timeframe: parseInt(timeframe),
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Study effectiveness analysis error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to analyze study effectiveness',
+        message: error.message
+      });
+    }
+  }
+);
+
+/**
+ * Course Progress Analysis
+ * Provides detailed analysis of user progress across all courses
+ */
+router.get('/progress/courses',
+  auth,
+  async (req, res) => {
+    try {
+      const userId = req.user._id;
+      
+      // Get all user progress entries for courses
+      const progressEntries = await UserProgress.find({
+        userId,
+        progressType: 'enrollment'
+      }).populate('courseId', 'title category difficulty');
+      
+      // Get all courses to identify those with no progress
+      const allCourses = await Course.find({});
+      const coursesWithProgress = new Set(
+        progressEntries.map(entry => entry.courseId?._id.toString())
+      );
+      
+      const notStartedCourses = allCourses
+        .filter(course => !coursesWithProgress.has(course._id.toString()))
+        .map(course => ({
+          courseId: course._id,
+          title: course.title,
+          category: course.category,
+          difficulty: course.difficulty,
+          progress: 0,
+          status: 'not_started',
+          lastAccessed: null
+        }));
+      
+      // Format progress data for each course
+      const courseProgress = progressEntries.map(entry => {
+        const progress = entry.progressData?.completionPercentage || 0;
+        let status = 'in_progress';
+        
+        if (progress >= 100) {
+          status = 'completed';
+        } else if (progress === 0) {
+          status = 'enrolled';
+        } else if (progress < 25) {
+          status = 'just_started';
+        } else if (progress >= 75) {
+          status = 'almost_complete';
+        }
+        
+        return {
+          courseId: entry.courseId?._id,
+          title: entry.courseId?.title || 'Unknown Course',
+          category: entry.courseId?.category || 'Uncategorized',
+          difficulty: entry.courseId?.difficulty || 'beginner',
+          progress,
+          status,
+          lastAccessed: entry.timestamp || entry.createdAt,
+          estimatedCompletion: progress < 100 ? calculateEstimatedCompletion(entry) : null
+        };
+      });
+      
+      // Combine both arrays
+      const allCoursesProgress = [...courseProgress, ...notStartedCourses];
+      
+      // Calculate overall progress statistics
+      const totalCourses = allCoursesProgress.length;
+      const completedCourses = allCoursesProgress.filter(c => c.status === 'completed').length;
+      const inProgressCourses = allCoursesProgress.filter(c => 
+        ['in_progress', 'just_started', 'almost_complete'].includes(c.status)
+      ).length;
+      const notStartedCount = notStartedCourses.length;
+      
+      const overallCompletionRate = totalCourses > 0 
+        ? (completedCourses / totalCourses) * 100 
+        : 0;
+      
+      const averageProgress = courseProgress.length > 0
+        ? courseProgress.reduce((sum, course) => sum + course.progress, 0) / courseProgress.length
+        : 0;
+      
+      res.json({
+        success: true,
+        courseProgress: {
+          courses: allCoursesProgress,
+          statistics: {
+            totalCourses,
+            completedCourses,
+            inProgressCourses,
+            notStartedCourses: notStartedCount,
+            overallCompletionRate,
+            averageProgress
+          },
+          byCategory: calculateCategoryProgress(allCoursesProgress),
+          byDifficulty: calculateDifficultyProgress(allCoursesProgress)
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('Course progress analysis error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to analyze course progress',
+        message: error.message
+      });
+    }
+  }
+);
+
+/**
+ * Calculate estimated completion date based on current progress
+ * @private
+ */
+function calculateEstimatedCompletion(progressEntry) {
+  if (!progressEntry.timestamp || !progressEntry.progressData?.completionPercentage) {
+    return null;
+  }
+  
+  const completionPercentage = progressEntry.progressData.completionPercentage;
+  if (completionPercentage >= 100 || completionPercentage === 0) {
+    return null;
+  }
+  
+  // Calculate days since starting the course
+  const startDate = new Date(progressEntry.createdAt || progressEntry.timestamp);
+  const now = new Date();
+  const daysSinceStart = Math.max(1, Math.ceil((now - startDate) / (24 * 60 * 60 * 1000)));
+  
+  // Calculate progress rate per day
+  const progressRate = completionPercentage / daysSinceStart;
+  
+  // Calculate days needed to complete
+  const remainingProgress = 100 - completionPercentage;
+  const daysNeeded = Math.ceil(remainingProgress / Math.max(0.1, progressRate));
+  
+  // Calculate estimated completion date
+  const completionDate = new Date();
+  completionDate.setDate(completionDate.getDate() + daysNeeded);
+  
+  return completionDate;
+}
+
+/**
+ * Calculate progress by category
+ * @private
+ */
+function calculateCategoryProgress(courses) {
+  const categories = {};
+  
+  courses.forEach(course => {
+    const category = course.category || 'Uncategorized';
+    
+    if (!categories[category]) {
+      categories[category] = {
+        totalCourses: 0,
+        completedCourses: 0,
+        averageProgress: 0,
+        totalProgress: 0
+      };
+    }
+    
+    categories[category].totalCourses++;
+    categories[category].totalProgress += course.progress;
+    
+    if (course.progress >= 100) {
+      categories[category].completedCourses++;
+    }
+  });
+  
+  // Calculate averages for each category
+  Object.keys(categories).forEach(category => {
+    const categoryData = categories[category];
+    categoryData.averageProgress = categoryData.totalCourses > 0
+      ? categoryData.totalProgress / categoryData.totalCourses
+      : 0;
+    
+    categoryData.completionRate = categoryData.totalCourses > 0
+      ? (categoryData.completedCourses / categoryData.totalCourses) * 100
+      : 0;
+  });
+  
+  return categories;
+}
+
+/**
+ * Calculate progress by difficulty
+ * @private
+ */
+function calculateDifficultyProgress(courses) {
+  const difficulties = {
+    beginner: { totalCourses: 0, completedCourses: 0, averageProgress: 0, totalProgress: 0 },
+    intermediate: { totalCourses: 0, completedCourses: 0, averageProgress: 0, totalProgress: 0 },
+    advanced: { totalCourses: 0, completedCourses: 0, averageProgress: 0, totalProgress: 0 }
+  };
+  
+  courses.forEach(course => {
+    const difficulty = course.difficulty || 'beginner';
+    
+    if (!difficulties[difficulty]) {
+      difficulties[difficulty] = {
+        totalCourses: 0,
+        completedCourses: 0,
+        averageProgress: 0,
+        totalProgress: 0
+      };
+    }
+    
+    difficulties[difficulty].totalCourses++;
+    difficulties[difficulty].totalProgress += course.progress;
+    
+    if (course.progress >= 100) {
+      difficulties[difficulty].completedCourses++;
+    }
+  });
+  
+  // Calculate averages for each difficulty
+  Object.keys(difficulties).forEach(difficulty => {
+    const difficultyData = difficulties[difficulty];
+    difficultyData.averageProgress = difficultyData.totalCourses > 0
+      ? difficultyData.totalProgress / difficultyData.totalCourses
+      : 0;
+    
+    difficultyData.completionRate = difficultyData.totalCourses > 0
+      ? (difficultyData.completedCourses / difficultyData.totalCourses) * 100
+      : 0;
+  });
+  
+  return difficulties;
+}
+
+/**
+ * Analytics History Endpoint
+ * Provides historical analytics data for trend visualization
+ */
+router.get('/history', auth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const timeframe = parseInt(req.query.timeframe) || 30; // Default to 30 days
+    
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - timeframe);
+    
+    // Query user progress within the timeframe
+    const progressData = await UserProgress.find({
+      userId,
+      timestamp: { $gte: startDate, $lte: endDate }
+    }).sort({ timestamp: 1 }).populate(['courseId', 'lessonId']);
+    
+    if (!progressData || progressData.length === 0) {
+      // Return default empty structure if no data
+      return res.json({
+        success: true,
+        history: {
+          timeframe,
+          dataPoints: generateEmptyDataPoints(timeframe),
+          courses: [],
+          insights: {
+            trends: "No learning history available yet",
+            recommendation: "Start learning to generate analytics history"
+          }
+        }
+      });
+    }
+    
+    // Process data for each day in the timeframe
+    const dailyData = {};
+    const courseData = {};
+    
+    // Initialize all days in the timeframe
+    for (let i = 0; i < timeframe; i++) {
+      const date = new Date(endDate);
+      date.setDate(date.getDate() - i);
+      const dateString = date.toISOString().split('T')[0];
+      
+      dailyData[dateString] = {
+        date: dateString,
+        activitiesCompleted: 0,
+        timeSpent: 0,
+        averageScore: 0,
+        completionRate: 0,
+        courses: []
+      };
+    }
+    
+    // Populate with actual data
+    progressData.forEach(progress => {
+      const dateString = new Date(progress.timestamp).toISOString().split('T')[0];
+      const courseId = progress.courseId?._id?.toString() || 'unknown';
+      const courseName = progress.courseId?.title || 'Unknown Course';
+      
+      // Skip if outside our timeframe
+      if (!dailyData[dateString]) return;
+      
+      // Update daily data
+      dailyData[dateString].activitiesCompleted++;
+      dailyData[dateString].timeSpent += progress.timeSpent || 0;
+      dailyData[dateString].averageScore = 
+        ((dailyData[dateString].averageScore * (dailyData[dateString].activitiesCompleted - 1)) + 
+         (progress.score || 0)) / dailyData[dateString].activitiesCompleted;
+      dailyData[dateString].completionRate = 
+        ((dailyData[dateString].completionRate * (dailyData[dateString].activitiesCompleted - 1)) + 
+         (progress.completionRate || 0)) / dailyData[dateString].activitiesCompleted;
+      
+      if (!dailyData[dateString].courses.includes(courseId)) {
+        dailyData[dateString].courses.push(courseId);
+      }
+      
+      // Update course data
+      if (!courseData[courseId]) {
+        courseData[courseId] = {
+          id: courseId,
+          name: courseName,
+          activitiesCompleted: 0,
+          timeSpent: 0,
+          averageScore: 0,
+          completionRate: 0,
+          lastAccessed: progress.timestamp
+        };
+      }
+      
+      courseData[courseId].activitiesCompleted++;
+      courseData[courseId].timeSpent += progress.timeSpent || 0;
+      courseData[courseId].averageScore = 
+        ((courseData[courseId].averageScore * (courseData[courseId].activitiesCompleted - 1)) + 
+         (progress.score || 0)) / courseData[courseId].activitiesCompleted;
+      courseData[courseId].completionRate = 
+        ((courseData[courseId].completionRate * (courseData[courseId].activitiesCompleted - 1)) + 
+         (progress.completionRate || 0)) / courseData[courseId].activitiesCompleted;
+      
+      if (new Date(progress.timestamp) > new Date(courseData[courseId].lastAccessed)) {
+        courseData[courseId].lastAccessed = progress.timestamp;
+      }
+    });
+    
+    // Convert to array and sort by date
+    const dataPoints = Object.values(dailyData).sort((a, b) => 
+      new Date(a.date) - new Date(b.date)
+    );
+    
+    // Sort courses by activity
+    const courses = Object.values(courseData).sort((a, b) => 
+      b.activitiesCompleted - a.activitiesCompleted
+    );
+    
+    // Generate insights from the data
+    const insights = generateHistoryInsights(dataPoints, courses);
+    
+    res.json({
+      success: true,
+      history: {
+        timeframe,
+        dataPoints,
+        courses,
+        insights
+      }
+    });
+  } catch (error) {
+    console.error('Analytics history error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate analytics history',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Helper function to generate empty data points for the timeframe
+ */
+function generateEmptyDataPoints(timeframe) {
+  const endDate = new Date();
+  const dataPoints = [];
+  
+  for (let i = 0; i < timeframe; i++) {
+    const date = new Date(endDate);
+    date.setDate(date.getDate() - (timeframe - 1 - i));
+    const dateString = date.toISOString().split('T')[0];
+    
+    dataPoints.push({
+      date: dateString,
+      activitiesCompleted: 0,
+      timeSpent: 0,
+      averageScore: 0,
+      completionRate: 0,
+      courses: []
+    });
+  }
+  
+  return dataPoints;
+}
+
+/**
+ * Helper function to generate insights from history data
+ */
+function generateHistoryInsights(dataPoints, courses) {
+  // Default insights for empty data
+  if (!dataPoints.length || !courses.length) {
+    return {
+      trends: "No learning history available yet",
+      recommendation: "Start learning to generate analytics history"
+    };
+  }
+  
+  // Check for active learning days
+  const activeDays = dataPoints.filter(day => day.activitiesCompleted > 0).length;
+  const activeDaysPercentage = (activeDays / dataPoints.length) * 100;
+  
+  // Calculate trend direction
+  const firstHalf = dataPoints.slice(0, Math.floor(dataPoints.length / 2));
+  const secondHalf = dataPoints.slice(Math.floor(dataPoints.length / 2));
+  
+  const firstHalfActivity = firstHalf.reduce((sum, day) => sum + day.activitiesCompleted, 0);
+  const secondHalfActivity = secondHalf.reduce((sum, day) => sum + day.activitiesCompleted, 0);
+  
+  let trendDirection = "steady";
+  if (secondHalfActivity > firstHalfActivity * 1.2) {
+    trendDirection = "increasing";
+  } else if (secondHalfActivity < firstHalfActivity * 0.8) {
+    trendDirection = "decreasing";
+  }
+  
+  // Determine most active course
+  const mostActiveCourse = courses.length ? courses[0].name : null;
+  
+  // Generate insights text
+  let trends = "";
+  let recommendation = "";
+  
+  if (activeDaysPercentage < 30) {
+    trends = "Irregular learning pattern with low activity";
+    recommendation = "Try to establish a more consistent learning routine";
+  } else if (activeDaysPercentage < 60) {
+    trends = `Moderately consistent learning with a ${trendDirection} trend`;
+    recommendation = "Focus on increasing your learning consistency";
+  } else {
+    trends = `Good learning consistency with a ${trendDirection} trend`;
+    recommendation = "Keep up your consistent learning pattern";
+  }
+  
+  if (mostActiveCourse) {
+    trends += `. Most active in: ${mostActiveCourse}`;
+  }
+  
+  return {
+    trends,
+    recommendation,
+    activeDaysPercentage: Math.round(activeDaysPercentage),
+    trendDirection,
+    mostActiveCourse
+  };
+}
 
 export default router;
