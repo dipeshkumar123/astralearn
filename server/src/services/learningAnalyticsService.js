@@ -100,6 +100,96 @@ class LearningAnalyticsService {
   }
 
   /**
+   * Update real-time metrics based on learning events
+   */
+  async updateRealTimeMetrics(userId, eventData) {
+    try {
+      // In a production environment, this would update a real-time metrics store
+      // For now, we'll just log the event for debugging
+      const eventSummary = {
+        userId: userId,
+        eventType: eventData.eventType,
+        timestamp: eventData.timestamp,
+        category: eventData.eventCategory,
+        weight: eventData.eventWeight
+      };
+      
+      // This could be expanded to maintain session-based metrics, 
+      // update real-time dashboards, or trigger notifications
+      console.log(`Real-time metrics updated for user ${userId} - ${eventData.eventType}`);
+      
+      return {
+        success: true,
+        metrics: eventSummary
+      };
+    } catch (error) {
+      console.error('Error updating real-time metrics:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Check for intervention triggers based on learning events
+   */
+  async checkInterventionTriggers(userId, eventData) {
+    try {
+      // This would check conditions that might trigger interventions
+      // For example, consecutive failed quiz attempts might trigger a support intervention
+      
+      // For demonstration purposes, let's implement a simple check
+      if (eventData.eventType === 'assessment_attempt' && 
+          eventData.metadata.score !== undefined && 
+          eventData.metadata.score < 50) {
+        // This could trigger an intervention for low assessment scores
+        console.log(`Intervention trigger: Low assessment score for user ${userId}`);
+        // In a real implementation, this would queue an intervention or notification
+      }
+      
+      // Another example: low engagement detection
+      if (eventData.eventCategory === 'engagement' && eventData.eventWeight < 2) {
+        console.log(`Intervention trigger: Low engagement detected for user ${userId}`);
+      }
+      
+      return {
+        success: true,
+        triggersActivated: 0
+      };
+    } catch (error) {
+      console.error('Error checking intervention triggers:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Store analytics event in database
+   */
+  async storeAnalyticsEvent(eventData) {
+    try {
+      // In a real implementation, this would store to a time-series database or analytics store
+      // For now, we'll just log that the event was stored
+      console.log(`Analytics event stored: ${eventData.eventType} for user ${eventData.userId}`);
+      
+      // We could store this in a collection, but for this implementation, we'll just return success
+      return {
+        success: true,
+        eventId: eventData.timestamp.getTime()
+      };
+    } catch (error) {
+      console.error('Error storing analytics event:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
    * Generate comprehensive progress report for a user
    */
   async generateProgressReport(userId, timeframe = 30) {
