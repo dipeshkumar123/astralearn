@@ -196,7 +196,8 @@ jobs:
       uses: codecov/codecov-action@v3
       with:
         files: ./server/coverage/lcov.info
-        flags: backend        name: backend-coverage
+        flags: backend
+        name: backend-coverage
 
   # Phase 6: AI Validation Testing
   ai-validation:

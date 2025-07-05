@@ -102,7 +102,7 @@ We welcome contributions! To get started:
 - Use descriptive commit messages.
 - Keep PRs focused and small.
 - For major changes, open an issue first to discuss your proposal.
-- See `CONTRIBUTING.md` (if available) for more details.
+- See `CONTRIBUTING.md` for more details.
 
 ---
 

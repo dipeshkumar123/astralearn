@@ -44,10 +44,17 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
    - Address any requested changes.
    - PRs may be squashed and merged for a clean history.
 
+## Kubernetes Secrets Management
+
+- **Never commit raw Kubernetes secrets or sensitive values to the repository.**
+- For production, use tools like [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets), [External Secrets Operator](https://external-secrets.io/), or your cloud provider's secret manager (e.g., AWS Secrets Manager, Azure Key Vault, Google Secret Manager).
+- Add all secret files (e.g., `secrets.yaml`, `.env`, `*.secret.yaml`) to `.gitignore`.
+- If you need to share secrets for development, use encrypted channels or environment variable managers, never plain text in version control.
+
 ## Code of Conduct
 Please be respectful and inclusive. See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) if available.
 
 ## Questions?
-- For help, open a [GitHub Issue](https://github.com/your-org/astralearn/issues) or contact the maintainers listed in the README.
+- For help, open a [GitHub Issue](https://github.com/dipeshkumar123/astralearn/issues) or contact the maintainers listed in the README.
 
 Thank you for helping make AstraLearn better!
