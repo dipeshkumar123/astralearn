@@ -93,7 +93,10 @@ export const DataSyncProvider = ({ children }) => {
 
   // Fetch courses with real data
   const fetchCourses = useCallback(async (refresh = false) => {
-    if (!refresh && courses.length > 0) return courses;
+    if (!refresh && courses && courses.length > 0) {
+      console.log('📚 Using cached courses, count:', courses.length);
+      return courses;
+    }
     
     setDataLoading('courses', true);
     clearDataError('courses');
@@ -109,76 +112,65 @@ export const DataSyncProvider = ({ children }) => {
     } finally {
       setDataLoading('courses', false);
     }
-  }, [apiCall, courses.length]);
+  }, [apiCall]);
 
-  // Fetch user progress with real data
+  // Remove the activeRequests state and related logic
+  // const [activeRequests, setActiveRequests] = useState(new Set());
+
+  // Fetch user progress with simplified logic and better error handling
   const fetchUserProgress = useCallback(async (refresh = false) => {
-    console.log('🔄 fetchUserProgress called, refresh:', refresh, 'existing keys:', Object.keys(userProgress).length);
-    if (!refresh && Object.keys(userProgress).length > 0) return userProgress;
+    console.log('� fetchUserProgress called, refresh:', refresh);
+    
+    // Simple cache check without complex dependencies
+    if (!refresh && userProgress && Object.keys(userProgress).length > 0) {
+      console.log('📋 Using cached user progress, keys:', Object.keys(userProgress).length);
+      return userProgress;
+    }
     
     setDataLoading('progress', true);
     clearDataError('progress');
     
     try {
-      // Fetch enrolled courses first
+      // Simplified API call - just get enrolled courses
       console.log('📚 Fetching enrolled courses...');
       const enrolledData = await apiCall('/courses/my/enrolled');
       const enrolled = enrolledData.enrolledCourses || enrolledData.courses || enrolledData || [];
       console.log('📚 Found enrolled courses:', enrolled.length);
-      console.log('📚 Enrolled data structure:', enrolledData);
       
-      // Ensure enrolled is an array
-      if (!Array.isArray(enrolled)) {
-        console.error('❌ Enrolled courses is not an array:', enrolled);
-        throw new Error('Invalid enrolled courses data format');
-      }
-      
-      // Initialize progress object with course IDs
+      // Initialize progress object
       const progressObj = {};
       
-      // Fetch progress for each enrolled course
-      console.log('📊 Fetching progress for each course...');
-      await Promise.all(enrolled.map(async (enrollmentData) => {
+      // Process enrolled courses with simplified structure
+      for (const enrollmentData of enrolled) {
         try {
-          // Handle different data structures from enrolled courses endpoint
           const course = enrollmentData.course || enrollmentData.courseId || enrollmentData;
           const courseId = course._id || course.id || enrollmentData.courseId;
           
-          if (!courseId) {
-            console.error('❌ No course ID found in enrollment data:', enrollmentData);
-            return;
-          }
+          if (!courseId) continue;
           
-          console.log(`🔍 Fetching progress for course: ${courseId}`);
-          const progressData = await apiCall(`/courses/${courseId}/progress`);
-          
-          if (progressData && progressData.success && progressData.progress) {
-            console.log(`✅ Progress received for ${courseId}:`, progressData);
-            
-            // Extract the actual progress data from the nested structure
-            const actualProgress = progressData.progress.overall || progressData.progress;
-            
-            // Format the progress data for frontend consumption
-            const formattedProgress = {
-              completionPercentage: actualProgress.completionPercentage || 0,
-              timeSpent: actualProgress.timeSpent || 0,
-              completionStatus: actualProgress.completionStatus || 'not-started',
-              totalLessons: progressData.progress.lessons?.length || 0,
-              completedLessons: progressData.progress.lessons?.filter(l => l.completed) || [],
-              lastUpdated: progressData.progress.lastUpdated,
-              // Keep the original nested structure for reference
-              _original: progressData.progress
+          // Use enrollment data directly if available, otherwise fetch progress
+          if (enrollmentData.progressData) {
+            progressObj[courseId] = {
+              completionPercentage: enrollmentData.progressData.completionPercentage || 0,
+              timeSpent: enrollmentData.progressData.timeSpent || 0,
+              completionStatus: enrollmentData.progressData.completionStatus || 'not-started',
+              lastUpdated: enrollmentData.timestamp || enrollmentData.enrolledAt
             };
-            
-            progressObj[courseId] = formattedProgress;
-            console.log(`📊 Formatted progress for ${courseId}:`, formattedProgress);
           } else {
-            console.log(`❌ No progress data for ${courseId}`, progressData);
+            // Fallback to simple progress structure
+            progressObj[courseId] = {
+              completionPercentage: 0,
+              timeSpent: 0,
+              completionStatus: 'enrolled',
+              lastUpdated: new Date().toISOString()
+            };
           }
+          
+          console.log(`📊 Processed progress for ${courseId}`);
         } catch (err) {
-          console.error(`Failed to fetch progress for course:`, err);
+          console.error(`Failed to process course progress:`, err);
         }
-      }));
+      }
       
       console.log('📊 Final progress object:', progressObj);
       setUserProgress(progressObj);
@@ -190,7 +182,7 @@ export const DataSyncProvider = ({ children }) => {
     } finally {
       setDataLoading('progress', false);
     }
-  }, [apiCall, userProgress]);
+  }, [apiCall]); // Removed complex dependencies
 
   // Fetch analytics data
   const fetchAnalytics = useCallback(async (refresh = false) => {
@@ -480,22 +472,30 @@ export const DataSyncProvider = ({ children }) => {
     }
   }, [isAuthenticated, user, fetchCourses, fetchUserProgress, fetchAnalytics]);
 
-  // Real-time data sync interval
+  // Simplified periodic sync - disabled during lesson loading
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const syncInterval = setInterval(() => {
-      // Refresh critical data every 30 seconds
-      if (typeof fetchUserProgress === 'function') {
-        fetchUserProgress(true);
-      }
-      if (typeof fetchAnalytics === 'function') {
-        fetchAnalytics(true);
-      }
-    }, 30000);
+    // Check if currently in a lesson view to prevent conflicts
+    const isInLessonView = window.location.pathname?.includes('lesson') || 
+                          document.querySelector('[data-lesson-active]');
+    
+    if (isInLessonView) {
+      console.log('🚫 Skipping periodic sync - lesson view detected');
+      return;
+    }
 
-    return () => clearInterval(syncInterval);
-  }, [isAuthenticated]); // Remove function dependencies to prevent infinite loop
+    const syncInterval = setInterval(() => {
+      console.log('🔄 Periodic data refresh triggered');
+      // Only refresh essential data
+      fetchCourses(true).catch(err => console.error('Sync fetch courses error:', err));
+    }, 300000); // 5 minutes
+
+    return () => {
+      console.log('🧹 Clearing sync interval');
+      clearInterval(syncInterval);
+    };
+  }, [isAuthenticated, fetchCourses]); // Minimal dependencies
 
   const value = {
     // Data

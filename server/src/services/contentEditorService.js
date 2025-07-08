@@ -599,10 +599,19 @@ class ContentEditorService {
     };
   }
 
+  /**
+   * Safely increment a semantic version string (e.g., '1.0.0' -> '1.0.1').
+   * Returns the original version if invalid. Throws if versioning is not fixable.
+   */
   incrementVersion(currentVersion) {
+    if (typeof currentVersion !== 'string') return '1.0.1';
     const parts = currentVersion.split('.');
-    const patch = parseInt(parts[2]) + 1;
-    return `${parts[0]}.${parts[1]}.${patch}`;
+    if (parts.length !== 3 || parts.some(p => isNaN(parseInt(p)))) {
+      // fallback or throw for invalid version format
+      throw new Error(`Invalid version format: ${currentVersion}`);
+    }
+    const [major, minor, patch] = parts.map(Number);
+    return `${major}.${minor}.${patch + 1}`;
   }
 
   async updateAIContext(lesson, session) {

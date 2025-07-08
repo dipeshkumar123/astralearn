@@ -9,9 +9,9 @@ import DatabaseManager from './config/database.js';
 import apiRoutes from './routes/index.js';
 
 // Import Phase 3 Step 3 services
-import performanceMonitorService from './services/performanceMonitorService.js';
 import redisCacheService from './services/redisCacheService.js';
 import webSocketService from './services/webSocketService.js';
+import performanceMonitorService from './services/performanceMonitorService.js';
 
 // Initialize Express app
 const app = express();
@@ -31,9 +31,6 @@ app.use(cors({
 
 // Compression middleware
 app.use(compression());
-
-// Performance monitoring middleware
-app.use(performanceMonitorService.trackRequest());
 
 // Logging middleware
 if (config.server.environment !== 'test') {
@@ -63,10 +60,10 @@ app.get('/health', async (req, res) => {
     const dbManager = DatabaseManager.getInstance();
     const dbStatus = dbManager.isConnected() ? 'Connected' : 'Disconnected';
     
-    // Get performance health summary
-    const performanceHealth = await performanceMonitorService.getHealthSummary();
+    // Get basic health summary
     const cacheHealth = await redisCacheService.healthCheck();
     const wsHealth = webSocketService.healthCheck();
+    const performanceHealth = await performanceMonitorService.getHealthSummary();
     
     res.json({
       status: 'OK',
@@ -121,17 +118,27 @@ app.use((err, req, res, next) => {
 // Server startup function
 async function startServer() {
   try {
+    // Check if server is already listening
+    if (httpServer.listening) {
+      console.log('⚠️ Server is already running');
+      return httpServer;
+    }
+
     // Initialize database connection
     const dbManager = DatabaseManager.getInstance();
-    await dbManager.connect();    // Initialize WebSocket service
+    await dbManager.connect();
+
+    // Initialize WebSocket service
     webSocketService.initialize(httpServer);
     
-    // Initialize instructor monitoring WebSocket events (Phase 5 Step 2) - Temporarily disabled
-    try {
-      webSocketService.initializeInstructorMonitoring();
-    } catch (error) {
-      console.log('⚠️ Instructor monitoring initialization skipped:', error.message);
-    }
+    // Initialize instructor monitoring WebSocket events (Phase 5 Step 2) - Make it non-blocking
+    setImmediate(() => {
+      try {
+        webSocketService.initializeInstructorMonitoring();
+      } catch (error) {
+        console.log('⚠️ Instructor monitoring initialization skipped:', error.message);
+      }
+    });
 
     // Start server
     const server = httpServer.listen(config.server.port, () => {
@@ -157,13 +164,15 @@ async function startServer() {
       });
     });
 
+    return server;
+
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 }
 
-// Start the server if this file is run directly
-startServer();
+// Server startup is handled by start-server.js
+// To start manually: import { startServer } from './src/index.js'; startServer();
 
 export { app, httpServer, startServer };

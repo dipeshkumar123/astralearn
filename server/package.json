@@ -5,11 +5,17 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon src/index.js",
-    "start": "node src/index.js",
+    "dev": "nodemon start-server.js",
+    "start": "node start-server.js",
+    "start:production": "NODE_ENV=production node start-server.js",
+    "start:debug": "node --inspect start-server.js",
     "test": "vitest",
     "lint": "eslint src --ext .js",
-    "lint:fix": "eslint src --ext .js --fix"
+    "lint:fix": "eslint src --ext .js --fix",
+    "seed": "node simplified-seeder.js",
+    "seed:full": "node complete-seeder.js",
+    "seed:minimal": "node minimal-seeder.js",
+    "health": "node -e \"fetch('http://localhost:5000/health').then(r=>r.json()).then(console.log).catch(console.error)\""
   },
   "dependencies": {
     "@astralearn/client": "file:../client",

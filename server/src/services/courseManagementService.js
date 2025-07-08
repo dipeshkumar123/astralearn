@@ -118,31 +118,34 @@ class CourseManagementService {
       : 'title objectives estimatedDuration difficulty position metadata';
       
     const course = await Course.findById(courseId)
-      .populate('instructor', 'firstName lastName email')
-      .populate({
-        path: 'modules',
-        select: 'title description position objectives estimatedDuration difficulty metadata content',
-        options: { sort: { position: 1 } }
-      });
+      .populate('instructor', 'firstName lastName email');
 
     if (!course) {
       throw new Error('Course not found');
-    }    // Manually populate lessons for each module
-    if (course.modules && course.modules.length > 0) {
-      for (let module of course.modules) {
-        // Try both moduleId and module fields for compatibility
-        const lessons = await Lesson.find({
-          $or: [
-            { moduleId: module._id },
-            { module: module._id }
-          ]
-        })
-          .sort({ position: 1 })
-          .select(populateOptions);
-        
-        module.lessons = lessons;
-      }
     }
+
+    // Manually fetch modules for this course (since modules reference course, not vice versa)
+    const modules = await Module.find({ courseId: courseId })
+      .select('title description position objectives estimatedDuration difficulty metadata content')
+      .sort({ position: 1 });
+
+    // Manually populate lessons for each module
+    for (let module of modules) {
+      // Try both moduleId and module fields for compatibility
+      const lessons = await Lesson.find({
+        $or: [
+          { moduleId: module._id },
+          { module: module._id }
+        ]
+      })
+        .sort({ position: 1 })
+        .select(populateOptions);
+      
+      module.lessons = lessons;
+    }
+    
+    // Assign modules to course
+    course.modules = modules;
 
     // Add calculated fields
     const enrichedCourse = course.toObject();

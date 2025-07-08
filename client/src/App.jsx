@@ -4,13 +4,15 @@ import './App.css'
 import EnhancedAIAssistant from './components/ai/EnhancedAIAssistant'
 import AIToggleButton from './components/ai/AIToggleButton'
 import AIContextProvider from './contexts/AIContextProvider'
-import DataSyncProvider from './contexts/DataSyncProvider'
+import DataSyncProvider, { useDataSync } from './contexts/DataSyncProvider'
 import CourseManagementDashboard from './components/course/CourseManagementDashboard'
 import CoursePreview from './components/course/CoursePreview'
 import ModernCoursePreview from './components/course/ModernCoursePreview'
 import RedesignedCoursePreview from './components/course/RedesignedCoursePreview'
 import ModernLessonPage from './components/course/ModernLessonPage'
 import ModernLessonCompletion from './components/course/ModernLessonCompletion'
+import SimplifiedLessonLoader from './components/course/SimplifiedLessonLoader'
+import LessonErrorBoundary from './components/course/LessonErrorBoundary'
 import CourseLearningEnvironment from './components/course/CourseLearningEnvironment'
 import AdaptiveLearningDashboard from './components/adaptive/AdaptiveLearningDashboard'
 import GamificationDashboard from './components/gamification/GamificationDashboard'
@@ -33,6 +35,19 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
   useEffect(() => {
     checkServerStatus();
   }, []);
+
+  const handleBackToDashboard = useCallback(() => {
+    setCurrentView('dashboard');
+  }, []);
+
+  const handleCoursePreviewBack = useCallback((destination) => {
+    if (destination === 'course-detail') {
+      setCurrentView('course-detail');
+    } else {
+      setCurrentView('dashboard');
+    }
+  }, []);
+
   // Show login modal if not authenticated and not loading
   useEffect(() => {
     if (!loading && !isAuthenticated && !showLogin && !showRegister && !userDismissedAuth) {
@@ -49,12 +64,18 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       setServerStatus('disconnected');
       setServerInfo(null);
     }
-  };  // Load course data when needed for preview/detail views
+  };  // Simplified course data loading with better error handling
   const loadCourseData = useCallback(async (courseId) => {
+    if (!courseId || courseId === 'undefined' || courseId === 'null') {
+      console.error('Invalid course ID provided:', courseId);
+      return null;
+    }
+
     try {
       console.log('Loading course data for:', courseId);
-        // Try course-management endpoint first for full hierarchy
-      let response = await fetch(`/api/course-management/${courseId}/hierarchy?includeContent=true`, {
+      
+      // Try course-management endpoint first
+      const response = await fetch(`/api/course-management/${courseId}/hierarchy?includeContent=true`, {
         headers: {
           'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}`
         }
@@ -62,35 +83,38 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Course hierarchy loaded:', data.course?.title);
-        setSelectedCourse(data.course);
-        return data.course;
+        if (data.success && data.course) {
+          console.log('Course hierarchy loaded:', data.course.title);
+          setSelectedCourse(data.course);
+          return data.course;
+        }
       }
       
       // Fallback to basic courses endpoint
       console.log('Falling back to basic course endpoint');
-      response = await fetch(`/api/courses/${courseId}`, {
+      const fallbackResponse = await fetch(`/api/courses/${courseId}`, {
         headers: {
           'Authorization': `Bearer ${token || localStorage.getItem('token') || ''}`
         }
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        // Handle both response formats
-        const courseData = data.course || data;
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json();
+        const courseData = fallbackData.course || fallbackData;
         console.log('Basic course loaded:', courseData?.title);
         setSelectedCourse(courseData);
         return courseData;
-      } else {
-        console.error('Failed to load course:', response.status);
-        return null;
       }
+      
+      console.error('Failed to load course from both endpoints:', response.status, fallbackResponse.status);
+      return null;
     } catch (error) {
       console.error('Error loading course:', error);
       return null;
     }
-  }, [token]);const renderCurrentView = () => {
+  }, [token]); // Stable dependency
+
+  const renderCurrentView = () => {
     // Show loading while authentication is being checked
     if (loading) {
       return (
@@ -127,13 +151,7 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
         return (
           <ModernCoursePreviewWrapper 
             courseId={selectedCourseId} 
-            onBack={(destination) => {
-              if (destination === 'course-detail') {
-                setCurrentView('course-detail');
-              } else {
-                setCurrentView('dashboard');
-              }
-            }}
+            onBack={handleCoursePreviewBack}
             loadCourseData={loadCourseData}
           />
         );
@@ -145,11 +163,13 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
           return renderCurrentView();
         }
         return (
-          <ModernLessonWrapper 
-            courseId={selectedCourseId} 
-            onBack={() => setCurrentView('dashboard')}
-            loadCourseData={loadCourseData}
-          />
+          <LessonErrorBoundary onBack={handleBackToDashboard}>
+            <ModernLessonWrapper 
+              courseId={selectedCourseId} 
+              onBack={handleBackToDashboard}
+              loadCourseData={loadCourseData}
+            />
+          </LessonErrorBoundary>
         );case 'adaptive-learning':
         // Pass userRole for student, instructor, admin access levels
         return <AdaptiveLearningDashboard userId={user.id} userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;case 'gamification':
@@ -362,45 +382,64 @@ const ModernCoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
   const { user, token } = useAuth();
 
   useEffect(() => {
+    let isCancelled = false;
+
     const loadCourse = async () => {
       const targetCourseId = courseId || localStorage.getItem('selectedCourseId');
       
       if (targetCourseId) {
         setLoading(true);
-        const courseData = await loadCourseData(targetCourseId);
-        setCourse(courseData);
         
-        // Check enrollment status
-        if (user && courseData) {
-          try {
-            const response = await fetch('/api/courses/my/enrolled', {
-              headers: {
-                'Authorization': `Bearer ${token || localStorage.getItem('token')}`
+        try {
+          const courseData = await loadCourseData(targetCourseId);
+          if (isCancelled) return;
+          
+          setCourse(courseData);
+          
+          // Check enrollment status only once per component mount
+          if (user && courseData) {
+            try {
+              const response = await fetch('/api/courses/my/enrolled', {
+                headers: {
+                  'Authorization': `Bearer ${token || localStorage.getItem('token')}`
+                }
+              });
+              if (response.ok && !isCancelled) {
+                const data = await response.json();
+                const enrollment = data.enrolledCourses?.find(
+                  e => e.course?._id === targetCourseId
+                );
+                if (enrollment) {
+                  setIsEnrolled(true);
+                  setUserProgress(enrollment.progressData);
+                } else {
+                  setIsEnrolled(false);
+                  setUserProgress(null);
+                }
               }
-            });
-            if (response.ok) {
-              const data = await response.json();
-              const enrollment = data.enrolledCourses?.find(
-                e => e.course?._id === targetCourseId
-              );
-              if (enrollment) {
-                setIsEnrolled(true);
-                setUserProgress(enrollment.progressData);
-              }
+            } catch (error) {
+              console.error('Error checking enrollment:', error);
             }
-          } catch (error) {
-            console.error('Error checking enrollment:', error);
+          }
+        } catch (error) {
+          console.error('Error loading course:', error);
+        } finally {
+          if (!isCancelled) {
+            setLoading(false);
           }
         }
-        
-        setLoading(false);      } else {
+      } else {
         console.error('No course ID provided for preview');
         onBack();
       }
     };
 
     loadCourse();
-  }, [courseId, user, token]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [courseId, user?.id, token, loadCourseData]); // Include loadCourseData to ensure it reloads when token changes
 
   const handleEnroll = async (courseId) => {
     try {
@@ -476,78 +515,101 @@ const ModernCoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
   );
 };
 
-// Modern Lesson Page Wrapper Component
+// Simplified Modern Lesson Page Wrapper - Fixed for infinite loading
 const ModernLessonWrapper = ({ courseId, onBack, loadCourseData }) => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [userProgress, setUserProgress] = useState({});
   const [currentModule, setCurrentModule] = useState(0);
   const [currentLesson, setCurrentLesson] = useState(0);
+  const [error, setError] = useState(null);
   const { user, token } = useAuth();
+  const { getCourseProgress, updateLessonProgress } = useDataSync();
 
+  // Simple, one-time course loading with timeout protection
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId;
+
     const loadCourse = async () => {
       const targetCourseId = courseId || localStorage.getItem('selectedCourseId');
       
-      if (targetCourseId) {
-        setLoading(true);
-        const courseData = await loadCourseData(targetCourseId);
-        setCourse(courseData);
-        
-        // Load user progress
-        if (user && courseData) {
-          try {
-            const response = await fetch('/api/courses/my/enrolled', {
-              headers: {
-                'Authorization': `Bearer ${token || localStorage.getItem('token')}`
-              }
-            });
-            if (response.ok) {
-              const data = await response.json();
-              const enrollment = data.enrolledCourses?.find(
-                e => e.course?._id === targetCourseId
-              );
-              if (enrollment) {
-                setUserProgress(enrollment.progressData || {});
-              }
-            }
-          } catch (error) {
-            console.error('Error loading progress:', error);
-          }
-        }
-        
-        setLoading(false);      } else {
+      if (!targetCourseId) {
         console.error('No course ID provided for lesson');
         onBack();
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      // Set timeout to prevent hanging
+      timeoutId = setTimeout(() => {
+        if (isMounted) {
+          setError('Course loading timeout - please try again');
+          setLoading(false);
+        }
+      }, 10000);
+
+      try {
+        console.log('📚 Loading course for lessons:', targetCourseId);
+        const courseData = await loadCourseData(targetCourseId);
+        
+        if (!isMounted) return;
+        
+        clearTimeout(timeoutId);
+        
+        if (courseData) {
+          console.log('✅ Course loaded successfully for lessons:', courseData.title);
+          console.log('📚 Course structure:', {
+            title: courseData.title,
+            hasModules: !!courseData.modules,
+            modulesCount: courseData.modules?.length || 0,
+            modules: courseData.modules?.map(m => ({
+              title: m.title,
+              lessonsCount: m.lessons?.length || 0
+            })) || []
+          });
+          setCourse(courseData);
+          
+          // Set marker to indicate lesson view is active
+          document.body.setAttribute('data-lesson-active', 'true');
+        } else {
+          console.error('❌ No course data returned from loadCourseData');
+          setError('Course not found');
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error('Error loading course for lessons:', error);
+          setError('Failed to load course');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     loadCourse();
-  }, [courseId, user, token]);
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+      // Remove lesson view marker
+      document.body.removeAttribute('data-lesson-active');
+    };
+  }, [courseId]); // Only depend on courseId to prevent loops
+
+  // Simplified progress access
+  const courseProgress = course?._id ? getCourseProgress(course._id) : {};
 
   const handleLessonComplete = async (lessonId, moduleIndex, lessonIndex) => {
     try {
-      // Update progress on server
-      const response = await fetch(`/api/courses/${course._id}/progress`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token || localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          lessonId,
+      if (course?._id && updateLessonProgress) {
+        await updateLessonProgress(course._id, lessonId, {
           moduleIndex,
           lessonIndex,
           completed: true
-        })
-      });
-      
-      if (response.ok) {
-        // Update local progress state
-        setUserProgress(prev => ({
-          ...prev,
-          completedLessons: [...(prev.completedLessons || []), lessonId]
-        }));
+        });
       }
     } catch (error) {
       console.error('Error updating progress:', error);
@@ -568,6 +630,28 @@ const ModernLessonWrapper = ({ courseId, onBack, loadCourseData }) => {
     setCurrentModule(moduleIndex);
     setCurrentLesson(lessonIndex);
   };
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 mr-2"
+          >
+            Retry
+          </button>
+          <button 
+            onClick={() => onBack()}
+            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -596,11 +680,11 @@ const ModernLessonWrapper = ({ courseId, onBack, loadCourseData }) => {
     );
   }
   return (
-    <ModernLessonCompletion
+    <SimplifiedLessonLoader
       course={course}
       currentModule={currentModule}
       currentLesson={currentLesson}
-      userProgress={userProgress}
+      userProgress={courseProgress}
       onBack={() => onBack()}
       onLessonComplete={handleLessonComplete}
       onNextLesson={handleNextLesson}
@@ -631,7 +715,7 @@ const CoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
     };
 
     loadCourse();
-  }, [courseId]); // Removed loadCourseData and onBack from dependencies
+  }, [courseId, loadCourseData]); // Include loadCourseData dependency
 
   if (loading) {
     return (
@@ -691,7 +775,7 @@ const CourseDetailWrapper = ({ courseId, onBack, loadCourseData }) => {
     };
 
     loadCourse();
-  }, [courseId]); // Removed loadCourseData and onBack from dependencies
+  }, [courseId, loadCourseData]); // Include loadCourseData dependency
 
   if (loading) {
     return (

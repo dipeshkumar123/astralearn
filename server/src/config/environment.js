@@ -7,7 +7,7 @@ dotenvConfig();
 // Environment validation schema
 const envSchema = z.object({
   // Server Configuration
-  PORT: z.string().default('5001'),
+  PORT: z.string().default('5000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
   // Database Configuration
@@ -53,7 +53,10 @@ const envSchema = z.object({
 // Validate and parse environment variables
 const parseEnv = () => {
   try {
-    return envSchema.parse(process.env);
+    console.log('🔧 Validating environment variables...');
+    const result = envSchema.parse(process.env);
+    console.log('✅ Environment validation passed');
+    return result;
   } catch (error) {
     console.error('❌ Environment validation failed:');
     if (error instanceof z.ZodError) {
@@ -61,7 +64,24 @@ const parseEnv = () => {
         console.error(`  - ${err.path.join('.')}: ${err.message}`);
       });
     }
-    process.exit(1);
+    
+    // In development, try to continue with defaults
+    if (process.env.NODE_ENV === 'development') {
+      console.log('⚠️ Continuing with defaults in development mode...');
+      try {
+        // Try to parse with partial defaults
+        return envSchema.parse({
+          ...process.env,
+          JWT_SECRET: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production-development-fallback',
+          JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key-change-this-in-production-development-fallback'
+        });
+      } catch (fallbackError) {
+        console.error('❌ Even fallback validation failed');
+        process.exit(1);
+      }
+    } else {
+      process.exit(1);
+    }
   }
 };
 

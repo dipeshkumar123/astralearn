@@ -306,6 +306,46 @@ kubectl port-forward -n astralearn-monitoring svc/grafana-service 3000:3000
 # Visit http://localhost:3000
 ```
 
+### 🛠️ Helm & ArgoCD Usage
+
+- **Helm**: This deployment supports Helm for templating and managing releases. Use the provided `values.yaml` and environment-specific values files for customization.
+  - Example: `helm install astralearn . -f values.yaml`
+- **ArgoCD**: (If used) You can deploy and manage AstraLearn using ArgoCD for GitOps workflows. Point ArgoCD to this directory or your forked repository.
+  - Example: Set up an ArgoCD Application with the `k8s/` directory as the source.
+- See the main project README and CI/CD workflow for automation examples.
+
+### ⚠️ Cluster Requirements (Summary)
+- Kubernetes v1.25+ (tested up to v1.29)
+- 3+ worker nodes (production), SSD-backed storage class (e.g., `fast-ssd`)
+- NGINX Ingress Controller, cert-manager, and (optionally) ArgoCD/Helm
+- Sufficient CPU/RAM as detailed above
+
+### 🐛 Helm/ArgoCD Troubleshooting
+
+**Helm Issues**
+```bash
+# Check Helm release status
+helm list -A
+helm status <release-name> -n <namespace>
+
+# Debug failed install/upgrade
+helm install ... --debug --dry-run
+```
+
+**ArgoCD Issues**
+```bash
+# Check ArgoCD application status
+argocd app list
+argocd app get <app-name>
+
+# View sync and health status
+argocd app sync <app-name>
+argocd app health <app-name>
+```
+
+- Ensure all CRDs (cert-manager, ingress, etc.) are installed before deploying with Helm or ArgoCD.
+- For secret management, use Sealed Secrets or External Secrets Operator for production (see CONTRIBUTING.md).
+
 ### 🔄 Maintenance Procedures
 
 #### Regular Maintenance

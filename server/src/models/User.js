@@ -1,6 +1,14 @@
 import mongoose, { Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+/**
+ * User Schema
+ * @module models/User
+ * @description Represents a user with authentication, profile, preferences, and progress fields.
+ * Arrays: refreshTokens, assessmentAnswers, etc. are not capped but should be paginated at the API/service layer if large.
+ * Business logic: All business logic should be implemented in service/model methods, not in the schema definition.
+ * Middleware: Add robust pre/post hooks for validation, password hashing, etc. as needed.
+ */
 const userSchema = new Schema({
   email: {
     type: String,
@@ -108,6 +116,29 @@ const userSchema = new Schema({
     max: 100,
     default: 0,
   },
+  // Add any new fields from the TS model here if missing
+  refreshTokens: [{
+    type: String,
+  }],
+  lastLoginAt: {
+    type: Date,
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  emailVerificationToken: {
+    type: String,
+    select: false,
+  },
+  passwordResetToken: {
+    type: String,
+    select: false,
+  },
+  passwordResetExpires: {
+    type: Date,
+    select: false,
+  },
   refreshTokens: [{
     type: String,
   }],
@@ -132,6 +163,13 @@ const userSchema = new Schema({
   },
 }, {
   timestamps: true,
+  /**
+   * Custom toJSON transform to remove MongoDB internals and sensitive fields from API responses.
+   * - Removes _id, __v, password, refreshTokens, emailVerificationToken, passwordResetToken, passwordResetExpires
+   * - Optionally remove or mask any sensitive fields here
+   * @param {Document} doc
+   * @param {Object} ret
+   */
   toJSON: {
     transform: function(doc, ret) {
       ret.id = ret._id;
@@ -142,6 +180,7 @@ const userSchema = new Schema({
       delete ret.emailVerificationToken;
       delete ret.passwordResetToken;
       delete ret.passwordResetExpires;
+      // Add additional sensitive field removals here if needed
       return ret;
     }
   }
@@ -157,7 +196,6 @@ userSchema.index({ profileCompleteness: -1 });
 // Pre-save middleware to hash password
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
-  
   try {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
@@ -255,7 +293,6 @@ userSchema.statics.findByCredentials = async function(identifier) {
       { username: identifier }
     ]
   }).select('+password');
-  
   return user;
 };
 

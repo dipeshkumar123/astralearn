@@ -13,6 +13,14 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
+/**
+ * Study Group Schema
+ * @module models/SocialLearning
+ * @description Represents a study group for social learning, with members, settings, analytics, etc.
+ * Arrays: members, analytics fields are not capped but should be paginated at the API/service layer if large.
+ * Business logic: All business logic should be implemented in service/model methods, not in the schema definition.
+ * Middleware: Add robust pre/post hooks for validation, notifications, etc. as needed.
+ */
 // Study Group Schema
 const studyGroupSchema = new Schema({
   groupId: {
@@ -116,11 +124,19 @@ const studyGroupSchema = new Schema({
   }
 }, {
   timestamps: true,
+  /**
+   * Custom toJSON transform to remove MongoDB internals and sensitive fields from API responses.
+   * - Removes _id, __v
+   * - Optionally remove or mask any sensitive fields here
+   * @param {Document} doc
+   * @param {Object} ret
+   */
   toJSON: {
     transform: function(doc, ret) {
       ret.id = ret._id;
       delete ret._id;
       delete ret.__v;
+      // Add additional sensitive field removals here if needed
       return ret;
     }
   }

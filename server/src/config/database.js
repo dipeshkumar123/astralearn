@@ -18,6 +18,9 @@ class DatabaseManager {
     try {
       const dbConfig = this.getConfig();
       
+      console.log('🔌 Attempting MongoDB connection...');
+      console.log(`📍 URI: ${dbConfig.uri.replace(/:[^:@]*@/, ':***@')}`); // Hide password
+      
       await mongoose.connect(dbConfig.uri, dbConfig.options);
       this.connection = mongoose.connection;
 
@@ -33,6 +36,22 @@ class DatabaseManager {
       
     } catch (error) {
       console.error('❌ MongoDB connection error:', error);
+      
+      // In development, try alternative connection
+      if (config.server.environment === 'development' && error.message.includes('ECONNREFUSED')) {
+        console.log('🔄 Attempting fallback connection...');
+        try {
+          const fallbackUri = 'mongodb://localhost:27017/astralearn';
+          await mongoose.connect(fallbackUri, this.getConfig().options);
+          this.connection = mongoose.connection;
+          console.log('✅ MongoDB connected via fallback');
+          this.setupEventListeners();
+          return;
+        } catch (fallbackError) {
+          console.error('❌ Fallback connection also failed:', fallbackError);
+        }
+      }
+      
       process.exit(1);
     }
   }

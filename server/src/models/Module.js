@@ -1,12 +1,14 @@
 // filepath: c:\Users\panji\OneDrive\Desktop\Sem 7\Projects\AstraLearn\server\src\models\Module.js
 import mongoose, { Schema } from 'mongoose';
 
+/**
+ * Module Schema
+ */
 const moduleSchema = new Schema({
   title: {
     type: String,
     required: true,
     trim: true,
-    maxlength: 200,
     index: true,
   },
   description: {
@@ -80,6 +82,10 @@ const moduleSchema = new Schema({
       required: true,
     },
   },
+
+  /**
+   * content: Main instructional content for the module.
+   */
   content: {
     introduction: {
       type: String,
@@ -97,6 +103,20 @@ const moduleSchema = new Schema({
       trim: true,
       index: true,
     }],
+    // data: Optional extensible content blocks (e.g., for AI, quizzes, media)
+    data: {
+      type: Schema.Types.Mixed,
+      required: false,
+      default: undefined,
+      /*
+        Example shape:
+        [
+          { type: 'video', url: '...' },
+          { type: 'quiz', questions: [...] },
+          { type: 'ai', generatedSummary: '...' }
+        ]
+      */
+    },
   },
   resources: [{
     type: {
@@ -109,13 +129,14 @@ const moduleSchema = new Schema({
       required: true,
       maxlength: 100,
     },
-    url: String,
-    fileId: String,
     description: {
       type: String,
       maxlength: 300,
     },
   }],
+  /**
+   * aiContext: Stores AI-generated and instructor-curated pedagogical metadata for the module.
+   */
   aiContext: {
     learningGoals: [{
       type: String,
@@ -138,6 +159,9 @@ const moduleSchema = new Schema({
       maxlength: 200,
     }],
   },
+  /**
+   * versionControl: Tracks all changes to the module for audit, rollback, and collaboration.
+   */
   versionControl: {
     version: {
       type: String,
@@ -176,18 +200,22 @@ const moduleSchema = new Schema({
   isActive: {
     type: Boolean,
     default: true,
-    index: true,
-  },
+  }
 }, {
-  timestamps: true,
   toJSON: {
-    transform: function(doc, ret) {
+    /**
+     * Custom transform to remove MongoDB internals and sensitive fields from API responses.
+     * - Removes _id, __v
+     * - Optionally remove or mask any sensitive fields here
+     */
+    transform: function(_, ret) {
       ret.id = ret._id;
       delete ret._id;
       delete ret.__v;
+      // Add additional sensitive field removals here if needed
       return ret;
     }
-  }
+  },
 });
 
 // Compound indexes for performance
