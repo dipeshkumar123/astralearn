@@ -32,7 +32,7 @@ metadata:
 type: Opaque
 data:
   jwt-secret: <base64-encoded-jwt-secret>
-  openai-api-key: <base64-encoded-openai-key>
+  groq-api-key: <base64-encoded-groq-key>
   session-secret: <base64-encoded-session-secret>
 
 ---

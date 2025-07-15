@@ -1,21 +1,21 @@
 /**
  * AI Service - Main orchestration layer for AI functionality
- * Integrates OpenRouter API, prompt templates, and context management
+ * Integrates Groq API, prompt templates, and context management
  */
 
-import openRouterService from './openrouter.js';
+import groqService from './groqService.js';
 import apiKeyManager from './apiKeyManager.js';
 import promptTemplates from './promptTemplates.js';
 
 class AIService {
   constructor() {
-    this.openRouter = openRouterService;
+    this.groq = groqService;
     this.keyManager = apiKeyManager;
     this.prompts = promptTemplates;
     
     // Default configuration
     this.defaultConfig = {
-      model: 'anthropic/claude-3-haiku',
+      model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
       maxTokens: 1000,
       timeout: 30000,
@@ -28,15 +28,15 @@ class AIService {
   async isReady() {
     try {
       const keyValidation = await this.keyManager.validateAllKeys();
-      const openRouterReady = this.openRouter.isConfigured();
+      const groqReady = this.groq.isConfigured();
       
       return {
-        ready: openRouterReady && keyValidation.openrouter?.valid,
+        ready: groqReady && keyValidation.groq?.valid,
         services: {
-          openrouter: {
-            configured: openRouterReady,
-            valid: keyValidation.openrouter?.valid || false,
-            error: keyValidation.openrouter?.error || null,
+          groq: {
+            configured: groqReady,
+            valid: keyValidation.groq?.valid || false,
+            error: keyValidation.groq?.error || null,
           },
           apiKeyManager: {
             ready: true,
@@ -99,8 +99,8 @@ class AIService {
         ...options,
       };
 
-      // Send to OpenRouter
-      const response = await this.openRouter.createChatCompletion(messages, requestOptions);
+      // Send to Groq
+      const response = await this.groq.createChatCompletion(messages, requestOptions);
       
       // Process and return response
       return {
@@ -307,16 +307,16 @@ class AIService {
       const readiness = await this.isReady();
       const keyStatus = await this.keyManager.generateStatusReport();
       
-      let openRouterTest = null;
+      let groqTest = null;
       if (readiness.ready) {
-        openRouterTest = await this.openRouter.testConnection();
+        groqTest = await this.groq.testConnection();
       }
 
       return {
         status: readiness.ready ? 'operational' : 'degraded',
         readiness,
         keyManagement: keyStatus,
-        openRouterTest,
+        groqTest,
         configuration: {
           defaultModel: this.defaultConfig.model,
           defaultTemperature: this.defaultConfig.temperature,

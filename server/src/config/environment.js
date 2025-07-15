@@ -24,9 +24,7 @@ const envSchema = z.object({
   REDIS_ENABLED: z.string().transform(val => val === 'true').default('false'),
 
   // AI Configuration
-  OPENAI_API_KEY: z.string().optional(),
-  OPENROUTER_API_KEY: z.string().optional(),
-  OPENROUTER_BASE_URL: z.string().default('https://openrouter.ai/api/v1'),
+  GROQ_API_KEY: z.string().optional(),
 
   // Email Configuration
   SMTP_HOST: z.string().optional(),
@@ -112,9 +110,7 @@ export const config = {
   },
 
   ai: {
-    openaiApiKey: env.OPENAI_API_KEY,
-    openrouterApiKey: env.OPENROUTER_API_KEY,
-    openrouterBaseUrl: env.OPENROUTER_BASE_URL,
+    groqApiKey: env.GROQ_API_KEY,
   },
 
   email: {

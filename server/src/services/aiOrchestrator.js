@@ -60,11 +60,28 @@ class AIOrchestrator {
     try {
       const { type, userId, content, context = {}, options = {} } = request;
 
-      // Gather comprehensive context
-      const fullContext = await this.contextService.getComprehensiveContext(
+      // Gather comprehensive context from database
+      const databaseContext = await this.contextService.getComprehensiveContext(
         userId, 
         context
       );
+
+      // Merge frontend context with database context, prioritizing frontend data
+      const fullContext = {
+        user: { ...databaseContext.user, ...context.user },
+        course: { ...databaseContext.course, ...context.course },
+        lesson: { ...databaseContext.lesson, ...context.lesson },
+        progress: { ...databaseContext.progress, ...context.progress },
+        analytics: { ...databaseContext.analytics, ...context.analytics },
+        metadata: {
+          ...databaseContext.metadata,
+          frontendContextProvided: Object.keys(context).length > 0,
+          contextSources: {
+            database: Object.keys(databaseContext).filter(k => k !== 'metadata'),
+            frontend: Object.keys(context)
+          }
+        }
+      };
 
       // Determine optimal AI configuration based on user profile
       const aiConfig = this.determineOptimalConfig(fullContext, type);

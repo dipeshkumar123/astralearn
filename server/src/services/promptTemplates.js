@@ -353,6 +353,7 @@ LEARNING PATTERNS:
       template: `COURSE CONTEXT:
 - Title: {course_title}
 - Category: {course_category}
+- Description: {course_description}
 - Difficulty Level: {difficulty_level}
 - Duration: {estimated_duration}
 - Instructor: {instructor_name}
@@ -374,7 +375,8 @@ PREREQUISITES:
       
       variables: [
         'course_title',
-        'course_category',
+        'course_category', 
+        'course_description',
         'difficulty_level',
         'estimated_duration',
         'instructor_name',
@@ -399,11 +401,12 @@ PREREQUISITES:
 - Title: {lesson_title}
 - Module: {module_title}
 - Position: Lesson {lesson_number} of {total_lessons}
-- Duration: {estimated_duration}
+- Duration: {estimated_time}
 - Type: {lesson_type}
+- Difficulty: {difficulty_level}
 
 LESSON OBJECTIVES:
-{lesson_objectives}
+{learning_objectives}
 
 KEY CONCEPTS:
 {key_concepts}
@@ -418,22 +421,27 @@ NEXT LESSON:
 {next_lesson_title}
 
 HANDS-ON ACTIVITIES:
-{activities}`,
+{activities}
+
+PREREQUISITES:
+{prerequisites}`,
       
       variables: [
         'lesson_title',
         'module_title',
         'lesson_number',
         'total_lessons',
-        'estimated_duration',
+        'estimated_time',
         'lesson_type',
-        'lesson_objectives',
+        'difficulty_level',
+        'learning_objectives',
         'key_concepts',
         'lesson_resources',
         'previous_lesson_title',
         'previous_lesson_status',
         'next_lesson_title',
-        'activities'
+        'activities',
+        'prerequisites'
       ]
     };
   }
@@ -524,16 +532,48 @@ ENGAGEMENT PATTERNS:
     
     // Build user context
     const userContext = this.buildPrompt('context', 'user', user);
-    const courseContext = this.buildPrompt('context', 'course', course);
-    const lessonContext = this.buildPrompt('context', 'lesson', lesson);
+    
+    // Build course context with proper mapping
+    const courseData = {
+      course_title: course.course_title || course.title || '[Course title not specified]',
+      course_category: course.course_category || course.category || '[Category not specified]',
+      course_description: course.course_description || course.description || '[Description not specified]',
+      difficulty_level: course.difficulty_level || course.difficulty || '[Difficulty not specified]',
+      estimated_duration: course.estimated_duration || course.duration || '[Duration not specified]',
+      instructor_name: course.instructor_name || course.instructor || '[Instructor not specified]',
+      total_modules: course.total_modules || '[Total modules not specified]',
+      current_module: course.current_module || '[Current module not specified]',
+      module_title: course.module_title || '[Module title not specified]',
+      completed_modules: course.completed_modules || '[Completed modules not specified]',
+      remaining_modules: course.remaining_modules || '[Remaining modules not specified]',
+      course_objectives: course.course_objectives || course.objectives || '[Objectives not specified]',
+      key_concepts: course.key_concepts || course.concepts || '[Key concepts not specified]',
+      prerequisites: course.prerequisites || '[Prerequisites not specified]'
+    };
+    const courseContext = this.buildPrompt('context', 'course', courseData);
+
+    // Build lesson context with proper mapping
+    const lessonData = {
+      lesson_title: lesson.lesson_title || lesson.title || '[Lesson title not specified]',
+      lesson_number: lesson.lesson_number || lesson.number || '[Lesson number not specified]',
+      module_title: lesson.module_title || lesson.module || '[Module not specified]',
+      learning_objectives: lesson.learning_objectives || lesson.objectives || '[Objectives not specified]',
+      key_concepts: lesson.key_concepts || lesson.concepts || '[Key concepts not specified]',
+      estimated_time: lesson.estimated_time || lesson.duration || '[Time not specified]',
+      difficulty_level: lesson.difficulty_level || lesson.difficulty || '[Difficulty not specified]',
+      lesson_type: lesson.lesson_type || lesson.type || '[Type not specified]',
+      prerequisites: lesson.prerequisites || '[Prerequisites not specified]'
+    };
+    const lessonContext = this.buildPrompt('context', 'lesson', lessonData);
+    
     const progressContext = this.buildPrompt('context', 'progress', progress);
 
     // Build interaction-specific prompt
     const interactionPrompt = this.buildPrompt('user', interactionType, {
       user_question: userMessage,
       ...user,
-      ...course,
-      ...lesson,
+      ...courseData,
+      ...lessonData,
       ...progress
     });
 
@@ -910,24 +950,24 @@ Make the feedback constructive, specific, and motivating while being honest abou
   }
 
   /**
-   * Enhanced prompt building for orchestration
+   * Interpolate variables into a template string
    */
-  buildOrchestratedPrompt(type, category, data = {}) {
-    const template = this.templates.orchestration?.[type]?.[category];
+  interpolateTemplate(template, data = {}) {
+    if (!template) return '';
     
-    if (!template) {
-      // Fallback to regular prompt building
-      return this.buildPrompt(type, category, data);
+    let result = template;
+    
+    // Replace variables in the format {variable_name}
+    for (const [key, value] of Object.entries(data)) {
+      const placeholder = `{${key}}`;
+      const replacementValue = value !== null && value !== undefined ? String(value) : '[Not specified]';
+      result = result.replace(new RegExp(placeholder, 'g'), replacementValue);
     }
-
-    return this.interpolateTemplate(template.template, data);
-  }
-
-  /**
-   * Get orchestration-specific templates
-   */
-  getOrchestrationTemplates() {
-    return this.templates.orchestration || {};
+    
+    // Clean up any remaining unreplaced placeholders
+    result = result.replace(/\{[^}]+\}/g, '[Not specified]');
+    
+    return result;
   }
 
   /**

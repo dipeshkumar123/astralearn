@@ -8,17 +8,11 @@ import { config } from '../config/environment.js';
 class ApiKeyManager {
   constructor() {
     this.supportedProviders = {
-      openrouter: {
-        name: 'OpenRouter',
-        keyPattern: /^sk-or-v1-[a-f0-9]{64}$/,
-        testEndpoint: '/auth/key',
-        required: true,
-      },
-      openai: {
-        name: 'OpenAI',
-        keyPattern: /^sk-[a-zA-Z0-9]{48}$/,
+      groq: {
+        name: 'Groq',
+        keyPattern: /^gsk_[a-zA-Z0-9]{52}$/,
         testEndpoint: '/models',
-        required: false,
+        required: true,
       },
     };
   }
@@ -70,20 +64,12 @@ class ApiKeyManager {
   getApiKeysStatus() {
     const status = {};
     
-    // Check OpenRouter
-    const openrouterKey = config.ai.openrouterApiKey;
-    status.openrouter = {
-      ...this.validateKeyFormat('openrouter', openrouterKey),
-      configured: Boolean(openrouterKey),
-      environment: 'OPENROUTER_API_KEY',
-    };
-
-    // Check OpenAI
-    const openaiKey = config.ai.openaiApiKey;
-    status.openai = {
-      ...this.validateKeyFormat('openai', openaiKey),
-      configured: Boolean(openaiKey),
-      environment: 'OPENAI_API_KEY',
+    // Check Groq
+    const groqKey = config.ai.groqApiKey;
+    status.groq = {
+      ...this.validateKeyFormat('groq', groqKey),
+      configured: Boolean(groqKey),
+      environment: 'GROQ_API_KEY',
     };
 
     return status;
@@ -114,16 +100,8 @@ class ApiKeyManager {
       let headers;
 
       switch (provider) {
-        case 'openrouter':
-          baseUrl = config.ai.openrouterBaseUrl || 'https://openrouter.ai/api/v1';
-          headers = {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          };
-          break;
-          
-        case 'openai':
-          baseUrl = 'https://api.openai.com/v1';
+        case 'groq':
+          baseUrl = 'https://api.groq.com/openai/v1';
           headers = {
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
@@ -178,9 +156,7 @@ class ApiKeyManager {
 
     for (const [provider, keyStatus] of Object.entries(status)) {
       if (keyStatus.configured) {
-        const apiKey = provider === 'openrouter' 
-          ? config.ai.openrouterApiKey 
-          : config.ai.openaiApiKey;
+        const apiKey = config.ai.groqApiKey;
           
         results[provider] = await this.testApiKey(provider, apiKey);
       } else {
@@ -188,7 +164,7 @@ class ApiKeyManager {
           valid: false,
           configured: false,
           error: `${keyStatus.provider} API key not configured`,
-          required: this.supportedProviders[provider].required,
+          required: this.supportedProviders[provider]?.required || false,
         };
       }
     }

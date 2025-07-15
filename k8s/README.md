@@ -216,7 +216,7 @@ kubectl port-forward -n astralearn-monitoring svc/prometheus-service 9090:9090
 
 #### Secrets Management
 - Database credentials
-- API keys (OpenAI, etc.)
+- API keys (Groq, etc.)
 - SSL certificates
 - Session secrets
 

@@ -312,9 +312,9 @@ ssl:
 
 # External services configuration
 externalServices:
-  openai:
+  groq:
     apiKey: ""
-    endpoint: "https://api.openai.com/v1"
+    endpoint: "https://api.groq.com/openai/v1"
   
   smtp:
     host: ""
