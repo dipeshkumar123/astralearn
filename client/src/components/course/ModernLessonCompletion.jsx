@@ -57,6 +57,7 @@ import {
   Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useDataSync } from '../../contexts/DataSyncProvider';
 
 const ModernLessonCompletion = ({ 
   course, 
@@ -105,6 +106,9 @@ const ModernLessonCompletion = ({
   const playerRef = useRef(null);
   const notesRef = useRef(null);
   const contentRef = useRef(null);
+  
+  // Use DataSync for progress updates
+  const { updateLessonProgress } = useDataSync();
 
   // Get current lesson and module data
   const getCurrentModule = () => course?.modules?.[currentModule];

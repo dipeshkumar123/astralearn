@@ -45,14 +45,12 @@ const userProgressSchema = new Schema({
     index: true,
   },
   courseId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Course',
+    type: Schema.Types.Mixed, // Allow both ObjectId and String
     required: true,
     index: true,
   },
   lessonId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Lesson',
+    type: Schema.Types.Mixed, // Allow both ObjectId and String
     index: true,
   },
   progressType: {

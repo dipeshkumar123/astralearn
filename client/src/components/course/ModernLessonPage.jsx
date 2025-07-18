@@ -36,6 +36,8 @@ import {
   EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
+import { useAIAssistantStore } from '../../stores/aiAssistantStore';
 
 const ModernLessonPage = ({ 
   course, 
@@ -63,6 +65,9 @@ const ModernLessonPage = ({
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [bookmarks, setBookmarks] = useState([]);
 
+  // AI Assistant store
+  const { updateContext, toggleAssistant } = useAIAssistantStore();
+
   // Get current lesson and module data
   const getCurrentModule = () => course?.modules?.[currentModule];
   const getCurrentLesson = () => getCurrentModule()?.lessons?.[currentLesson];
@@ -88,6 +93,28 @@ const ModernLessonPage = ({
       setAiSuggestions(suggestions.slice(0, 2));
     }
   }, [lesson]);
+
+  // Update AI context when lesson changes
+  useEffect(() => {
+    if (lesson && course && updateContext) {
+      const contextData = {
+        courseId: course._id,
+        courseName: course.title,
+        moduleId: module._id,
+        moduleName: module.title,
+        lessonId: lesson._id,
+        lessonTitle: lesson.title,
+        lessonContent: lesson.content,
+        currentProgress: lessonProgress,
+        completedLessons: Array.from(completedLessons),
+        userRole: 'student',
+        learningObjectives: lesson.objectives || [],
+        difficulty: lesson.difficulty || 'beginner'
+      };
+      
+      updateContext(contextData);
+    }
+  }, [lesson, course, module, lessonProgress, completedLessons, updateContext]);
 
   const isLessonCompleted = useCallback((moduleIdx, lessonIdx) => {
     const lessonId = course?.modules?.[moduleIdx]?.lessons?.[lessonIdx]?._id;
@@ -226,7 +253,12 @@ const ModernLessonPage = ({
               </button>
               
               <button
-                onClick={() => setShowAIAssistant(!showAIAssistant)}
+                onClick={() => {
+                  setShowAIAssistant(!showAIAssistant);
+                  if (!showAIAssistant) {
+                    toggleAssistant();
+                  }
+                }}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <Brain className="w-4 h-4" />
@@ -534,88 +566,8 @@ const ModernLessonPage = ({
           </div>
         </div>
 
-        {/* AI Assistant Sidebar */}
-        <AnimatePresence>
-          {showAIAssistant && (
-            <motion.div
-              initial={{ x: 320, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 320, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="w-80 bg-white border-l shadow-sm flex-shrink-0 overflow-y-auto"
-            >
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                    <Brain className="w-5 h-5 mr-2 text-blue-600" />
-                    AI Assistant
-                  </h2>
-                  <button
-                    onClick={() => setShowAIAssistant(false)}
-                    className="p-1 text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {/* AI Suggestions */}
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                    <h3 className="font-medium text-blue-900 mb-3">Smart Suggestions</h3>
-                    <div className="space-y-2">
-                      {aiSuggestions.map((suggestion, index) => (
-                        <div key={index} className="text-sm text-blue-800 p-2 bg-white rounded border">
-                          {suggestion}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Quick Help */}
-                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-100">
-                    <h3 className="font-medium text-yellow-900 mb-3 flex items-center">
-                      <HelpCircle className="w-4 h-4 mr-2" />
-                      Need Help?
-                    </h3>
-                    <div className="space-y-2">
-                      <button className="w-full text-left text-sm text-yellow-800 p-2 bg-white rounded border hover:bg-yellow-50 transition-colors">
-                        🤔 I don't understand this concept
-                      </button>
-                      <button className="w-full text-left text-sm text-yellow-800 p-2 bg-white rounded border hover:bg-yellow-50 transition-colors">
-                        💡 Can you explain this differently?
-                      </button>
-                      <button className="w-full text-left text-sm text-yellow-800 p-2 bg-white rounded border hover:bg-yellow-50 transition-colors">
-                        📚 Show me related resources
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Progress Insights */}
-                  <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                    <h3 className="font-medium text-green-900 mb-3 flex items-center">
-                      <TrendingUp className="w-4 h-4 mr-2" />
-                      Your Progress
-                    </h3>
-                    <div className="text-sm text-green-800 space-y-2">
-                      <div className="flex justify-between">
-                        <span>Course Progress:</span>
-                        <span className="font-medium">{calculateCourseProgress()}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Lessons Completed:</span>
-                        <span className="font-medium">{completedLessons.size}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Current Module:</span>
-                        <span className="font-medium">{currentModule + 1} of {course.modules.length}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Enhanced AI Assistant */}
+        {showAIAssistant && <EnhancedAIAssistant />}
 
         {/* Notes Panel */}
         <AnimatePresence>

@@ -148,21 +148,61 @@ export const DataSyncProvider = ({ children }) => {
           
           if (!courseId) continue;
           
-          // Use enrollment data directly if available, otherwise fetch progress
-          if (enrollmentData.progressData) {
+          // Fetch detailed progress for each course
+          try {
+            console.log(`📊 Fetching detailed progress for course ${courseId}`);
+            const progressResponse = await apiCall(`/courses/${courseId}/progress`);
+            
+            if (progressResponse.success && progressResponse.progress) {
+              const { overall, lessons } = progressResponse.progress;
+              
+              // Count total lessons from course structure
+              let totalLessons = 0;
+              if (course.modules && Array.isArray(course.modules)) {
+                totalLessons = course.modules.reduce((total, module) => {
+                  return total + (module.lessons ? module.lessons.length : 0);
+                }, 0);
+              }
+              
+              // Extract completed lessons from progress data
+              const completedLessons = lessons ? lessons
+                .filter(lesson => lesson.progressType === 'lesson_complete' && lesson.progressData?.completed)
+                .map(lesson => lesson.lessonId) : [];
+              
+              progressObj[courseId] = {
+                completionPercentage: overall?.completionPercentage || Math.round((completedLessons.length / Math.max(totalLessons, 1)) * 100),
+                timeSpent: overall?.timeSpent || 0,
+                completionStatus: overall?.completionStatus || 'not-started',
+                lastUpdated: progressResponse.progress.lastUpdated || new Date().toISOString(),
+                totalLessons,
+                completedLessons,
+                lessons: lessons || []
+              };
+              
+              console.log(`✅ Detailed progress loaded for ${courseId}: ${completedLessons.length}/${totalLessons} lessons`);
+            } else {
+              // Fallback to basic progress structure
+              progressObj[courseId] = {
+                completionPercentage: 0,
+                timeSpent: 0,
+                completionStatus: 'enrolled',
+                lastUpdated: new Date().toISOString(),
+                totalLessons: 0,
+                completedLessons: [],
+                lessons: []
+              };
+            }
+          } catch (progressError) {
+            console.warn(`⚠️ Failed to fetch progress for course ${courseId}:`, progressError);
+            // Use enrollment data as fallback
             progressObj[courseId] = {
-              completionPercentage: enrollmentData.progressData.completionPercentage || 0,
-              timeSpent: enrollmentData.progressData.timeSpent || 0,
-              completionStatus: enrollmentData.progressData.completionStatus || 'not-started',
-              lastUpdated: enrollmentData.timestamp || enrollmentData.enrolledAt
-            };
-          } else {
-            // Fallback to simple progress structure
-            progressObj[courseId] = {
-              completionPercentage: 0,
-              timeSpent: 0,
-              completionStatus: 'enrolled',
-              lastUpdated: new Date().toISOString()
+              completionPercentage: enrollmentData.progressData?.completionPercentage || 0,
+              timeSpent: enrollmentData.progressData?.timeSpent || 0,
+              completionStatus: enrollmentData.progressData?.completionStatus || 'enrolled',
+              lastUpdated: enrollmentData.timestamp || enrollmentData.enrolledAt || new Date().toISOString(),
+              totalLessons: 0,
+              completedLessons: [],
+              lessons: []
             };
           }
           
@@ -241,29 +281,50 @@ export const DataSyncProvider = ({ children }) => {
   // Update lesson progress in real-time
   const updateLessonProgress = useCallback(async (courseId, lessonId, progressData) => {
     try {
-      const data = await apiCall(`/courses/${courseId}/lessons/${lessonId}/progress`, {
+      const data = await apiCall(`/courses/${courseId}/lessons/${lessonId}/complete`, {
         method: 'POST',
         body: JSON.stringify(progressData)
       });
 
       // Update local state immediately for real-time UI updates
-      setUserProgress(prev => ({
-        ...prev,
-        [courseId]: {
-          ...prev[courseId],
-          lessons: {
-            ...prev[courseId]?.lessons,
-            [lessonId]: progressData
+      setUserProgress(prev => {
+        const existingProgress = prev[courseId] || {};
+        const existingCompletedLessons = existingProgress.completedLessons || [];
+        
+        // Add lesson to completed lessons if not already there
+        const updatedCompletedLessons = existingCompletedLessons.includes(lessonId) 
+          ? existingCompletedLessons 
+          : [...existingCompletedLessons, lessonId];
+
+        return {
+          ...prev,
+          [courseId]: {
+            ...existingProgress,
+            lessons: {
+              ...existingProgress.lessons,
+              [lessonId]: progressData
+            },
+            completedLessons: updatedCompletedLessons,
+            // Update completion percentage based on completed lessons
+            completionPercentage: existingProgress.totalLessons 
+              ? Math.round((updatedCompletedLessons.length / existingProgress.totalLessons) * 100)
+              : 0,
+            lastUpdated: new Date().toISOString()
           }
-        }
-      }));
+        };
+      });
+
+      // Refresh course progress from server to ensure consistency
+      setTimeout(() => {
+        fetchUserProgress(true);
+      }, 1000);
 
       return data;
     } catch (error) {
       console.error('Failed to update lesson progress:', error);
       throw error;
     }
-  }, [apiCall]);
+  }, [apiCall, fetchUserProgress]);
 
   // Complete a lesson with real-time updates
   const completeLesson = useCallback(async (courseId, lessonId, completionData) => {

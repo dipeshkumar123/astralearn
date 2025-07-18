@@ -1588,6 +1588,93 @@ class AnalyticsService {
       };
     }
   }
+
+  // Missing cache management methods
+  getFromCache(key) {
+    const cached = this.analyticsCache.get(key);
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached.data;
+    }
+    return null;
+  }
+
+  setCache(key, data, timeout = null) {
+    this.analyticsCache.set(key, {
+      data,
+      timestamp: Date.now(),
+      timeout: timeout || this.cacheTimeout
+    });
+  }
+
+  // Missing calculation methods
+  calculateCompletionRate(progressData) {
+    if (!progressData || !Array.isArray(progressData) || progressData.length === 0) {
+      return 0;
+    }
+    
+    const completedActivities = progressData.filter(p => 
+      p.progressType === 'lesson_complete' || 
+      p.progressData?.completed === true ||
+      p.progressData?.status === 'completed'
+    ).length;
+    
+    return Math.round((completedActivities / progressData.length) * 100);
+  }
+
+  calculateAverageScore(progressData) {
+    if (!progressData || !Array.isArray(progressData) || progressData.length === 0) {
+      return 0;
+    }
+    
+    const scoresData = progressData.filter(p => 
+      p.progressData?.score !== undefined && 
+      typeof p.progressData.score === 'number'
+    );
+    
+    if (scoresData.length === 0) return 0;
+    
+    const totalScore = scoresData.reduce((sum, p) => sum + p.progressData.score, 0);
+    return Math.round((totalScore / scoresData.length) * 100) / 100;
+  }
+
+  calculateTotalTimeSpent(progressData) {
+    if (!progressData || !Array.isArray(progressData) || progressData.length === 0) {
+      return 0;
+    }
+    
+    const timeData = progressData.filter(p => 
+      p.progressData?.timeSpent !== undefined && 
+      typeof p.progressData.timeSpent === 'number'
+    );
+    
+    const totalTime = timeData.reduce((sum, p) => sum + p.progressData.timeSpent, 0);
+    return Math.round(totalTime / 1000); // Convert to seconds
+  }
+
+  calculateConsistencyScore(progressData) {
+    if (!progressData || !Array.isArray(progressData) || progressData.length < 2) {
+      return 0;
+    }
+    
+    // Calculate consistency based on regular activity
+    const dates = progressData.map(p => new Date(p.timestamp || p.createdAt).getTime());
+    dates.sort((a, b) => a - b);
+    
+    const intervals = [];
+    for (let i = 1; i < dates.length; i++) {
+      intervals.push(dates[i] - dates[i-1]);
+    }
+    
+    if (intervals.length === 0) return 0;
+    
+    const avgInterval = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
+    const variance = intervals.reduce((sum, interval) => sum + Math.pow(interval - avgInterval, 2), 0) / intervals.length;
+    const standardDeviation = Math.sqrt(variance);
+    
+    // Consistency is higher when standard deviation is lower
+    const consistency = Math.max(0, 1 - (standardDeviation / avgInterval));
+    return Math.round(consistency * 100) / 100;
+  }
 }
 
 // Create an instance and export it

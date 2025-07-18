@@ -23,6 +23,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useDataSync } from '../../contexts/DataSyncProvider';
 
 const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
   const [currentModule, setCurrentModule] = useState(0);
@@ -37,14 +38,60 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [currentAIHelp, setCurrentAIHelp] = useState(null);
 
+  // Use DataSync for progress updates
+  const { updateLessonProgress } = useDataSync();
+
   useEffect(() => {
-    // Initialize progress based on userProgress
-    if (userProgress && userProgress.progressData) {
-      const completed = new Set(userProgress.progressData.completedLessons || []);
-      setCompletedLessons(completed);
-      setLessonProgress(userProgress.progressData.lessonProgress || {});
-    }
-  }, [userProgress]);
+    // Fetch detailed course progress on component mount
+    const fetchCourseProgress = async () => {
+      if (!course?._id) return;
+      
+      try {
+        const response = await fetch(`http://localhost:5000/api/courses/${course._id}/progress`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (response.ok) {
+          const progressData = await response.json();
+          console.log('📊 Fetched course progress:', progressData);
+          
+          // Extract completed lessons from lesson progress records
+          const completed = new Set();
+          const lessonProgressMap = {};
+          
+          if (progressData.progress?.lessons) {
+            progressData.progress.lessons.forEach(lessonRecord => {
+              if (lessonRecord.progressType === 'lesson_complete' && 
+                  lessonRecord.progressData?.completed) {
+                completed.add(lessonRecord.lessonId);
+                lessonProgressMap[lessonRecord.lessonId] = {
+                  completed: true,
+                  completedAt: lessonRecord.progressData.completedAt,
+                  timeSpent: lessonRecord.progressData.timeSpent || 300
+                };
+              }
+            });
+          }
+          
+          console.log('📋 Completed lessons:', completed);
+          setCompletedLessons(completed);
+          setLessonProgress(lessonProgressMap);
+        }
+      } catch (error) {
+        console.error('Error fetching course progress:', error);
+        // Fallback to userProgress if detailed fetch fails
+        if (userProgress && userProgress.progressData) {
+          const completed = new Set(userProgress.progressData.completedLessons || []);
+          setCompletedLessons(completed);
+          setLessonProgress(userProgress.progressData.lessonProgress || {});
+        }
+      }
+    };
+
+    fetchCourseProgress();
+  }, [course?._id, userProgress]);
 
   // Load AI suggestions based on current lesson
   useEffect(() => {
@@ -121,37 +168,54 @@ const CourseLearningEnvironment = ({ course, userProgress, onBack }) => {
     if (!lesson) return;
 
     const lessonId = lesson._id || `${currentModule}-${currentLesson}`;
+    
+    // Update lesson progress locally first
     const newCompleted = new Set([...completedLessons, lessonId]);
     setCompletedLessons(newCompleted);
 
-    // Update lesson progress
     const newProgress = {
       ...lessonProgress,
       [lessonId]: {
         completed: true,
         completedAt: new Date().toISOString(),
-        timeSpent: lessonProgress[lessonId]?.timeSpent || 0
+        timeSpent: lessonProgress[lessonId]?.timeSpent || 300
       }
     };
     setLessonProgress(newProgress);
 
-    // TODO: Send progress update to backend
+    // Use DataSyncProvider to update progress in backend
     try {
-      await fetch(`/api/courses/${course._id}/progress`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
+      if (updateLessonProgress && course?._id) {
+        console.log('🎯 Marking lesson complete:', { 
+          courseId: course._id, 
           lessonId,
-          completed: true,
           moduleIndex: currentModule,
-          lessonIndex: currentLesson
-        })
-      });
+          lessonIndex: currentLesson 
+        });
+        
+        const result = await updateLessonProgress(course._id, lessonId, {
+          moduleIndex: currentModule,
+          lessonIndex: currentLesson,
+          completed: true,
+          timeSpent: lessonProgress[lessonId]?.timeSpent || 300
+        });
+        
+        console.log('✅ Lesson completion result:', result);
+      }
     } catch (error) {
-      console.error('Failed to update progress:', error);
+      console.error('❌ Failed to update progress:', error);
+      // Revert local state on error
+      setCompletedLessons(prevCompleted => {
+        const newSet = new Set(prevCompleted);
+        newSet.delete(lessonId);
+        return newSet;
+      });
+      
+      setLessonProgress(prev => {
+        const newProg = { ...prev };
+        delete newProg[lessonId];
+        return newProg;
+      });
     }
   };
 

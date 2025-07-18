@@ -508,14 +508,36 @@ export const useAIAssistantStore = create(
           'Content-Type': 'application/json'
         } : {};
         
+        // Get user role to determine which endpoints to call
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        
         const promises = [
           fetch(`/api/users/${currentContext.userId}/progress`, { headers: authHeaders }),
-          fetch(`/api/analytics/insights/${currentContext.userId}`, { headers: authHeaders }),
-          fetch(`/api/ai/recommendations/${currentContext.userId}`, { headers: authHeaders })
+          fetch(`/api/ai/orchestrated/recommendations`, { 
+            method: 'POST',
+            headers: { 
+              ...authHeaders,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              context: currentContext,
+              type: 'general'
+            })
+          })
         ];
         
+        // Only fetch analytics insights if user is admin or instructor
+        if (user?.role === 'admin' || user?.role === 'instructor') {
+          promises.push(
+            fetch(`/api/analytics/insights/${currentContext.userId}`, { headers: authHeaders })
+          );
+        } else {
+          promises.push(Promise.resolve({ ok: true, json: () => Promise.resolve(null) }));
+        }
+        
         const responses = await Promise.all(promises);
-        const [progress, insights, recommendations] = await Promise.all(
+        const [progress, recommendations, insights] = await Promise.all(
           responses.map(r => r.ok ? r.json() : null)
         );
         

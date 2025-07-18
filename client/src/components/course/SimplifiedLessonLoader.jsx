@@ -19,12 +19,53 @@ const SimplifiedLessonLoader = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [completedLessons, setCompletedLessons] = useState(new Set());
+  const [isMarkingComplete, setIsMarkingComplete] = useState(false);
 
   // Get current lesson and module data safely with defaults
   const modules = course?.modules || [];
   const module = modules[currentModule];
   const lessons = module?.lessons || [];
   const lesson = lessons[currentLesson];
+
+  // Fetch detailed course progress on component mount
+  useEffect(() => {
+    const fetchCourseProgress = async () => {
+      if (!course?._id) return;
+      
+      try {
+        const response = await fetch(`http://localhost:5000/api/courses/${course._id}/progress`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (response.ok) {
+          const progressData = await response.json();
+          console.log('📊 Fetched course progress for SimplifiedLessonLoader:', progressData);
+          
+          // Extract completed lessons from lesson progress records
+          const completed = new Set();
+          
+          if (progressData.progress?.lessons) {
+            progressData.progress.lessons.forEach(lessonRecord => {
+              if (lessonRecord.progressType === 'lesson_complete' && 
+                  lessonRecord.progressData?.completed) {
+                completed.add(lessonRecord.lessonId);
+              }
+            });
+          }
+          
+          console.log('📋 Completed lessons for SimplifiedLessonLoader:', completed);
+          setCompletedLessons(completed);
+        }
+      } catch (error) {
+        console.error('Error fetching course progress in SimplifiedLessonLoader:', error);
+      }
+    };
+
+    fetchCourseProgress();
+  }, [course?._id]);
 
   // Safe content extraction function
   const getSafeContent = useCallback((lessonData) => {
@@ -129,12 +170,76 @@ const SimplifiedLessonLoader = ({
     };
   }, [course, module, lesson, modules.length, lessons.length, currentModule, currentLesson]); // Direct dependencies
 
-  const handleLessonComplete = useCallback(() => {
-    if (lesson && onLessonComplete) {
-      const lessonId = lesson._id || lesson.id || `${currentModule}-${currentLesson}`;
-      onLessonComplete(lessonId, currentModule, currentLesson);
+  const handleLessonComplete = useCallback(async () => {
+    if (!lesson || !course) return;
+    
+    const lessonId = lesson._id || lesson.id || `${currentModule}-${currentLesson}`;
+    setIsMarkingComplete(true);
+    
+    try {
+      console.log('🎯 SimplifiedLessonLoader marking lesson complete:', { 
+        lessonId, 
+        courseId: course._id,
+        moduleIndex: currentModule,
+        lessonIndex: currentLesson 
+      });
+      
+      // Try parent handler first if available
+      if (onLessonComplete) {
+        try {
+          await onLessonComplete(lessonId, currentModule, currentLesson);
+          console.log('✅ Parent handler completed lesson successfully');
+        } catch (parentError) {
+          console.warn('⚠️ Parent handler failed, using direct API call:', parentError);
+          // Fall back to direct API call
+          await directLessonComplete(course._id, lessonId);
+        }
+      } else {
+        // No parent handler, use direct API call
+        await directLessonComplete(course._id, lessonId);
+      }
+      
+      // Update local state immediately for UI feedback
+      setCompletedLessons(prev => new Set([...prev, lessonId]));
+      
+      console.log('✅ SimplifiedLessonLoader lesson marked complete');
+    } catch (error) {
+      console.error('❌ SimplifiedLessonLoader lesson completion failed:', error);
+      // You could show an error toast here
+    } finally {
+      setIsMarkingComplete(false);
     }
-  }, [lesson, currentModule, currentLesson, onLessonComplete]);
+  }, [lesson, course, currentModule, currentLesson, onLessonComplete]);
+
+  // Direct API call for lesson completion with proper authentication
+  const directLessonComplete = useCallback(async (courseId, lessonId) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`http://localhost:5000/api/courses/${courseId}/lessons/${lessonId}/complete`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        moduleIndex: currentModule,
+        lessonIndex: currentLesson,
+        completed: true
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Lesson completion failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('📡 Direct API lesson completion result:', result);
+    return result;
+  }, [currentModule, currentLesson]);
 
   const handleNext = useCallback(() => {
     if (!modules.length) return;
@@ -159,6 +264,38 @@ const SimplifiedLessonLoader = ({
       }
     }
   }, [currentModule, currentLesson, modules, onPreviousLesson]);
+
+  // Calculate course progress
+  const calculateCourseProgress = useCallback(() => {
+    if (!course?.modules) return 0;
+    
+    let totalLessons = 0;
+    let completedCount = 0;
+
+    course.modules.forEach(module => {
+      if (module.lessons) {
+        totalLessons += module.lessons.length;
+        module.lessons.forEach(lesson => {
+          const lessonId = lesson._id || lesson.id;
+          if (lessonId && completedLessons.has(lessonId)) {
+            completedCount++;
+          }
+        });
+      }
+    });
+
+    return totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+  }, [course, completedLessons]);
+
+  // Check if current lesson is completed
+  const isCurrentLessonCompleted = useCallback(() => {
+    if (!lesson) return false;
+    const lessonId = lesson._id || lesson.id || `${currentModule}-${currentLesson}`;
+    return completedLessons.has(lessonId);
+  }, [lesson, currentModule, currentLesson, completedLessons]);
+
+  const courseProgress = calculateCourseProgress();
+  const currentLessonCompleted = isCurrentLessonCompleted();
 
   if (loading) {
     return (
@@ -312,6 +449,25 @@ const SimplifiedLessonLoader = ({
                 </p>
               </div>
             </div>
+            
+            {/* Course Progress Display */}
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-600">
+                Course Progress: {courseProgress}%
+              </div>
+              <div className="w-32 bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${courseProgress}%` }}
+                />
+              </div>
+              {currentLessonCompleted && (
+                <div className="flex items-center space-x-1 text-green-600">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-sm">Completed</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -400,10 +556,22 @@ const SimplifiedLessonLoader = ({
 
             <button
               onClick={handleLessonComplete}
-              className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              disabled={isMarkingComplete}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition-colors ${
+                currentLessonCompleted 
+                  ? 'bg-green-600 text-white' 
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              } ${isMarkingComplete ? 'opacity-75 cursor-not-allowed' : ''}`}
             >
               <CheckCircle className="w-4 h-4" />
-              <span>Mark Complete</span>
+              <span>
+                {isMarkingComplete 
+                  ? 'Marking Complete...' 
+                  : currentLessonCompleted 
+                    ? 'Completed ✓' 
+                    : 'Mark Complete'
+                }
+              </span>
             </button>
 
             <button

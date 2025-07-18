@@ -22,6 +22,7 @@ import {
   X
 } from 'lucide-react';
 import { useAIAssistantStore } from '../../stores/aiAssistantStore';
+import { useDataSync } from '../../contexts/DataSyncProvider';
 
 import EnhancedAIAssistant from '../ai/EnhancedAIAssistant';
 const CoursePreview = ({ 
@@ -44,6 +45,9 @@ const CoursePreview = ({
 
   // AI Assistant context integration
   const { updateContext } = useAIAssistantStore();
+  
+  // Use DataSync for progress updates
+  const { updateLessonProgress } = useDataSync();
 
   useEffect(() => {
     if (course && course.modules?.length > 0) {
@@ -171,17 +175,22 @@ const CoursePreview = ({
   };
 
   const markLessonComplete = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/courses/${course._id}/lessons/${lesson._id}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+    const lesson = getCurrentLesson();
+    if (!lesson) return;
 
-      if (response.ok) {
-        const updatedProgress = await response.json();
+    try {
+      // Use DataSyncProvider to update progress
+      if (updateLessonProgress && course?._id) {
+        const progressData = {
+          moduleIndex: currentModule,
+          lessonIndex: currentLesson,
+          completed: true,
+          timeSpent: 300 // Default time spent for preview
+        };
+
+        const updatedProgress = await updateLessonProgress(course._id, lesson._id, progressData);
+        
+        // Update local progress state
         const newProgress = { ...progress };
         if (!newProgress[currentModule]) newProgress[currentModule] = {};
         
@@ -192,8 +201,6 @@ const CoursePreview = ({
         };
         
         setProgress(newProgress);
-      } else {
-        console.error('Failed to mark lesson as complete');
       }
     } catch (error) {
       console.error('Error marking lesson complete:', error);

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { Course, User, UserProgress } from '../models/index.js';
 import { auth, authorize } from '../middleware/auth.js';
 import { flexibleAuthenticate, flexibleAuthorize } from '../middleware/devAuth.js';
+import { awardLessonPoints } from '../middleware/gamificationMiddleware.js';
 
 const router = Router();
 
@@ -399,7 +400,7 @@ router.get('/:id/progress', flexibleAuthenticate, async (req, res) => {
 
     // Get lesson-level progress
     const lessonProgress = progressRecords.filter(p => 
-      p.progressType === 'lesson' && p.lessonId
+      (p.progressType === 'lesson_complete' || p.progressType === 'lesson_start') && p.lessonId
     );
 
     // Structure the response
@@ -429,7 +430,7 @@ router.get('/:id/progress', flexibleAuthenticate, async (req, res) => {
 });
 
 // Mark lesson as complete
-router.post('/:id/lessons/:lessonId/complete', flexibleAuthenticate, async (req, res) => {
+router.post('/:id/lessons/:lessonId/complete', flexibleAuthenticate, async (req, res, next) => {
   try {
     const { id: courseId, lessonId } = req.params;
     const userId = req.user._id;
@@ -439,17 +440,17 @@ router.post('/:id/lessons/:lessonId/complete', flexibleAuthenticate, async (req,
     let userProgress = await UserProgress.findOne({
       userId,
       courseId,
-      progressType: 'lesson',
-      'progressData.lessonId': lessonId
+      lessonId,
+      progressType: 'lesson_complete'
     });
 
     if (!userProgress) {
       userProgress = new UserProgress({
         userId,
         courseId,
-        progressType: 'lesson',
+        lessonId,
+        progressType: 'lesson_complete',
         progressData: {
-          lessonId,
           moduleIndex: moduleIndex || 0,
           lessonIndex: lessonIndex || 0,
           completed: true,
@@ -461,21 +462,33 @@ router.post('/:id/lessons/:lessonId/complete', flexibleAuthenticate, async (req,
       userProgress.progressData.completed = true;
       userProgress.progressData.timeSpent = (userProgress.progressData.timeSpent || 0) + (timeSpent || 300);
       userProgress.progressData.completedAt = new Date();
-      userProgress.lastUpdated = new Date();
+      userProgress.timestamp = new Date();
     }
 
     await userProgress.save();
+
+    // Set up gamification data for middleware
+    res.locals.activityCompleted = true;
+    res.locals.activityData = {
+      lessonId,
+      lessonTitle: req.body.lessonTitle || 'Lesson',
+      timeSpent: timeSpent || 300,
+      score: null
+    };
 
     res.json({
       success: true,
       timeSpent: userProgress.progressData.timeSpent,
       completedAt: userProgress.progressData.completedAt
     });
+
+    // Call next to trigger gamification middleware
+    next();
   } catch (error) {
     console.error('Mark lesson complete error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-});
+}, awardLessonPoints);
 
 // Submit quiz answers
 router.post('/:id/lessons/:lessonId/quiz', flexibleAuthenticate, async (req, res) => {

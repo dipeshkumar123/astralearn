@@ -553,39 +553,6 @@ router.post('/orchestrated/chat',
 );
 
 // Personalized Learning Recommendations
-router.get('/orchestrated/recommendations', 
-  flexibleAuthenticate,
-  async (req, res) => {
-    try {
-      const { courseId, lessonId } = req.query;
-
-      const orchestratedResponse = await aiOrchestrator.orchestrateRequest({
-        type: 'recommendation',
-        userId: req.user._id,
-        content: 'Generate personalized learning recommendations',
-        context: { courseId, lessonId },
-        options: {},
-      });
-
-      res.json({
-        success: orchestratedResponse.success,
-        recommendations: orchestratedResponse.response?.reply,
-        personalizedFor: orchestratedResponse.metadata?.learningStyleAdapted,
-        configUsed: orchestratedResponse.metadata?.configUsed,
-        contextQuality: orchestratedResponse.metadata?.contextQuality,
-        timestamp: new Date().toISOString(),
-      });
-
-    } catch (error) {
-      console.error('AI Recommendations error:', error);
-      res.status(500).json({
-        error: 'Internal server error',
-        message: 'Recommendation service temporarily unavailable',
-      });
-    }
-  }
-);
-
 // Adaptive Study Plan Generation
 router.post('/orchestrated/study-plan', 
   flexibleAuthenticate,
@@ -898,5 +865,91 @@ router.post('/contextual-help',
     }
   }
 );
+
+// Recommendations route with AI orchestrator integration - WORKING VERSION
+router.post('/orchestrated/recommendations', flexibleAuthenticate, async (req, res) => {
+  try {
+    console.log('🔄 AI Recommendations endpoint hit');
+    console.log('📨 Request body:', req.body);
+    console.log('👤 User:', req.user?._id);
+    
+    const { context = {}, type = 'general' } = req.body;
+
+    // Use the same approach as working chat endpoint
+    const databaseContext = await aiContextService.getComprehensiveContext(
+      req.user._id, 
+      context
+    );
+
+    // Merge with provided context (provided context takes precedence)
+    const enhancedContext = {
+      ...databaseContext,
+      user: {
+        ...databaseContext.user,
+        ...context.user,
+        userId: req.user._id,
+        timestamp: new Date().toISOString(),
+      },
+      course: {
+        ...databaseContext.course,
+        ...context.course,
+      },
+      lesson: {
+        ...databaseContext.lesson,
+        ...context.lesson,
+      },
+      progress: {
+        ...databaseContext.progress,
+        ...context.progress,
+      },
+      analytics: {
+        ...databaseContext.analytics,
+        ...context.analytics,
+      },
+    };
+
+    console.log('📊 Enhanced context prepared');
+
+    // Generate recommendations using AI service directly (like chat does)
+    const recommendationPrompt = `Based on the user's learning context, generate personalized learning recommendations.
+    
+User Learning Style: ${enhancedContext.user?.learning_style || 'visual'}
+Current Course: ${enhancedContext.course?.title || 'General Learning'}
+Progress Level: ${enhancedContext.progress?.overall_progress || 0}%
+
+Please provide:
+1. Next learning topics to focus on
+2. Study methods that match their learning style
+3. Recommended resources
+4. Practice exercises
+
+Format your response as helpful, actionable recommendations.`;
+
+    const aiResponse = await aiService.processContextAwareChat(
+      recommendationPrompt, 
+      enhancedContext
+    );
+
+    console.log('✅ AI Response received:', {
+      success: aiResponse.success,
+      hasReply: !!aiResponse.reply
+    });
+
+    res.json({
+      success: aiResponse.success,
+      recommendations: aiResponse.reply || 'Unable to generate recommendations at this time.',
+      personalizedFor: enhancedContext.user?.learning_style,
+      contextQuality: 'enhanced',
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error) {
+    console.error('AI Recommendations error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Recommendation service temporarily unavailable',
+    });
+  }
+});
 
 export default router;
