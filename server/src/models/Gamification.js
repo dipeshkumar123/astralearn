@@ -85,8 +85,7 @@ const userGamificationSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   totalPoints: {
     type: Number,
@@ -359,7 +358,6 @@ const achievementSchema = new Schema({
 });
 
 // Create indexes for performance
-userGamificationSchema.index({ userId: 1 });
 userGamificationSchema.index({ totalPoints: -1 });
 userGamificationSchema.index({ level: -1 });
 

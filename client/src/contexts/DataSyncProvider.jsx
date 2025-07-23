@@ -166,7 +166,7 @@ export const DataSyncProvider = ({ children }) => {
               
               // Extract completed lessons from progress data
               const completedLessons = lessons ? lessons
-                .filter(lesson => lesson.progressType === 'lesson_complete' && lesson.progressData?.completed)
+                .filter(lesson => lesson.progressType === 'lesson_complete')
                 .map(lesson => lesson.lessonId) : [];
               
               progressObj[courseId] = {
@@ -290,11 +290,15 @@ export const DataSyncProvider = ({ children }) => {
       setUserProgress(prev => {
         const existingProgress = prev[courseId] || {};
         const existingCompletedLessons = existingProgress.completedLessons || [];
-        
+
         // Add lesson to completed lessons if not already there
-        const updatedCompletedLessons = existingCompletedLessons.includes(lessonId) 
-          ? existingCompletedLessons 
+        const updatedCompletedLessons = existingCompletedLessons.includes(lessonId)
+          ? existingCompletedLessons
           : [...existingCompletedLessons, lessonId];
+
+        // Calculate new completion percentage
+        const totalLessons = existingProgress.totalLessons || 10; // Default fallback
+        const newCompletionPercentage = Math.round((updatedCompletedLessons.length / totalLessons) * 100);
 
         return {
           ...prev,
@@ -305,10 +309,8 @@ export const DataSyncProvider = ({ children }) => {
               [lessonId]: progressData
             },
             completedLessons: updatedCompletedLessons,
-            // Update completion percentage based on completed lessons
-            completionPercentage: existingProgress.totalLessons 
-              ? Math.round((updatedCompletedLessons.length / existingProgress.totalLessons) * 100)
-              : 0,
+            completionPercentage: newCompletionPercentage,
+            overallProgress: newCompletionPercentage,
             lastUpdated: new Date().toISOString()
           }
         };
@@ -407,6 +409,8 @@ export const DataSyncProvider = ({ children }) => {
     if (!courseId) return { completed: 0, total: 0, percentage: 0 };
     
     const progress = userProgress[courseId];
+    console.log(`📊 getCourseProgress for ${courseId}:`, progress);
+    
     if (!progress) return { completed: 0, total: 0, percentage: 0 };
 
     // Handle different progress data formats
@@ -417,42 +421,68 @@ export const DataSyncProvider = ({ children }) => {
       completed = progress.completedModules.length;
     } else if (progress.completedLessons && Array.isArray(progress.completedLessons)) {
       completed = progress.completedLessons.length;
+    } else if (progress.lessons && Array.isArray(progress.lessons)) {
+      // Handle lessons object format
+      completed = progress.lessons.filter(l => l.completed).length;
     }
     
     if (typeof progress.completionPercentage === 'number') {
-      return { 
+      const result = { 
         completed, 
         total: progress.totalLessons || 0, 
         percentage: progress.completionPercentage 
       };
+      console.log(`📈 Course progress result:`, result);
+      return result;
     }
     
     total = progress.totalLessons || 0;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    return { completed, total, percentage };
+    const result = { completed, total, percentage };
+    console.log(`📈 Course progress result:`, result);
+    return result;
   }, [userProgress]);
 
   // Get real learning statistics
   const getLearningStats = useCallback(() => {
+    console.log('📊 Getting learning stats from userProgress:', userProgress);
+
     const stats = {
       totalCoursesEnrolled: Object.keys(userProgress).length,
       totalLessonsCompleted: Object.values(userProgress).reduce(
-        (sum, progress) => sum + (progress.completedLessons?.length || 0), 0
+        (sum, progress) => {
+          // Handle different data structure formats
+          const completed = progress.completedLessons?.length || 
+                           progress.lessons?.filter(l => l.completed)?.length || 
+                           0;
+          return sum + completed;
+        }, 0
       ),
       totalTimeSpent: Object.values(userProgress).reduce(
-        (sum, progress) => sum + (progress.totalTimeSpent || 0), 0
+        (sum, progress) => {
+          const timeSpent = progress.timeSpent || 
+                           progress.totalTimeSpent || 
+                           0;
+          return sum + timeSpent;
+        }, 0
       ),
-      averageProgress: Object.keys(userProgress).length > 0 
+      averageProgress: Object.keys(userProgress).length > 0
         ? Object.values(userProgress).reduce(
-            (sum, progress) => sum + (progress.overallProgress || 0), 0
+            (sum, progress) => {
+              const progressPercent = progress.completionPercentage ||
+                                    progress.overallProgress ||
+                                    0;
+              return sum + progressPercent;
+            }, 0
           ) / Object.keys(userProgress).length
         : 0,
       currentStreak: Math.max(
-        ...Object.values(userProgress).map(p => p.currentStreak || 0), 0
+        ...Object.values(userProgress).map(p => p.currentStreak || p.streak || 0), 0
       )
     };
 
+    console.log('📈 Calculated learning stats:', stats);
     return stats;
   }, [userProgress]);
 

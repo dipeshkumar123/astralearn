@@ -57,11 +57,11 @@ const StudentDashboard = ({ setCurrentView }) => {
     setAssistantMode('learning-assistant');
   }, [updateContext, setAssistantMode, location, user]);
 
-  const { 
-    courses, 
-    userProgress, 
-    analytics, 
-    loading, 
+  const {
+    courses,
+    userProgress,
+    analytics,
+    loading,
     errors,
     fetchCourses,
     fetchUserProgress,
@@ -77,12 +77,12 @@ const StudentDashboard = ({ setCurrentView }) => {
   const [catalogLoading, setCatalogLoading] = useState(false);
 
   // Get enrolled courses from real user progress data
-  const enrolledCourses = courses.filter(course => 
+  const enrolledCourses = courses.filter(course =>
     userProgress[course._id] || userProgress[course.id]
   );
 
   // Get available courses (not enrolled)
-  const availableCourses = courses.filter(course => 
+  const availableCourses = courses.filter(course =>
     !userProgress[course._id] && !userProgress[course.id]
   );
   // Get real learning statistics

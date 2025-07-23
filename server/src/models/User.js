@@ -139,28 +139,6 @@ const userSchema = new Schema({
     type: Date,
     select: false,
   },
-  refreshTokens: [{
-    type: String,
-  }],
-  lastLoginAt: {
-    type: Date,
-  },
-  isEmailVerified: {
-    type: Boolean,
-    default: false,
-  },
-  emailVerificationToken: {
-    type: String,
-    select: false,
-  },
-  passwordResetToken: {
-    type: String,
-    select: false,
-  },
-  passwordResetExpires: {
-    type: Date,
-    select: false,
-  },
 }, {
   timestamps: true,
   /**

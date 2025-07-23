@@ -308,7 +308,7 @@ router.get('/my/enrolled', flexibleAuthenticate, async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const userProgress = await UserProgress.find({ 
+    const userProgress = await UserProgress.find({
       userId: req.user._id,
       progressType: 'enrollment'
     })
@@ -466,6 +466,9 @@ router.post('/:id/lessons/:lessonId/complete', flexibleAuthenticate, async (req,
     }
 
     await userProgress.save();
+
+    // Update overall course progress after lesson completion
+    await updateOverallCourseProgress(userId, courseId);
 
     // Set up gamification data for middleware
     res.locals.activityCompleted = true;
@@ -669,8 +672,7 @@ async function updateOverallCourseProgress(userId, courseId) {
     const lessonProgress = await UserProgress.find({
       userId,
       courseId,
-      progressType: 'lesson',
-      'progressData.completionStatus': 'completed'
+      progressType: 'lesson_complete'
     });
     
     // Get course structure to determine total lessons

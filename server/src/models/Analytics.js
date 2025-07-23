@@ -416,13 +416,11 @@ const learningGoalAnalyticsSchema = new Schema({
   userId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
   },
   goalId: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   goalDetails: {
     title: String,

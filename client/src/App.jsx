@@ -2,18 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import './App.css'
 import EnhancedAIAssistant from './components/ai/EnhancedAIAssistant'
-import AIToggleButton from './components/ai/AIToggleButton'
 import AIContextProvider from './contexts/AIContextProvider'
 import DataSyncProvider, { useDataSync } from './contexts/DataSyncProvider'
 import CourseManagementDashboard from './components/course/CourseManagementDashboard'
-import CoursePreview from './components/course/CoursePreview'
-import ModernCoursePreview from './components/course/ModernCoursePreview'
 import RedesignedCoursePreview from './components/course/RedesignedCoursePreview'
-import ModernLessonPage from './components/course/ModernLessonPage'
-import ModernLessonCompletion from './components/course/ModernLessonCompletion'
 import SimplifiedLessonLoader from './components/course/SimplifiedLessonLoader'
 import LessonErrorBoundary from './components/course/LessonErrorBoundary'
-import CourseLearningEnvironment from './components/course/CourseLearningEnvironment'
 import AdaptiveLearningDashboard from './components/adaptive/AdaptiveLearningDashboard'
 import GamificationDashboard from './components/gamification/GamificationDashboard'
 import SocialDashboard from './components/social/SocialDashboard'
@@ -24,10 +18,9 @@ import RoleBasedDashboard from './components/dashboard/RoleBasedDashboard'
 import LandingPage from './components/LandingPage'
 
 // Main App Content Component
-function AppContent() {  const [serverStatus, setServerStatus] = useState('checking');
-  const [serverInfo, setServerInfo] = useState(null);  const [currentView, setCurrentView] = useState('status');
+function AppContent() {
+  const [currentView, setCurrentView] = useState('status');
   const [selectedCourseId, setSelectedCourseId] = useState(null);
-  const [selectedCourse, setSelectedCourse] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [userDismissedAuth, setUserDismissedAuth] = useState(false);
@@ -54,17 +47,18 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
       setShowLogin(true);
     }
   }, [loading, isAuthenticated, showLogin, showRegister, userDismissedAuth]);
+
   const checkServerStatus = async () => {
     try {
       const response = await fetch('http://localhost:5000/health');
       const data = await response.json();
-      setServerStatus('connected');
-      setServerInfo(data);
+      console.log('Server connected:', data);
     } catch (error) {
-      setServerStatus('disconnected');
-      setServerInfo(null);
+      console.error('Server disconnected:', error);
     }
-  };  // Simplified course data loading with better error handling
+  };
+
+  // Simplified course data loading with better error handling
   const loadCourseData = useCallback(async (courseId) => {
     if (!courseId || courseId === 'undefined' || courseId === 'null') {
       console.error('Invalid course ID provided:', courseId);
@@ -85,7 +79,6 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
         const data = await response.json();
         if (data.success && data.course) {
           console.log('Course hierarchy loaded:', data.course.title);
-          setSelectedCourse(data.course);
           return data.course;
         }
       }
@@ -102,7 +95,6 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
         const fallbackData = await fallbackResponse.json();
         const courseData = fallbackData.course || fallbackData;
         console.log('Basic course loaded:', courseData?.title);
-        setSelectedCourse(courseData);
         return courseData;
       }
       
@@ -125,8 +117,11 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
           </div>
         </div>
       );
-    }    // If not authenticated, show landing page with authentication options
-    if (!isAuthenticated) {      return (
+    }
+
+    // If not authenticated, show landing page with authentication options
+    if (!isAuthenticated) {
+      return (
         <LandingPage 
           onShowLogin={() => {
             setUserDismissedAuth(false);
@@ -138,10 +133,14 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
           }}
         />
       );
-    }    // Authenticated user views
+    }
+
+    // Authenticated user views
     switch (currentView) {
       case 'course-management':
-        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;      case 'course-preview':
+        return <CourseManagementDashboard onBackToStatus={() => setCurrentView('dashboard')} />;
+
+      case 'course-preview':
         // Check if we have a valid course ID
         if (!selectedCourseId || selectedCourseId === 'undefined' || selectedCourseId === 'null') {
           console.error('No valid course ID for preview, redirecting to dashboard');
@@ -170,15 +169,26 @@ function AppContent() {  const [serverStatus, setServerStatus] = useState('check
               loadCourseData={loadCourseData}
             />
           </LessonErrorBoundary>
-        );case 'adaptive-learning':
+        );
+
+      case 'adaptive-learning':
         // Pass userRole for student, instructor, admin access levels
-        return <AdaptiveLearningDashboard userId={user.id} userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;case 'gamification':
-        return <GamificationDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'social-learning':
-        return <SocialDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;      case 'dashboard':
-      default:        // Pass setCurrentView as prop for navigation functionality
+        return <AdaptiveLearningDashboard userId={user.id} userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;
+
+      case 'gamification':
+        return <GamificationDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;
+
+      case 'social-learning':
+        return <SocialDashboard userRole={user.role} onBackToMain={() => setCurrentView('dashboard')} />;
+
+      case 'dashboard':
+      default:
+        // Pass setCurrentView as prop for navigation functionality
         return <RoleBasedDashboard setCurrentView={handleViewChange} />;
     }
-  };  // Handle custom navigation events from dashboard
+  };
+
+  // Handle custom navigation events from dashboard
   useEffect(() => {
     const handleNavigateToCourse = (event) => {
       const { view, courseId } = event.detail;
@@ -522,7 +532,6 @@ const ModernLessonWrapper = ({ courseId, onBack, loadCourseData }) => {
   const [currentModule, setCurrentModule] = useState(0);
   const [currentLesson, setCurrentLesson] = useState(0);
   const [error, setError] = useState(null);
-  const { user, token } = useAuth();
   const { getCourseProgress, updateLessonProgress } = useDataSync();
 
   // Simple, one-time course loading with timeout protection
@@ -690,126 +699,6 @@ const ModernLessonWrapper = ({ courseId, onBack, loadCourseData }) => {
       onNextLesson={handleNextLesson}
       onPreviousLesson={handlePreviousLesson}
       onNavigateToLesson={handleNavigateToLesson}
-    />
-  );
-};
-
-// Legacy Course Preview Wrapper Component (kept for backward compatibility)
-const CoursePreviewWrapper = ({ courseId, onBack, loadCourseData }) => {
-  const [course, setCourse] = useState(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const loadCourse = async () => {
-      // First try to get courseId from localStorage if not provided
-      const targetCourseId = courseId || localStorage.getItem('selectedCourseId');
-      
-      if (targetCourseId) {
-        setLoading(true);
-        const courseData = await loadCourseData(targetCourseId);
-        setCourse(courseData);
-        setLoading(false);
-      } else {
-        console.error('No course ID provided for preview');
-        onBack();
-      }
-    };
-
-    loadCourse();
-  }, [courseId, loadCourseData]); // Include loadCourseData dependency
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading course preview...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!course) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Course not found</p>
-          <button 
-            onClick={onBack}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <CoursePreview
-      course={course}
-      isVisible={true}
-      mode="student"
-      onClose={onBack}
-    />
-  );
-};
-
-// Course Detail Wrapper Component (for enrolled courses)
-const CourseDetailWrapper = ({ courseId, onBack, loadCourseData }) => {
-  const [course, setCourse] = useState(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const loadCourse = async () => {
-      // First try to get courseId from localStorage if not provided
-      const targetCourseId = courseId || localStorage.getItem('selectedCourseId');
-      
-      if (targetCourseId) {
-        setLoading(true);
-        const courseData = await loadCourseData(targetCourseId);
-        setCourse(courseData);
-        setLoading(false);
-      } else {
-        console.error('No course ID provided for course detail');
-        onBack();
-      }
-    };
-
-    loadCourse();
-  }, [courseId, loadCourseData]); // Include loadCourseData dependency
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading course...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!course) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Course not found</p>
-          <button 
-            onClick={onBack}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <CoursePreview
-      course={course}
-      isVisible={true}
-      mode="student"
-      onClose={onBack}
     />
   );
 };

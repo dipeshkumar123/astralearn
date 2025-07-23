@@ -1,0 +1,350 @@
+{
+  "timestamp": "2025-07-23T11:16:09.051Z",
+  "summary": {
+    "totalTests": 54,
+    "totalPassed": 47,
+    "totalFailed": 7,
+    "successRate": "87.0"
+  },
+  "results": {
+    "backend": {
+      "total": 28,
+      "passed": 22,
+      "failed": 6,
+      "tests": [
+        {
+          "name": "Health Check",
+          "status": "FAIL",
+          "details": "Invalid health response",
+          "timestamp": "2025-07-23T11:15:50.238Z"
+        },
+        {
+          "name": "User Registration",
+          "status": "FAIL",
+          "details": "All fields are required",
+          "timestamp": "2025-07-23T11:15:50.266Z"
+        },
+        {
+          "name": "User Login",
+          "status": "FAIL",
+          "details": "Invalid credentials",
+          "timestamp": "2025-07-23T11:15:50.369Z"
+        },
+        {
+          "name": "Invalid Login Rejection",
+          "status": "PASS",
+          "details": "Invalid credentials properly rejected",
+          "timestamp": "2025-07-23T11:15:50.471Z"
+        },
+        {
+          "name": "Course Tests Setup",
+          "status": "FAIL",
+          "details": "Could not authenticate",
+          "timestamp": "2025-07-23T11:15:50.528Z"
+        },
+        {
+          "name": "Get Forum Posts",
+          "status": "PASS",
+          "details": "Found 0 posts",
+          "timestamp": "2025-07-23T11:15:51.000Z"
+        },
+        {
+          "name": "Create Forum Post",
+          "status": "PASS",
+          "details": "Post ID: 1",
+          "timestamp": "2025-07-23T11:15:51.007Z"
+        },
+        {
+          "name": "Create Forum Reply",
+          "status": "PASS",
+          "details": "Reply created successfully",
+          "timestamp": "2025-07-23T11:15:51.012Z"
+        },
+        {
+          "name": "Forum Post Voting",
+          "status": "PASS",
+          "details": "Vote recorded successfully",
+          "timestamp": "2025-07-23T11:15:51.016Z"
+        },
+        {
+          "name": "Forum Statistics",
+          "status": "PASS",
+          "details": "Total posts: 1",
+          "timestamp": "2025-07-23T11:15:51.018Z"
+        },
+        {
+          "name": "Get Notifications",
+          "status": "PASS",
+          "details": "Found 0 notifications",
+          "timestamp": "2025-07-23T11:15:51.262Z"
+        },
+        {
+          "name": "Notification Statistics",
+          "status": "PASS",
+          "details": "Total: 0, Unread: 0",
+          "timestamp": "2025-07-23T11:15:51.263Z"
+        },
+        {
+          "name": "Mark All Notifications Read",
+          "status": "PASS",
+          "details": "Marked 0 as read",
+          "timestamp": "2025-07-23T11:15:51.266Z"
+        },
+        {
+          "name": "WebSocket Connection",
+          "status": "PASS",
+          "details": "Socket ID: 8WCfniCckGQt2IlwAAAB",
+          "timestamp": "2025-07-23T11:15:51.282Z"
+        },
+        {
+          "name": "Certificate Generation",
+          "status": "FAIL",
+          "details": "User not enrolled in this course",
+          "timestamp": "2025-07-23T11:15:51.515Z"
+        },
+        {
+          "name": "Certificate Statistics",
+          "status": "PASS",
+          "details": "Total certificates: 0",
+          "timestamp": "2025-07-23T11:15:51.747Z"
+        },
+        {
+          "name": "Discount Validation",
+          "status": "PASS",
+          "details": "Discount: $10",
+          "timestamp": "2025-07-23T11:15:51.978Z"
+        },
+        {
+          "name": "Payment Intent Creation",
+          "status": "PASS",
+          "details": "Intent ID: PAY-1753269351980-YSAPJFUXN",
+          "timestamp": "2025-07-23T11:15:51.980Z"
+        },
+        {
+          "name": "Payment History",
+          "status": "PASS",
+          "details": "Found 0 payments",
+          "timestamp": "2025-07-23T11:15:51.982Z"
+        },
+        {
+          "name": "AI Course Recommendations",
+          "status": "PASS",
+          "details": "Generated 1 recommendations",
+          "timestamp": "2025-07-23T11:15:52.212Z"
+        },
+        {
+          "name": "AI Learning Path Generation",
+          "status": "PASS",
+          "details": "Learning path generated successfully",
+          "timestamp": "2025-07-23T11:15:53.126Z"
+        },
+        {
+          "name": "AI Q&A Assistant",
+          "status": "PASS",
+          "details": "AI response generated successfully",
+          "timestamp": "2025-07-23T11:15:54.570Z"
+        },
+        {
+          "name": "AI Quiz Generation",
+          "status": "PASS",
+          "details": "Quiz generated successfully",
+          "timestamp": "2025-07-23T11:15:55.502Z"
+        },
+        {
+          "name": "AI Usage Statistics",
+          "status": "PASS",
+          "details": "Tokens used: 405",
+          "timestamp": "2025-07-23T11:15:55.505Z"
+        },
+        {
+          "name": "Get Lesson Assessment",
+          "status": "PASS",
+          "details": "Found 4 questions",
+          "timestamp": "2025-07-23T11:15:55.742Z"
+        },
+        {
+          "name": "Submit Assessment",
+          "status": "PASS",
+          "details": "Score: 0%",
+          "timestamp": "2025-07-23T11:15:55.745Z"
+        },
+        {
+          "name": "Update Lesson Progress",
+          "status": "PASS",
+          "details": "Progress updated successfully",
+          "timestamp": "2025-07-23T11:15:55.980Z"
+        },
+        {
+          "name": "Learning Analytics",
+          "status": "FAIL",
+          "details": "Analytics retrieval failed",
+          "timestamp": "2025-07-23T11:15:55.982Z"
+        }
+      ]
+    },
+    "performance": {
+      "total": 23,
+      "passed": 22,
+      "failed": 1,
+      "metrics": [
+        {
+          "name": "Health Check Response Time",
+          "status": "PASS",
+          "details": "1.28ms",
+          "timestamp": "2025-07-23T11:15:55.986Z"
+        },
+        {
+          "name": "Get Courses Response Time",
+          "status": "PASS",
+          "details": "1.16ms",
+          "timestamp": "2025-07-23T11:15:55.987Z"
+        },
+        {
+          "name": "Get Course Details Response Time",
+          "status": "PASS",
+          "details": "0.90ms",
+          "timestamp": "2025-07-23T11:15:55.988Z"
+        },
+        {
+          "name": "Get Forum Posts Response Time",
+          "status": "PASS",
+          "details": "0.93ms",
+          "timestamp": "2025-07-23T11:15:55.989Z"
+        },
+        {
+          "name": "Get Forum Stats Response Time",
+          "status": "PASS",
+          "details": "0.90ms",
+          "timestamp": "2025-07-23T11:15:55.990Z"
+        },
+        {
+          "name": "Authentication Performance",
+          "status": "PASS",
+          "details": "287.05ms",
+          "timestamp": "2025-07-23T11:15:56.277Z"
+        },
+        {
+          "name": "Get Notifications Performance",
+          "status": "PASS",
+          "details": "2.54ms",
+          "timestamp": "2025-07-23T11:15:56.281Z"
+        },
+        {
+          "name": "Get Course Progress Performance",
+          "status": "PASS",
+          "details": "3.24ms",
+          "timestamp": "2025-07-23T11:15:56.284Z"
+        },
+        {
+          "name": "AI Recommendations Performance",
+          "status": "PASS",
+          "details": "2.21ms",
+          "timestamp": "2025-07-23T11:15:56.286Z"
+        },
+        {
+          "name": "Payment History Performance",
+          "status": "PASS",
+          "details": "1.66ms",
+          "timestamp": "2025-07-23T11:15:56.288Z"
+        },
+        {
+          "name": "Concurrent Request Handling",
+          "status": "PASS",
+          "details": "10/10 successful, avg: 1.87ms",
+          "timestamp": "2025-07-23T11:15:56.307Z"
+        },
+        {
+          "name": "Memory Usage",
+          "status": "PASS",
+          "details": "Memory increase: 1.42MB",
+          "timestamp": "2025-07-23T11:15:56.388Z"
+        },
+        {
+          "name": "Database Read Performance",
+          "status": "PASS",
+          "details": "1.26ms",
+          "timestamp": "2025-07-23T11:15:56.622Z"
+        },
+        {
+          "name": "Database Write Performance",
+          "status": "PASS",
+          "details": "2.81ms",
+          "timestamp": "2025-07-23T11:15:56.625Z"
+        },
+        {
+          "name": "Certificate Generation Performance",
+          "status": "FAIL",
+          "details": "3.11ms (too slow)",
+          "timestamp": "2025-07-23T11:15:56.867Z"
+        },
+        {
+          "name": "Memory Cleanup",
+          "status": "PASS",
+          "details": "Memory cleaned up: -1.80MB remaining",
+          "timestamp": "2025-07-23T11:15:58.403Z"
+        },
+        {
+          "name": "CPU Usage",
+          "status": "PASS",
+          "details": "1.42% CPU usage",
+          "timestamp": "2025-07-23T11:16:08.998Z"
+        },
+        {
+          "name": "System Memory Usage",
+          "status": "PASS",
+          "details": "75.65% system memory used",
+          "timestamp": "2025-07-23T11:16:08.998Z"
+        },
+        {
+          "name": "Scalability Test (1 requests)",
+          "status": "PASS",
+          "details": "Avg response: 1.02ms",
+          "timestamp": "2025-07-23T11:16:08.999Z"
+        },
+        {
+          "name": "Scalability Test (5 requests)",
+          "status": "PASS",
+          "details": "Avg response: 1.31ms",
+          "timestamp": "2025-07-23T11:16:09.006Z"
+        },
+        {
+          "name": "Scalability Test (10 requests)",
+          "status": "PASS",
+          "details": "Avg response: 1.07ms",
+          "timestamp": "2025-07-23T11:16:09.017Z"
+        },
+        {
+          "name": "Scalability Test (20 requests)",
+          "status": "PASS",
+          "details": "Avg response: 0.95ms",
+          "timestamp": "2025-07-23T11:16:09.036Z"
+        },
+        {
+          "name": "Scalability Trend",
+          "status": "PASS",
+          "details": "Good scalability ratio: 0.93x",
+          "timestamp": "2025-07-23T11:16:09.037Z"
+        }
+      ]
+    },
+    "integration": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": [
+        {
+          "name": "Health Check Integration",
+          "status": "PASS"
+        },
+        {
+          "name": "CORS Configuration",
+          "status": "PASS"
+        },
+        {
+          "name": "JSON Response Format",
+          "status": "PASS"
+        }
+      ]
+    }
+  }
+}

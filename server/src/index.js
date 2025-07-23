@@ -46,12 +46,29 @@ app.use('/api', apiRoutes);
 
 // API 404 handler - ensures API routes always return JSON
 app.use('/api/*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'API endpoint not found',
-    message: `API route ${req.originalUrl} not found`,
-    timestamp: new Date().toISOString()
-  });
+  if (!res.headersSent) {
+    res.status(404).json({
+      success: false,
+      error: 'API endpoint not found',
+      message: `API route ${req.originalUrl} not found`,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Global error handler
+app.use((error, _req, res, _next) => {
+  console.error('❌ Unhandled error:', error);
+
+  // Only send response if headers haven't been sent yet
+  if (!res.headersSent) {
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message || 'An unexpected error occurred',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Health endpoint with performance metrics
@@ -97,21 +114,6 @@ app.use('*', (req, res) => {
       health: 'GET /health',
       api: 'GET /api/*',
     },
-  });
-});
-
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('❌ Unhandled error:', err);
-  
-  if (res.headersSent) {
-    return next(err);
-  }
-  
-  res.status(err.status || 500).json({
-    error: 'Internal Server Error',
-    message: config.server.environment === 'development' ? err.message : 'Something went wrong',
-    ...(config.server.environment === 'development' && { stack: err.stack }),
   });
 });
 

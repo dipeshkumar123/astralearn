@@ -11,6 +11,7 @@ import gamificationRoutes from './gamification.js';
 import analyticsRoutes from './analytics.js';
 import socialLearningRoutes from './socialLearning.js';
 import adminRoutes from './admin.js';
+import performanceRoutes from './performance.js';
 
 const router = Router();
 
@@ -27,13 +28,15 @@ router.use('/gamification', gamificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/social-learning', socialLearningRoutes);
 router.use('/admin', adminRoutes);
+router.use('/performance', performanceRoutes);
 
 // Health check for API routes
 router.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     message: 'AstraLearn API Routes are healthy',
-    timestamp: new Date().toISOString(),    endpoints: {
+    timestamp: new Date().toISOString(),
+    endpoints: {
       auth: '/api/auth',
       courses: '/api/courses',
       lessons: '/api/lessons',
