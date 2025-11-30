@@ -1,0 +1,209 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ============================================
+// User Management
+// ============================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      String   @default("STUDENT") // SQLite doesn't support enums, using String
+  avatar    String?
+  clerkId   String?  @unique // Clerk external ID
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+
+  coursesInstructed Course[]     @relation("InstructorCourses")
+  enrollments       Enrollment[]
+  notes             Note[]
+
+  @@index([email])
+  @@index([clerkId])
+  @@map("users")
+}
+
+// ============================================
+// Organization Management
+// ============================================
+
+model Organization {
+  id               String           @id @default(uuid())
+  name             String
+  slug             String           @unique
+  subscriptionTier String           @default("FREE") // SQLite doesn't support enums
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  users   User[]
+  courses Course[]
+
+  @@index([slug])
+  @@map("organizations")
+}
+
+// ============================================
+// Course Structure
+// ============================================
+
+model Course {
+  id          String       @id @default(uuid())
+  title       String
+  description String?      // Removed @db.Text
+  thumbnail   String?
+  status      String       @default("DRAFT") // SQLite doesn't support enums
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  instructor   User   @relation("InstructorCourses", fields: [instructorId], references: [id])
+  instructorId String
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+
+  sections    Section[]
+  enrollments Enrollment[]
+
+  @@index([instructorId])
+  @@index([status])
+  @@map("courses")
+}
+
+model Section {
+  id          String @id @default(uuid())
+  title       String
+  description String? // Removed @db.Text
+  order       Int    @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId String
+
+  lessons Lesson[]
+
+  @@index([courseId, order])
+  @@map("sections")
+}
+
+model Lesson {
+  id          String     @id @default(uuid())
+  title       String
+  description String?    // Removed @db.Text
+  type        String     // SQLite doesn't support enums
+  order       Int        @default(0)
+  
+  // Content fields
+  textContent String?    // Removed @db.Text
+  videoUrl    String?    // Mux playback URL
+  videoMuxId  String?    // Mux asset ID
+  duration    Int?       // Duration in seconds for video lessons
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  section   Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  sectionId String
+
+  progress LessonProgress[]
+  notes    Note[]
+
+  @@index([sectionId, order])
+  @@map("lessons")
+}
+
+// ============================================
+// Student Progress Tracking
+// ============================================
+
+model Enrollment {
+  id        String   @id @default(uuid())
+  progress  Float    @default(0) // Percentage 0-100
+  
+  enrolledAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId String
+
+  lessonProgress LessonProgress[]
+
+  @@unique([userId, courseId]) // One enrollment per user per course
+  @@index([userId])
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+model LessonProgress {
+  id              String    @id @default(uuid())
+  completed       Boolean   @default(false)
+  completedAt     DateTime?
+  lastAccessedAt  DateTime  @default(now())
+  watchedDuration Int?      // For video lessons, seconds watched
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  enrollmentId String
+
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId String
+
+  @@unique([enrollmentId, lessonId]) // One progress record per lesson per enrollment
+  @@index([enrollmentId])
+  @@index([lessonId])
+  @@map("lesson_progress")
+}
+
+// ============================================
+// Student Notes
+// ============================================
+
+model Note {
+  id        String  @id @default(uuid())
+  content   String  // Removed @db.Text
+  timestamp Int?    // Video timestamp in seconds (for video lessons)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId String
+
+  @@index([userId, lessonId])
+  @@map("notes")
+}
+

@@ -1,180 +1,44 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import compression from 'compression';
-import { createServer } from 'http';
-import { config } from './config/environment.js';
-import DatabaseManager from './config/database.js';
-import apiRoutes from './routes/index.js';
+const app = require('./app');
 
-// Import Phase 3 Step 3 services
-import redisCacheService from './services/redisCacheService.js';
-import webSocketService from './services/webSocketService.js';
-import performanceMonitorService from './services/performanceMonitorService.js';
+// Enrollments route (handled by courses router for now)
+app.get('/api/enrollments', async (req, res) => {
+    try {
+        const { userId } = req.auth();
+        const { prisma } = require('./lib/prisma');
 
-// Initialize Express app
-const app = express();
+        const enrollments = await prisma.enrollment.findMany({
+            where: { userId },
+            include: {
+                course: {
+                    include: {
+                        instructor: {
+                            select: {
+                                id: true,
+                                firstName: true,
+                                lastName: true
+                            }
+                        },
+                        _count: {
+                            select: {
+                                enrollments: true,
+                                lessons: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
 
-// Create HTTP server for WebSocket integration
-const httpServer = createServer(app);
-
-// Initialize Phase 3 Step 3 services
-console.log('🚀 Initializing Phase 3 Step 3: Production Optimization & Advanced Features...');
-
-// Security middleware
-app.use(helmet());
-app.use(cors({
-  origin: config.server.corsOrigin,
-  credentials: true,
-}));
-
-// Compression middleware
-app.use(compression());
-
-// Logging middleware
-if (config.server.environment !== 'test') {
-  app.use(morgan('combined'));
-}
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// API Routes
-app.use('/api', apiRoutes);
-
-// API 404 handler - ensures API routes always return JSON
-app.use('/api/*', (req, res) => {
-  if (!res.headersSent) {
-    res.status(404).json({
-      success: false,
-      error: 'API endpoint not found',
-      message: `API route ${req.originalUrl} not found`,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Global error handler
-app.use((error, _req, res, _next) => {
-  console.error('❌ Unhandled error:', error);
-
-  // Only send response if headers haven't been sent yet
-  if (!res.headersSent) {
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      message: error.message || 'An unexpected error occurred',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Health endpoint with performance metrics
-app.get('/health', async (req, res) => {
-  try {
-    const dbManager = DatabaseManager.getInstance();
-    const dbStatus = dbManager.isConnected() ? 'Connected' : 'Disconnected';
-    
-    // Get basic health summary
-    const cacheHealth = await redisCacheService.healthCheck();
-    const wsHealth = webSocketService.healthCheck();
-    const performanceHealth = await performanceMonitorService.getHealthSummary();
-    
-    res.json({
-      status: 'OK',
-      message: 'AstraLearn Server is healthy',
-      timestamp: new Date().toISOString(),
-      environment: config.server.environment,
-      database: dbStatus,
-      version: '3.3.0', // Updated version for Phase 3 Step 3
-      services: {
-        performance: performanceHealth.status,
-        cache: cacheHealth.status,
-        websocket: wsHealth.status
-      },
-      phase: 'Phase 3 Step 3: Production Optimization & Advanced Features'
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'ERROR',
-      message: 'Health check failed',
-      error: error.message,
-    });
-  }
-});
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: `Route ${req.originalUrl} not found`,
-    availableRoutes: {
-      health: 'GET /health',
-      api: 'GET /api/*',
-    },
-  });
-});
-
-// Server startup function
-async function startServer() {
-  try {
-    // Check if server is already listening
-    if (httpServer.listening) {
-      console.log('⚠️ Server is already running');
-      return httpServer;
+        res.json(enrollments);
+    } catch (error) {
+        console.error('Error fetching enrollments:', error);
+        res.status(500).json({ error: 'Failed to fetch enrollments' });
     }
+});
 
-    // Initialize database connection
-    const dbManager = DatabaseManager.getInstance();
-    await dbManager.connect();
+const PORT = process.env.PORT || 5000;
 
-    // Initialize WebSocket service
-    webSocketService.initialize(httpServer);
-    
-    // Initialize instructor monitoring WebSocket events (Phase 5 Step 2) - Make it non-blocking
-    setImmediate(() => {
-      try {
-        webSocketService.initializeInstructorMonitoring();
-      } catch (error) {
-        console.log('⚠️ Instructor monitoring initialization skipped:', error.message);
-      }
-    });
-
-    // Start server
-    const server = httpServer.listen(config.server.port, () => {
-      console.log('🚀 AstraLearn Server Started');
-      console.log(`📍 Environment: ${config.server.environment}`);
-      console.log(`🌐 Server: http://localhost:${config.server.port}`);
-      console.log(`📊 Health: http://localhost:${config.server.port}/health`);
-      console.log(`🔗 API: http://localhost:${config.server.port}/api`);
-      console.log(`🌐 WebSocket: ws://localhost:${config.server.port}`);
-      console.log('✅ Phase 3 Step 3: Production Optimization & Advanced Features - ACTIVE');
-      console.log('📈 Performance Monitoring: Enabled');
-      console.log('💾 Redis Caching: ' + (redisCacheService.isAvailable() ? 'Enabled' : 'Disabled'));
-      console.log('🔄 Real-time Features: Enabled');
-    });
-
-    // Graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('🔄 SIGTERM received, shutting down gracefully');
-      server.close(async () => {
-        await dbManager.disconnect();
-        await redisCacheService.disconnect();
-        process.exit(0);
-      });
-    });
-
-    return server;
-
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-// Server startup is handled by start-server.js
-// To start manually: import { startServer } from './src/index.js'; startServer();
-
-export { app, httpServer, startServer };
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+});

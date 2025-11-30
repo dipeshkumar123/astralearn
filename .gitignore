@@ -1,57 +1,59 @@
+# OS-specific files
+.DS_Store
+Thumbs.db
+
 # Dependencies
 node_modules/
+
+# Logs
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+pnpm-debug.log*
 
 # Build outputs
-dist/
-build/
-*.tgz
-*.tar.gz
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
+client/dist/
+client/build/
+client/.vite/
+server/dist/
+server/build/
 coverage/
-*.lcov
+.vite/
+.vite-inspect/
+.eslintcache
 
-# nyc test coverage
-.nyc_output
+# Temp & caches
+.tmp/
+.temp/
+.cache/
+*.swo
+*.swp
 
-# IDEs
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE/editor
 .vscode/
 .idea/
-*.swp
-*.swo
+.history/
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Prisma (local sqlite/db files if any)
+server/prisma/*.db
 
-# Logs
-logs
-*.log
+# Uploads/storage
+uploads/
+server/uploads/
+storage/
 
-# MongoDB
-*.mongodb
+# Test artifacts
+playwright-report/
+test-results/
+.jest/
 
-# Temporary files
-tmp/
-temp/
+# Misc framework caches
+.next/
+.turbo/
