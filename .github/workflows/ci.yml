@@ -16,6 +16,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
+          cache-dependency-path: 'server/package-lock.json'
       - name: Install server deps
         working-directory: server
         run: npm ci
@@ -36,6 +37,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
+          cache-dependency-path: 'client/package-lock.json'
       - name: Install client deps
         working-directory: client
         run: npm ci
