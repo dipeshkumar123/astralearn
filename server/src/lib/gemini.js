@@ -1,9 +1,15 @@
 const Groq = require('groq-sdk');
 const axios = require('axios');
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY
-});
+let groq = null;
+function getGroq() {
+    if (!groq) {
+        groq = new Groq({
+            apiKey: process.env.GROQ_API_KEY || 'test-key'
+        });
+    }
+    return groq;
+}
 
 /**
  * Generate embeddings for text using sentence-transformers model
@@ -38,6 +44,7 @@ async function generateEmbedding(text) {
  */
 async function generateResponse(question, contextChunks) {
     try {
+        const groq = getGroq();
         // Build context from chunks
         const context = contextChunks
             .map((chunk, idx) => `[Source ${idx + 1}]\n${chunk.content}`)

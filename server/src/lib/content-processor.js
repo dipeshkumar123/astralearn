@@ -1,3 +1,8 @@
+// Mock DOMMatrix for Node.js environment (pdf-parse dependency)
+if (typeof DOMMatrix === 'undefined') {
+    global.DOMMatrix = class DOMMatrix {};
+}
+
 const pdfParse = require('pdf-parse');
 
 /**

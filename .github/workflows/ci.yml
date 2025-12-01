@@ -25,6 +25,7 @@ jobs:
         env:
           TEST_AUTH: '1'
           TEST_AUTH_CLERK_ID: 'test_clerk_user'
+          GROQ_API_KEY: 'test-key'
         run: npm test -- --ci
 
   client-e2e:
