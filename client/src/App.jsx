@@ -16,7 +16,9 @@ import SettingsPage from './pages/SettingsPage'
 import Dashboard from './pages/Dashboard'
 import CoursePage from './pages/CoursePage'
 import MyLearningPage from './pages/MyLearningPage'
+import OnboardPage from './pages/OnboardPage'
 import AchievementsPage from './pages/AchievementsPage'
+import CoursesListPage from './pages/CoursesListPage'
 
 // Teacher Pages
 import TeacherDashboard from './pages/teacher/TeacherDashboard'
@@ -49,6 +51,7 @@ function App() {
                         } />
                         <Route path="/login/*" element={<LoginPage />} />
                         <Route path="/signup/*" element={<SignupPage />} />
+                        <Route path="/onboard" element={<OnboardPage />} />
                     </Route>
 
                     {/* Protected Student Routes */}
@@ -58,6 +61,7 @@ function App() {
                         </SignedIn>
                     }>
                         <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/courses" element={<CoursesListPage />} />
                         <Route path="/courses/:courseId" element={<CoursePage />} />
                         <Route path="/profile" element={<ProfilePage />} />
                         <Route path="/learning" element={<MyLearningPage />} />

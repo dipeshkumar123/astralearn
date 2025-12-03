@@ -8,7 +8,7 @@ router.get('/me', requireAuth(), async (req, res) => {
     try {
         const auth = req.auth();
         const { userId: clerkId } = auth;
-        const { email, unsafeMetadata } = auth.claims || {}; // Clerk claims might have email and metadata
+        const { email } = auth.claims || {}; // Clerk claims might have email
 
         // Try to find user
         let user = await prisma.user.findUnique({
@@ -25,17 +25,13 @@ router.get('/me', requireAuth(), async (req, res) => {
         // If not found, create
         if (!user) {
             console.log(`Creating new user for Clerk ID: ${clerkId}`);
-            
-            // Get role from unsafe metadata (set during signup)
-            const role = unsafeMetadata?.role || 'STUDENT';
-            
             user = await prisma.user.create({
                 data: {
                     clerkId,
                     email: email || `${clerkId}@example.com`, // Fallback if email not in claims
                     firstName: 'New',
-                    lastName: role === 'TEACHER' ? 'Teacher' : 'Student',
-                    role: role
+                    lastName: 'Student',
+                    role: 'STUDENT'
                 }
             });
         }

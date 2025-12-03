@@ -61,7 +61,8 @@ export default function SignupPage() {
                             routing="path" 
                             path="/signup" 
                             signInUrl="/login"
-                            unsafeMetadata={{ role: selectedRole }}
+                            // After signup, bounce to onboarding to persist role in our DB
+                            afterSignUpUrl={`/onboard?role=${selectedRole}`}
                         />
                     </div>
                 </div>
