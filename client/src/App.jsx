@@ -16,6 +16,7 @@ import SettingsPage from './pages/SettingsPage'
 import Dashboard from './pages/Dashboard'
 import CoursePage from './pages/CoursePage'
 import MyLearningPage from './pages/MyLearningPage'
+import AchievementsPage from './pages/AchievementsPage'
 
 // Teacher Pages
 import TeacherDashboard from './pages/teacher/TeacherDashboard'
@@ -57,10 +58,10 @@ function App() {
                         </SignedIn>
                     }>
                         <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/dashboard/courses" element={<Navigate to="/dashboard" replace />} /> {/* Placeholder */}
                         <Route path="/courses/:courseId" element={<CoursePage />} />
                         <Route path="/profile" element={<ProfilePage />} />
                         <Route path="/learning" element={<MyLearningPage />} />
+                        <Route path="/achievements" element={<AchievementsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
                     </Route>
 

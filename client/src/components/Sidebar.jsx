@@ -8,8 +8,8 @@ export default function Sidebar() {
 
     const links = [
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { name: 'My Courses', path: '/dashboard/courses', icon: BookOpen },
-        { name: 'Achievements', path: '/dashboard/achievements', icon: Trophy },
+        { name: 'My Courses', path: '/learning', icon: BookOpen },
+        { name: 'Achievements', path: '/achievements', icon: Trophy },
         { name: 'Profile', path: '/profile', icon: User },
         { name: 'Settings', path: '/settings', icon: Settings },
     ]

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useUser, useClerk, useAuth } from '@clerk/clerk-react'
-import { BookOpen, Clock, Trophy, LogOut, Mail, User, Shield } from 'lucide-react'
+import { BookOpen, Clock, Trophy, LogOut, Mail, User, Shield, GraduationCap, Users } from 'lucide-react'
 import axios from 'axios'
+import toast from 'react-hot-toast'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
@@ -18,6 +19,8 @@ export default function ProfilePage() {
         currentStreak: 0
     })
     const [enrolledCourses, setEnrolledCourses] = useState([])
+    const [userRole, setUserRole] = useState('STUDENT')
+    const [changingRole, setChangingRole] = useState(false)
 
     useEffect(() => {
         if (user) {
@@ -30,9 +33,10 @@ export default function ProfilePage() {
             const token = await getToken()
             const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
 
-            // 1. Get internal user ID
+            // 1. Get internal user ID and role
             const userRes = await axios.get('/api/users/me', config)
             const internalUserId = userRes.data.id
+            setUserRole(userRes.data.role)
 
             // 2. Get Stats
             const statsRes = await axios.get(`/api/users/${internalUserId}/stats`, config)
@@ -44,6 +48,25 @@ export default function ProfilePage() {
 
         } catch (error) {
             console.error('Error fetching profile:', error)
+        }
+    }
+
+    const handleRoleChange = async (newRole) => {
+        if (newRole === userRole) return
+
+        setChangingRole(true)
+        try {
+            const token = await getToken()
+            const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+            
+            await axios.patch('/api/users/me/role', { role: newRole }, config)
+            setUserRole(newRole)
+            toast.success(`Role changed to ${newRole}. Please refresh to see changes.`)
+        } catch (error) {
+            toast.error('Failed to change role')
+            console.error('Role change error:', error)
+        } finally {
+            setChangingRole(false)
         }
     }
 
@@ -71,7 +94,10 @@ export default function ProfilePage() {
                         </div>
 
                         <h2 className="text-xl font-bold text-slate-900">{user.fullName}</h2>
-                        <p className="text-sm text-slate-500 mb-6">{user.primaryEmailAddress?.emailAddress}</p>
+                        <p className="text-sm text-slate-500 mb-2">{user.primaryEmailAddress?.emailAddress}</p>
+                        <Badge variant={userRole === 'TEACHER' ? 'primary' : 'secondary'} className="mb-6">
+                            {userRole === 'TEACHER' ? '👨‍🏫 Teacher' : '👨‍🎓 Student'}
+                        </Badge>
 
                         <div className="flex justify-center gap-4 mb-6 py-4 border-t border-b border-slate-100">
                             <div className="text-center">
@@ -104,12 +130,43 @@ export default function ProfilePage() {
                             </div>
                             <div className="flex items-center gap-3 text-slate-600">
                                 <User className="h-4 w-4" />
-                                <span>Student Account</span>
+                                <span>{userRole === 'TEACHER' ? 'Teacher' : 'Student'} Account</span>
                             </div>
                             <div className="flex items-center gap-3 text-slate-600">
                                 <Shield className="h-4 w-4" />
                                 <span>Verified</span>
                             </div>
+                        </div>
+                    </Card>
+
+                    <Card>
+                        <h3 className="font-bold text-slate-900 mb-3">Switch Role</h3>
+                        <p className="text-xs text-slate-500 mb-4">Change between student and teacher mode</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => handleRoleChange('STUDENT')}
+                                disabled={changingRole || userRole === 'STUDENT'}
+                                className={`p-3 rounded-lg border-2 transition-all text-sm ${
+                                    userRole === 'STUDENT'
+                                        ? 'border-primary bg-primary/5 text-primary font-medium'
+                                        : 'border-slate-200 hover:border-primary/50 text-slate-600'
+                                } disabled:opacity-50`}
+                            >
+                                <Users className="h-5 w-5 mx-auto mb-1" />
+                                Student
+                            </button>
+                            <button
+                                onClick={() => handleRoleChange('TEACHER')}
+                                disabled={changingRole || userRole === 'TEACHER'}
+                                className={`p-3 rounded-lg border-2 transition-all text-sm ${
+                                    userRole === 'TEACHER'
+                                        ? 'border-primary bg-primary/5 text-primary font-medium'
+                                        : 'border-slate-200 hover:border-primary/50 text-slate-600'
+                                } disabled:opacity-50`}
+                            >
+                                <GraduationCap className="h-5 w-5 mx-auto mb-1" />
+                                Teacher
+                            </button>
                         </div>
                     </Card>
                 </div>

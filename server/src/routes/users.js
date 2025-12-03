@@ -8,7 +8,7 @@ router.get('/me', requireAuth(), async (req, res) => {
     try {
         const auth = req.auth();
         const { userId: clerkId } = auth;
-        const { email } = auth.claims || {}; // Clerk claims might have email
+        const { email, unsafeMetadata } = auth.claims || {}; // Clerk claims might have email and metadata
 
         // Try to find user
         let user = await prisma.user.findUnique({
@@ -25,13 +25,17 @@ router.get('/me', requireAuth(), async (req, res) => {
         // If not found, create
         if (!user) {
             console.log(`Creating new user for Clerk ID: ${clerkId}`);
+            
+            // Get role from unsafe metadata (set during signup)
+            const role = unsafeMetadata?.role || 'STUDENT';
+            
             user = await prisma.user.create({
                 data: {
                     clerkId,
                     email: email || `${clerkId}@example.com`, // Fallback if email not in claims
                     firstName: 'New',
-                    lastName: 'Student',
-                    role: 'STUDENT'
+                    lastName: role === 'TEACHER' ? 'Teacher' : 'Student',
+                    role: role
                 }
             });
         }
@@ -141,6 +145,28 @@ router.get('/leaderboard', async (req, res) => {
         res.json(topUsers);
     } catch (error) {
         console.error('Leaderboard error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PATCH /api/users/me/role - Update user role
+router.patch('/me/role', requireAuth(), async (req, res) => {
+    try {
+        const { role } = req.body;
+        const { userId: clerkId } = req.auth();
+
+        if (!role || !['STUDENT', 'TEACHER'].includes(role)) {
+            return res.status(400).json({ error: 'Invalid role. Must be STUDENT or TEACHER' });
+        }
+
+        const user = await prisma.user.update({
+            where: { clerkId },
+            data: { role }
+        });
+
+        res.json(user);
+    } catch (error) {
+        console.error('Update role error:', error);
         res.status(500).json({ error: error.message });
     }
 });
