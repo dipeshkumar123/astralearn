@@ -51,13 +51,34 @@ router.get('/stats/:courseId', async (req, res) => {
 // POST /api/reviews - Create a review
 router.post('/', requireAuth(), async (req, res) => {
     try {
-        const { courseId, rating, comment, userId } = req.body;
+        const { courseId, rating, comment } = req.body;
+
+        // Validation
+        if (!courseId || !rating) {
+            return res.status(400).json({ error: 'courseId and rating are required' });
+        }
+
+        if (rating < 1 || rating > 5) {
+            return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+        }
+
+        const { userId: clerkId } = req.auth();
+
+        // Get internal user ID
+        const user = await prisma.user.findUnique({ 
+            where: { clerkId },
+            select: { id: true }
+        });
+        
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
         // Verify enrollment
         const enrollment = await prisma.enrollment.findUnique({
             where: {
                 userId_courseId: {
-                    userId,
+                    userId: user.id,
                     courseId
                 }
             }
@@ -69,10 +90,10 @@ router.post('/', requireAuth(), async (req, res) => {
 
         const review = await prisma.review.create({
             data: {
-                userId,
+                userId: user.id,
                 courseId,
-                rating,
-                comment
+                rating: parseInt(rating),
+                comment: comment || ''
             }
         });
 

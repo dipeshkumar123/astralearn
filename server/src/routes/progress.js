@@ -40,6 +40,11 @@ router.get('/course/:courseId', requireAuth(), async (req, res) => {
 router.post('/lesson/:lessonId', requireAuth(), async (req, res) => {
     try {
         const { lessonId } = req.params;
+
+        if (!lessonId) {
+            return res.status(400).json({ error: 'Lesson ID is required' });
+        }
+
         const { userId: clerkId } = req.auth();
 
         const user = await prisma.user.findUnique({

@@ -5,6 +5,7 @@ import axios from 'axios'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import Achievements from '../components/Achievements'
 
 export default function ProfilePage() {
     const { user } = useUser()
@@ -115,6 +116,8 @@ export default function ProfilePage() {
 
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-8">
+                    {/* Achievements */}
+                    <Achievements points={stats.points} streak={stats.currentStreak} badges={stats.badges} />
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {[

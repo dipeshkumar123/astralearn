@@ -185,6 +185,12 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireAuth(), requireTeacher(), async (req, res) => {
     try {
         const { title, description, category, level, price, thumbnail } = req.body;
+
+        // Validation
+        if (!title) {
+            return res.status(400).json({ error: 'title is required' });
+        }
+
         const { userId: clerkId } = req.auth();
 
         const user = await prisma.user.findUnique({
@@ -265,6 +271,11 @@ router.delete('/:id', requireAuth(), requireCourseOwnership('id'), async (req, r
 router.post('/:id/enroll', requireAuth(), async (req, res) => {
     try {
         const courseId = req.params.id;
+
+        if (!courseId) {
+            return res.status(400).json({ error: 'Course ID is required' });
+        }
+
         const { userId: clerkId } = req.auth();
 
         const user = await prisma.user.findUnique({

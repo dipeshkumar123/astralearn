@@ -44,6 +44,12 @@ router.get('/lesson/:lessonId', async (req, res) => {
 router.post('/', requireAuth(), async (req, res) => {
     try {
         const { title, content, lessonId } = req.body;
+
+        // Validation
+        if (!title || !content || !lessonId) {
+            return res.status(400).json({ error: 'title, content, and lessonId are required' });
+        }
+
         const { userId } = req.auth();
 
         // Get internal user ID
@@ -81,6 +87,16 @@ router.post('/:id/reply', requireAuth(), async (req, res) => {
     try {
         const { content } = req.body;
         const discussionId = req.params.id;
+
+        // Validation
+        if (!content) {
+            return res.status(400).json({ error: 'content is required' });
+        }
+
+        if (!discussionId) {
+            return res.status(400).json({ error: 'discussion ID is required' });
+        }
+
         const { userId } = req.auth();
 
         // Get internal user ID

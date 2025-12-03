@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, PlayCircle, CheckCircle, Lock } from 'lucide-react';
 import { Badge } from './ui/Badge';
+import ProgressBar from './ProgressBar';
 
 export default function CourseSidebar({ course, currentLessonId, onSelectLesson, completedLessons = [] }) {
     // Normalize modules/sections structure for sidebar consumption
@@ -14,6 +15,9 @@ export default function CourseSidebar({ course, currentLessonId, onSelectLesson,
                 <p className="text-sm text-slate-500 mt-1">
                     {completedLessons.length} / {totalLessons} lessons completed
                 </p>
+                <div className="mt-2">
+                    <ProgressBar value={totalLessons ? (completedLessons.length / totalLessons) * 100 : 0} />
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar">

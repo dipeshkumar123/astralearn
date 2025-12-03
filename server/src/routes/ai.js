@@ -104,12 +104,23 @@ router.post('/ingest-text', requireAuth(), requireTeacher(), async (req, res) =>
 /**
  * POST /api/ai/chat - Chat with AI tutor
  */
-router.post('/chat', async (req, res) => {
+router.post('/chat', requireAuth(), async (req, res) => {
     try {
-        const { question, courseId, userId } = req.body;
+        const { question, courseId } = req.body;
+        const { userId: clerkId } = req.auth();
 
         if (!question || !courseId) {
             return res.status(400).json({ error: 'Question and courseId required' });
+        }
+
+        // Get internal user ID
+        const user = await prisma.user.findUnique({
+            where: { clerkId },
+            select: { id: true }
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
         }
 
         // Generate embedding for the question
@@ -146,7 +157,7 @@ router.post('/chat', async (req, res) => {
         // Save chat message
         const chatMessage = await prisma.chatMessage.create({
             data: {
-                userId: userId || 'anonymous',
+                userId: user.id,
                 courseId,
                 question,
                 answer,

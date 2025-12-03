@@ -12,6 +12,9 @@ import AIChatbot from '../components/AIChatbot';
 import QuizPlayer from '../components/QuizPlayer';
 import ReviewList from '../components/ReviewList';
 import ReviewForm from '../components/ReviewForm';
+import NotesPanel from '../components/NotesPanel';
+import CourseRoadmap from '../components/CourseRoadmap';
+import LessonBookmarks from '../components/LessonBookmarks';
 
 export default function CoursePage() {
   const { courseId } = useParams();
@@ -256,6 +259,15 @@ export default function CoursePage() {
                       ))}
                     </div>
                   )}
+                  <div className="mt-6">
+                    <h3 className="text-lg font-bold text-slate-900 mb-2">Course Roadmap</h3>
+                    <CourseRoadmap course={course} />
+                    <LessonBookmarks
+                      courseId={courseId}
+                      lessonId={currentLesson?.id}
+                      onJump={(id) => setCurrentLesson(course.lessons.find(lesson => lesson.id === id))}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -266,13 +278,7 @@ export default function CoursePage() {
               )}
 
               {activeTab === 'notes' && (
-                <div className="animate-fade-in">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-slate-900">My Notes</h3>
-                    <Button size="sm" variant="secondary"><FileText className="h-4 w-4 mr-2" />Export Notes</Button>
-                  </div>
-                  <textarea className="w-full h-64 p-4 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none font-sans text-slate-700" placeholder="Take notes here... (Auto-saved)" />
-                </div>
+                <NotesPanel courseId={courseId} lessonId={currentLesson?.id} />
               )}
 
               {activeTab === 'reviews' && (

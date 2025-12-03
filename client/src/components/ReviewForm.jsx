@@ -23,11 +23,8 @@ export default function ReviewForm({ courseId, userId, onReviewSubmitted }) {
             const token = await getToken()
             const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
 
-            const effectiveUserId = userId || (import.meta.env.VITE_TEST_AUTH ? 'test_user_id' : undefined)
-
             await axios.post('/api/reviews', {
                 courseId,
-                userId: effectiveUserId,
                 rating,
                 comment
             }, config)

@@ -14,6 +14,15 @@ router.post('/', requireAuth(), async (req, res) => {
     try {
         const { lessonId, title, description, passingScore, timeLimit } = req.body;
 
+        // Validation
+        if (!lessonId || !title) {
+            return res.status(400).json({ error: 'lessonId and title are required' });
+        }
+
+        if (passingScore && (passingScore < 0 || passingScore > 100)) {
+            return res.status(400).json({ error: 'passingScore must be between 0 and 100' });
+        }
+
         const quiz = await prisma.quiz.create({
             data: {
                 lessonId,

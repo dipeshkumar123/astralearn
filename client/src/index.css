@@ -109,3 +109,20 @@
 .animate-delay-700 {
   animation-delay: 700ms;
 }
+
+/* Simple animations */
+.animate-fade-in {
+  animation: fadeIn 300ms ease-in-out both;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-bounce-slow {
+  animation: bounceSlow 2s infinite;
+}
+@keyframes bounceSlow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
