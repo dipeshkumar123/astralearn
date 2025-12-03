@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { UserButton, useAuth } from '@clerk/clerk-react'
 import { Menu, X, Search, BookOpen, LayoutDashboard, LogIn } from 'lucide-react'
+import { useUserRole } from '../hooks/useUserRole'
 
 export default function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false)
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const { isSignedIn } = useAuth()
+    const { role, isTeacher } = useUserRole()
     const location = useLocation()
+    const navigate = useNavigate()
 
     useEffect(() => {
         const handleScroll = () => {
@@ -17,9 +20,13 @@ export default function Navbar() {
         return () => window.removeEventListener('scroll', handleScroll)
     }, [])
 
+    const getDashboardPath = () => {
+        return isTeacher ? '/teacher' : '/dashboard'
+    }
+
     const navLinks = [
         { name: 'Browse Courses', path: '/courses', icon: BookOpen },
-        ...(isSignedIn ? [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }] : []),
+        ...(isSignedIn ? [{ name: 'Dashboard', path: getDashboardPath(), icon: LayoutDashboard }] : []),
     ]
 
     return (
@@ -30,14 +37,17 @@ export default function Navbar() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     {/* Logo */}
-                    <Link to="/" className="flex items-center gap-2 group">
+                    <div 
+                        onClick={() => navigate(isSignedIn ? getDashboardPath() : '/')}
+                        className="flex items-center gap-2 group cursor-pointer"
+                    >
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform">
                             A
                         </div>
                         <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-dark to-secondary-dark">
                             Astralearn
                         </span>
-                    </Link>
+                    </div>
 
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center gap-8">

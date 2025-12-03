@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { UserButton, useAuth } from '@clerk/clerk-react'
-import { Plus } from 'lucide-react'
+import { Plus, Edit, Eye, EyeOff, Layers, X } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import TeacherHeader from '../../components/TeacherHeader'
 
 export default function TeacherCourses() {
     const { getToken } = useAuth()
@@ -50,115 +51,159 @@ export default function TeacherCourses() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="bg-white shadow-sm border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        <Link to="/teacher" className="text-2xl font-bold text-gray-900">
-                            Nexus LMS - Instructor
-                        </Link>
-                        <div className="flex items-center gap-4">
-                            <Link to="/" className="text-gray-600 hover:text-gray-900">
-                                Student View
-                            </Link>
-                            <UserButton />
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+            <TeacherHeader 
+                title="My Courses" 
+                subtitle="Create and manage your courses"
+                backLink="/teacher"
+            />
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-3xl font-bold">My Courses</h1>
+                <div className="flex justify-between items-center mb-8">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-900">Course Library</h2>
+                        <p className="text-slate-600 mt-1">Manage your course content and settings</p>
+                    </div>
                     <button
                         onClick={() => setCreating(!creating)}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                        className="flex items-center gap-2 bg-gradient-to-r from-primary to-secondary text-white px-5 py-2.5 rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all hover:scale-105 font-medium"
                     >
-                        <Plus className="h-5 w-5" />
-                        New Course
+                        {creating ? <X className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+                        {creating ? 'Cancel' : 'New Course'}
                     </button>
                 </div>
 
                 {creating && (
-                    <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Create New Course</h2>
-                        <form onSubmit={handleCreateCourse} className="flex gap-4">
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 mb-8 animate-in slide-in-from-top-2">
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Create New Course</h3>
+                        <form onSubmit={handleCreateCourse} className="space-y-4">
                             <input
                                 type="text"
                                 value={newCourseTitle}
                                 onChange={(e) => setNewCourseTitle(e.target.value)}
                                 placeholder="Course title (e.g., 'Introduction to React')"
-                                className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                 autoFocus
                             />
-                            <button
-                                type="submit"
-                                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-                            >
-                                Create
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setCreating(false)}
-                                className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition"
-                            >
-                                Cancel
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={!newCourseTitle.trim()}
+                                    className="flex-1 bg-emerald-600 text-white px-6 py-3 rounded-xl hover:bg-emerald-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Create Course
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCreating(false)
+                                        setNewCourseTitle('')
+                                    }}
+                                    className="px-6 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition font-medium"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </form>
                     </div>
                 )}
 
                 {loading ? (
-                    <div className="text-center py-12">Loading courses...</div>
+                    <div className="text-center py-16">
+                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-primary"></div>
+                        <p className="text-slate-600 mt-4">Loading courses...</p>
+                    </div>
                 ) : courses.length === 0 ? (
-                    <div className="text-center py-12 text-gray-600">
-                        <p className="text-lg">No courses yet</p>
-                        <p className="text-sm mt-2">Click "New Course" to get started</p>
+                    <div className="text-center py-16">
+                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Layers className="h-10 w-10 text-slate-400" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-slate-900 mb-2">No courses yet</h3>
+                        <p className="text-slate-600 mb-6">Get started by creating your first course</p>
+                        <button
+                            onClick={() => setCreating(true)}
+                            className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-medium"
+                        >
+                            Create Your First Course
+                        </button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {courses.map(course => (
                             <div
                                 key={course.id}
-                                className="bg-white rounded-lg shadow-md hover:shadow-lg transition overflow-hidden"
+                                className="bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-xl hover:border-slate-300 transition-all duration-300 overflow-hidden group"
                             >
-                                <div className="h-36 bg-gradient-to-br from-blue-500 to-purple-600"></div>
-                                <div className="p-4 space-y-3">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <h3 className="font-semibold text-lg mb-1 truncate">{course.title}</h3>
-                                            <p className="text-sm text-gray-600 line-clamp-2">{course.description || 'No description'}</p>
+                                {/* Course Thumbnail */}
+                                <div className="h-40 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 relative overflow-hidden">
+                                    {course.thumbnail ? (
+                                        <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <Layers className="h-16 w-16 text-white opacity-50" />
                                         </div>
-                                        <span className={`whitespace-nowrap px-2 py-1 rounded ${course.isPublished ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                            {course.isPublished ? 'Published' : 'Draft'}
+                                    )}
+                                    <div className="absolute top-3 right-3">
+                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                            course.isPublished 
+                                                ? 'bg-emerald-500 text-white shadow-lg' 
+                                                : 'bg-slate-900/50 backdrop-blur-sm text-white'
+                                        }`}>
+                                            {course.isPublished ? '✓ Published' : 'Draft'}
                                         </span>
                                     </div>
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-gray-500">{course.sections?.length || 0} sections</span>
-                                        <div className="flex gap-2">
-                                            <button
-                                                className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
-                                                onClick={() => navigate(`/teacher/courses/${course.id}`)}
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                className={`px-3 py-1 rounded ${course.isPublished ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : 'bg-green-600 text-white hover:bg-green-700'}`}
-                                                onClick={async () => {
-                                                    try {
-                                                        const token = await getToken()
-                                                        const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
-                                                        await axios.put(`/api/courses/${course.id}`, { isPublished: !course.isPublished }, cfg)
-                                                        toast.success(course.isPublished ? 'Unpublished' : 'Published')
-                                                        fetchCourses()
-                                                    } catch (e) {
-                                                        toast.error('Failed to update publish state')
-                                                    }
-                                                }}
-                                            >
-                                                {course.isPublished ? 'Unpublish' : 'Publish'}
-                                            </button>
-                                        </div>
+                                </div>
+
+                                {/* Course Info */}
+                                <div className="p-5 space-y-4">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-slate-900 mb-2 line-clamp-2 min-h-[3.5rem]">
+                                            {course.title}
+                                        </h3>
+                                        <p className="text-sm text-slate-600 line-clamp-2">
+                                            {course.description || 'No description provided'}
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-4 text-sm text-slate-500">
+                                        <span className="flex items-center gap-1">
+                                            <Layers className="h-4 w-4" />
+                                            {course.sections?.length || 0} sections
+                                        </span>
+                                        <span className="text-slate-300">•</span>
+                                        <span>{course.category || 'Uncategorized'}</span>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-2 pt-2">
+                                        <button
+                                            className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition font-medium text-sm flex items-center justify-center gap-2"
+                                            onClick={() => navigate(`/teacher/courses/${course.id}`)}
+                                        >
+                                            <Edit className="h-4 w-4" />
+                                            Edit
+                                        </button>
+                                        <button
+                                            className={`flex-1 px-4 py-2.5 rounded-xl transition font-medium text-sm flex items-center justify-center gap-2 ${
+                                                course.isPublished 
+                                                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' 
+                                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                            }`}
+                                            onClick={async () => {
+                                                try {
+                                                    const token = await getToken()
+                                                    const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+                                                    await axios.put(`/api/courses/${course.id}`, { isPublished: !course.isPublished }, cfg)
+                                                    toast.success(course.isPublished ? 'Course unpublished' : 'Course published!')
+                                                    fetchCourses()
+                                                } catch (e) {
+                                                    toast.error('Failed to update')
+                                                }
+                                            }}
+                                        >
+                                            {course.isPublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                            {course.isPublished ? 'Unpublish' : 'Publish'}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
