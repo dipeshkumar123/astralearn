@@ -18,10 +18,10 @@ export default function OnboardPage() {
         await axios.patch('/api/users/me/role', { role }, cfg)
       } catch (e) {
         // ignore; fallback to default role
-      } finally {
-        if (role === 'TEACHER') navigate('/teacher', { replace: true })
-        else navigate('/dashboard', { replace: true })
       }
+      // Always redirect based on selected role
+      if (role === 'TEACHER') navigate('/teacher', { replace: true })
+      else navigate('/dashboard', { replace: true })
     }
     run()
   }, [location.search])

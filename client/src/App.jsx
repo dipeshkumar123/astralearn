@@ -52,6 +52,7 @@ function App() {
                         <Route path="/login/*" element={<LoginPage />} />
                         <Route path="/signup/*" element={<SignupPage />} />
                         <Route path="/onboard" element={<OnboardPage />} />
+                        <Route path="/courses" element={<CoursesListPage />} />
                     </Route>
 
                     {/* Protected Student Routes */}
@@ -61,7 +62,6 @@ function App() {
                         </SignedIn>
                     }>
                         <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/courses" element={<CoursesListPage />} />
                         <Route path="/courses/:courseId" element={<CoursePage />} />
                         <Route path="/profile" element={<ProfilePage />} />
                         <Route path="/learning" element={<MyLearningPage />} />

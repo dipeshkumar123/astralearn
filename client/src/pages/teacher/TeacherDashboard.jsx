@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom'
 import { UserButton, useAuth } from '@clerk/clerk-react'
-import { BookOpen, BarChart3, Upload, Users, Layers, CheckCircle } from 'lucide-react'
+import { BookOpen, BarChart3, Upload, Layers, CheckCircle, FileText } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 
 export default function TeacherDashboard() {
     const { getToken } = useAuth()
-    const [stats, setStats] = useState({ courses: 0, sections: 0, students: 0, published: 0 })
+    const [stats, setStats] = useState({ courses: 0, sections: 0, lessons: 0, published: 0 })
 
     useEffect(() => {
         const fetch = async () => {
@@ -16,10 +16,9 @@ export default function TeacherDashboard() {
                 const res = await axios.get('/api/courses/instructor', cfg)
                 const courses = res.data || []
                 const sections = courses.reduce((acc, c) => acc + (c.sections?.length || 0), 0)
+                const lessons = courses.reduce((acc, c) => acc + (c.sections?.reduce((a, s) => a + (s.lessons?.length || 0), 0) || 0), 0)
                 const published = courses.filter(c => c.isPublished).length
-                // approximate students = sum of enrollments lengths if included; fallback to published * 10
-                const students = published * 10
-                setStats({ courses: courses.length, sections, students, published })
+                setStats({ courses: courses.length, sections, lessons, published })
             } catch {}
         }
         fetch()
@@ -29,9 +28,9 @@ export default function TeacherDashboard() {
             <div className="bg-white shadow-sm border-b">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
-                        <h1 className="text-2xl font-bold text-gray-900">Nexus LMS - Instructor</h1>
+                        <h1 className="text-2xl font-bold text-gray-900">Astralearn - Instructor Dashboard</h1>
                         <div className="flex items-center gap-4">
-                            <Link to="/" className="text-gray-600 hover:text-gray-900">
+                            <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">
                                 Student View
                             </Link>
                             <UserButton />
@@ -43,38 +42,40 @@ export default function TeacherDashboard() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <h2 className="text-3xl font-bold mb-8">Welcome, Instructor!</h2>
 
-                {/* Overview Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {/* Overview Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                     <div className="bg-white p-6 rounded-lg shadow-sm border flex items-center gap-4">
-                        <Layers className="h-8 w-8 text-blue-600" />
+                        <Layers className="h-10 w-10 text-blue-600" />
                         <div>
-                            <p className="text-xs text-slate-500">Total Courses</p>
-                            <p className="text-2xl font-bold">{stats.courses}</p>
+                            <p className="text-sm text-slate-500">Total Courses</p>
+                            <p className="text-3xl font-bold">{stats.courses}</p>
                         </div>
                     </div>
                     <div className="bg-white p-6 rounded-lg shadow-sm border flex items-center gap-4">
-                        <BookOpen className="h-8 w-8 text-indigo-600" />
+                        <BookOpen className="h-10 w-10 text-indigo-600" />
                         <div>
-                            <p className="text-xs text-slate-500">Sections</p>
-                            <p className="text-2xl font-bold">{stats.sections}</p>
+                            <p className="text-sm text-slate-500">Lessons Created</p>
+                            <p className="text-3xl font-bold">{stats.lessons}</p>
                         </div>
                     </div>
                     <div className="bg-white p-6 rounded-lg shadow-sm border flex items-center gap-4">
-                        <Users className="h-8 w-8 text-green-600" />
+                        <FileText className="h-10 w-10 text-purple-600" />
                         <div>
-                            <p className="text-xs text-slate-500">Students (est.)</p>
-                            <p className="text-2xl font-bold">{stats.students}</p>
+                            <p className="text-sm text-slate-500">Sections</p>
+                            <p className="text-3xl font-bold">{stats.sections}</p>
                         </div>
                     </div>
                     <div className="bg-white p-6 rounded-lg shadow-sm border flex items-center gap-4">
-                        <CheckCircle className="h-8 w-8 text-emerald-600" />
+                        <CheckCircle className="h-10 w-10 text-emerald-600" />
                         <div>
-                            <p className="text-xs text-slate-500">Published</p>
-                            <p className="text-2xl font-bold">{stats.published}</p>
+                            <p className="text-sm text-slate-500">Published</p>
+                            <p className="text-3xl font-bold">{stats.published}</p>
                         </div>
                     </div>
                 </div>
 
+                {/* Quick Actions */}
+                <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <Link
                         to="/teacher/courses"
@@ -100,12 +101,12 @@ export default function TeacherDashboard() {
 
                     <Link
                         to="/teacher/analytics"
-                        className="bg-gray-200 p-6 rounded-lg flex items-center gap-4 hover:bg-gray-300 transition"
+                        className="bg-gray-700 text-white p-6 rounded-lg hover:bg-gray-800 transition flex items-center gap-4"
                     >
-                        <BarChart3 className="h-8 w-8 text-gray-700" />
+                        <BarChart3 className="h-8 w-8" />
                         <div>
-                            <h3 className="text-xl font-semibold text-gray-800">Analytics</h3>
-                            <p className="text-gray-600">View engagement and completion</p>
+                            <h3 className="text-xl font-semibold">Analytics</h3>
+                            <p className="text-gray-300">View engagement and completion</p>
                         </div>
                     </Link>
                 </div>

@@ -164,7 +164,64 @@ export default function CoursePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
         <h2 className="text-2xl font-bold text-slate-800">Course not found</h2>
-        <Button onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+        <Button onClick={() => navigate('/courses')}>Browse Courses</Button>
+      </div>
+    );
+  }
+
+  // Show preview/description only before enrollment
+  if (!enrollmentStatus.enrolled) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <div className="bg-white border-b border-slate-200 px-6 py-3">
+          <button onClick={() => navigate('/courses')} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-900 inline-flex items-center gap-2">
+            <ChevronLeft className="h-5 w-5" />
+            Back to Courses
+          </button>
+        </div>
+        <div className="max-w-4xl mx-auto p-6 lg:p-12 space-y-8">
+          <div>
+            <h1 className="text-4xl font-bold text-slate-900 mb-4">{course.title}</h1>
+            <p className="text-lg text-slate-600">{course.description || 'No description available.'}</p>
+          </div>
+          {course.thumbnail && (
+            <img src={course.thumbnail} alt={course.title} className="w-full h-64 object-cover rounded-xl shadow-md" />
+          )}
+          <Card className="p-8 bg-primary-50 border-primary-100">
+            <h3 className="text-2xl font-bold text-slate-900 mb-4">Course Details</h3>
+            <div className="grid gap-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Category:</span>
+                <span className="font-medium">{course.category}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Level:</span>
+                <span className="font-medium">{course.level}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Price:</span>
+                <span className="font-bold text-primary text-lg">${course.price || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Modules:</span>
+                <span className="font-medium">{course.modules?.length || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">Total Lessons:</span>
+                <span className="font-medium">{course.lessons?.length || 0}</span>
+              </div>
+            </div>
+          </Card>
+          <div className="flex gap-4">
+            <Button onClick={enrollInCourse} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-6 text-lg">
+              Enroll Now
+            </Button>
+          </div>
+          <div className="mt-8">
+            <h3 className="text-xl font-bold text-slate-900 mb-4">Reviews</h3>
+            <ReviewList courseId={courseId} />
+          </div>
+        </div>
       </div>
     );
   }
