@@ -107,7 +107,8 @@ router.get('/instructor', requireAuth(), async (req, res) => {
         });
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            // Return empty array instead of 404 - user might be newly created
+            return res.json([]);
         }
 
         const courses = await prisma.course.findMany({

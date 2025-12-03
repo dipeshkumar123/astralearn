@@ -2,7 +2,7 @@ const { getAuth } = require('@clerk/express');
 const prisma = require('../lib/prisma');
 
 const requireAuth = () => {
-    return (req, res, next) => {
+    return async (req, res, next) => {
         // Test bypass: allow injecting auth when TEST_AUTH=1
         if (process.env.TEST_AUTH === '1') {
             const injectedId = process.env.TEST_AUTH_CLERK_ID || 'test_clerk_user';
@@ -14,6 +14,33 @@ const requireAuth = () => {
         if (!auth || !auth.userId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
+
+        // Auto-sync user to database if not exists
+        try {
+            const { userId: clerkId } = auth;
+            const { emailAddress, firstName, lastName } = auth.sessionClaims || {};
+            
+            let user = await prisma.user.findUnique({
+                where: { clerkId }
+            });
+
+            if (!user) {
+                console.log(`Auto-creating user for Clerk ID: ${clerkId}`);
+                user = await prisma.user.create({
+                    data: {
+                        clerkId,
+                        email: emailAddress || `${clerkId}@example.com`,
+                        firstName: firstName || 'New',
+                        lastName: lastName || 'User',
+                        role: 'STUDENT' // Default role, can be changed via onboarding
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('User auto-sync error:', error);
+            // Continue anyway, don't block the request
+        }
+
         // Attach auth function to req for compatibility
         req.auth = () => auth;
         next();

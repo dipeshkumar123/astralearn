@@ -11,7 +11,12 @@ export default function LoginPage() {
                         <p className="mt-2 text-slate-600">Please sign in to your account</p>
                     </div>
                     <div className="flex justify-center">
-                        <SignIn routing="path" path="/login" signUpUrl="/signup" />
+                        <SignIn 
+                            routing="path" 
+                            path="/login" 
+                            signUpUrl="/signup"
+                            afterSignInUrl="/"
+                        />
                     </div>
                 </div>
             </div>

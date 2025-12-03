@@ -28,6 +28,7 @@ import LessonEditor from './pages/teacher/LessonEditor'
 import ContentIngestion from './pages/teacher/ContentIngestion'
 import Analytics from './pages/teacher/Analytics'
 import TeacherGuard from './components/TeacherGuard'
+import RoleBasedRedirect from './components/RoleBasedRedirect'
 
 const PUBLISHABLE_KEY = 'pk_test_YWRlcXVhdGUtdGFkcG9sZS03Ny5jbGVyay5hY2NvdW50cy5kZXYk'
 
@@ -45,7 +46,7 @@ function App() {
                                     <LandingPage />
                                 </SignedOut>
                                 <SignedIn>
-                                    <Navigate to="/dashboard" replace />
+                                    <RoleBasedRedirect />
                                 </SignedIn>
                             </>
                         } />
