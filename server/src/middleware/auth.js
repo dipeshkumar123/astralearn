@@ -26,10 +26,12 @@ const requireAuth = () => {
 
             if (!user) {
                 console.log(`Auto-creating user for Clerk ID: ${clerkId}`);
+                // Use a unique email based on clerkId to avoid conflicts
+                const uniqueEmail = emailAddress || `user_${clerkId.replace('user_', '')}@astralearn.local`;
                 user = await prisma.user.create({
                     data: {
                         clerkId,
-                        email: emailAddress || `${clerkId}@example.com`,
+                        email: uniqueEmail,
                         firstName: firstName || 'New',
                         lastName: lastName || 'User',
                         role: 'STUDENT' // Default role, can be changed via onboarding

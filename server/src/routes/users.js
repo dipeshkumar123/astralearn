@@ -25,10 +25,11 @@ router.get('/me', requireAuth(), async (req, res) => {
         // If not found, create
         if (!user) {
             console.log(`Creating new user for Clerk ID: ${clerkId}`);
+            const uniqueEmail = email || `user_${clerkId.replace('user_', '')}@astralearn.local`;
             user = await prisma.user.create({
                 data: {
                     clerkId,
-                    email: email || `${clerkId}@example.com`, // Fallback if email not in claims
+                    email: uniqueEmail,
                     firstName: 'New',
                     lastName: 'Student',
                     role: 'STUDENT'
@@ -155,18 +156,30 @@ router.patch('/me/role', requireAuth(), async (req, res) => {
             return res.status(400).json({ error: 'Invalid role. Must be STUDENT or TEACHER' });
         }
 
-        // Ensure user exists, then update role
-        const user = await prisma.user.upsert({
-            where: { clerkId },
-            update: { role },
-            create: {
-                clerkId,
-                email: `${clerkId}@example.com`,
-                firstName: 'New',
-                lastName: role === 'TEACHER' ? 'Teacher' : 'Student',
-                role
-            }
+        // Try to find existing user first
+        let user = await prisma.user.findUnique({
+            where: { clerkId }
         });
+
+        if (user) {
+            // User exists, just update role
+            user = await prisma.user.update({
+                where: { clerkId },
+                data: { role }
+            });
+        } else {
+            // User doesn't exist, create with unique email
+            const uniqueEmail = `user_${clerkId.replace('user_', '')}@astralearn.local`;
+            user = await prisma.user.create({
+                data: {
+                    clerkId,
+                    email: uniqueEmail,
+                    firstName: 'New',
+                    lastName: role === 'TEACHER' ? 'Teacher' : 'Student',
+                    role
+                }
+            });
+        }
 
         res.json(user);
     } catch (error) {
