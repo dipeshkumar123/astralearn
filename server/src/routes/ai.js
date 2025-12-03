@@ -79,7 +79,7 @@ router.post('/ingest-text', requireAuth(), requireTeacher(), async (req, res) =>
         const course = await prisma.course.findUnique({ where: { id: courseId } });
         if (!course) return res.status(404).json({ error: 'Course not found' });
 
-        const chunks = processContent(Buffer.from(text), 'text');
+        const chunks = await processContent(Buffer.from(text), 'text');
         const saved = [];
         for (let i = 0; i < chunks.length; i++) {
             const embedding = await generateEmbedding(chunks[i]);
