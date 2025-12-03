@@ -155,9 +155,17 @@ router.patch('/me/role', requireAuth(), async (req, res) => {
             return res.status(400).json({ error: 'Invalid role. Must be STUDENT or TEACHER' });
         }
 
-        const user = await prisma.user.update({
+        // Ensure user exists, then update role
+        const user = await prisma.user.upsert({
             where: { clerkId },
-            data: { role }
+            update: { role },
+            create: {
+                clerkId,
+                email: `${clerkId}@example.com`,
+                firstName: 'New',
+                lastName: role === 'TEACHER' ? 'Teacher' : 'Student',
+                role
+            }
         });
 
         res.json(user);

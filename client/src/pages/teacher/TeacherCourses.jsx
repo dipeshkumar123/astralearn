@@ -17,16 +17,17 @@ export default function TeacherCourses() {
         fetchCourses()
     }, [])
 
-    const fetchCourses = () => {
-        axios.get('/api/courses')
-            .then(res => {
-                setCourses(res.data)
-                setLoading(false)
-            })
-            .catch(err => {
-                console.error(err)
-                setLoading(false)
-            })
+    const fetchCourses = async () => {
+        try {
+            const token = await getToken()
+            const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+            const res = await axios.get('/api/courses/instructor', cfg)
+            setCourses(res.data)
+        } catch (err) {
+            console.error(err)
+        } finally {
+            setLoading(false)
+        }
     }
 
     const handleCreateCourse = async (e) => {
@@ -117,23 +118,50 @@ export default function TeacherCourses() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {courses.map(course => (
-                            <Link
+                            <div
                                 key={course.id}
-                                to={`/teacher/courses/${course.id}`}
                                 className="bg-white rounded-lg shadow-md hover:shadow-lg transition overflow-hidden"
                             >
-                                <div className="h-48 bg-gradient-to-br from-blue-500 to-purple-600"></div>
-                                <div className="p-4">
-                                    <h3 className="font-semibold text-lg mb-2">{course.title}</h3>
-                                    <p className="text-sm text-gray-600 mb-2">{course.description || 'No description'}</p>
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-gray-500">{course.sections?.length || 0} sections</span>
-                                        <span className={`px-2 py-1 rounded ${course.isPublished ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                <div className="h-36 bg-gradient-to-br from-blue-500 to-purple-600"></div>
+                                <div className="p-4 space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <h3 className="font-semibold text-lg mb-1 truncate">{course.title}</h3>
+                                            <p className="text-sm text-gray-600 line-clamp-2">{course.description || 'No description'}</p>
+                                        </div>
+                                        <span className={`whitespace-nowrap px-2 py-1 rounded ${course.isPublished ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                                             {course.isPublished ? 'Published' : 'Draft'}
                                         </span>
                                     </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-500">{course.sections?.length || 0} sections</span>
+                                        <div className="flex gap-2">
+                                            <button
+                                                className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
+                                                onClick={() => navigate(`/teacher/courses/${course.id}`)}
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                className={`px-3 py-1 rounded ${course.isPublished ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : 'bg-green-600 text-white hover:bg-green-700'}`}
+                                                onClick={async () => {
+                                                    try {
+                                                        const token = await getToken()
+                                                        const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+                                                        await axios.put(`/api/courses/${course.id}`, { isPublished: !course.isPublished }, cfg)
+                                                        toast.success(course.isPublished ? 'Unpublished' : 'Published')
+                                                        fetchCourses()
+                                                    } catch (e) {
+                                                        toast.error('Failed to update publish state')
+                                                    }
+                                                }}
+                                            >
+                                                {course.isPublished ? 'Unpublish' : 'Publish'}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </Link>
+                            </div>
                         ))}
                     </div>
                 )}
