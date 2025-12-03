@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { UserButton, useAuth } from '@clerk/clerk-react'
-import { ArrowLeft, Upload, FileText, CheckCircle, Sparkles } from 'lucide-react'
+import { ArrowLeft, Upload, FileText, CheckCircle, Sparkles, Loader2 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import TeacherHeader from '../../components/TeacherHeader'
@@ -10,9 +10,32 @@ export default function ContentIngestion() {
     const { getToken } = useAuth()
     const [selectedFile, setSelectedFile] = useState(null)
     const [courseId, setCourseId] = useState('')
+    const [courses, setCourses] = useState([])
+    const [loadingCourses, setLoadingCourses] = useState(true)
     const [uploading, setUploading] = useState(false)
     const [uploadResult, setUploadResult] = useState(null)
     const [rawText, setRawText] = useState('')
+
+    useEffect(() => {
+        fetchCourses()
+    }, [])
+
+    const fetchCourses = async () => {
+        try {
+            const token = await getToken()
+            const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+            const res = await axios.get('/api/courses/instructor', cfg)
+            setCourses(res.data || [])
+            if (res.data && res.data.length > 0) {
+                setCourseId(res.data[0].id)
+            }
+        } catch (err) {
+            console.error('Error fetching courses:', err)
+            toast.error('Failed to load your courses')
+        } finally {
+            setLoadingCourses(false)
+        }
+    }
 
     const handleFileSelect = (e) => {
         const file = e.target.files?.[0]
@@ -27,7 +50,7 @@ export default function ContentIngestion() {
 
     const handleUpload = async () => {
         if (!selectedFile || !courseId) {
-            toast.error('Please select a file and enter a course ID')
+            toast.error('Please select a file and a course')
             return
         }
 
@@ -49,10 +72,10 @@ export default function ContentIngestion() {
             setUploadResult(res.data)
             toast.success(`Content ingested! ${res.data.chunksCreated} chunks created`)
             setSelectedFile(null)
-            setCourseId('')
         } catch (error) {
             console.error(error)
-            toast.error('Failed to ingest content')
+            const errorMsg = error.response?.data?.error || 'Failed to ingest content'
+            toast.error(errorMsg)
         } finally {
             setUploading(false)
         }
@@ -72,21 +95,46 @@ export default function ContentIngestion() {
                     <h2 className="text-2xl font-bold mb-2">Upload Course Materials</h2>
                     <p className="text-gray-600 mb-6">
                         Upload PDFs or text files to make them searchable by the AI tutor
-                    </p>
-
-                    {/* Course ID Input */}
-                    <div className="mb-6">
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            Course ID
-                        </label>
-                        <input
-                            type="text"
-                            value={courseId}
-                            onChange={(e) => setCourseId(e.target.value)}
-                            placeholder="Enter course ID"
-                            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                        />
                     </div>
+
+                    {loadingCourses ? (
+                        <div className="text-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-2" />
+                            <p className="text-slate-600">Loading your courses...</p>
+                        </div>
+                    ) : courses.length === 0 ? (
+                        <div className="text-center py-8 bg-amber-50 rounded-xl border border-amber-200 mb-6">
+                            <p className="text-amber-800 font-medium mb-2">No courses found</p>
+                            <p className="text-amber-700 text-sm mb-4">You need to create a course first before indexing content.</p>
+                            <Link 
+                                to="/teacher/courses"
+                                className="inline-block bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition"
+                            >
+                                Create Your First Course
+                            </Link>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Course Selector */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                    Select Course
+                                </label>
+                                <select
+                                    value={courseId}
+                                    onChange={(e) => setCourseId(e.target.value)}
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white"
+                                >
+                                    {courses.map(course => (
+                                        <option key={course.id} value={course.id}>
+                                            {course.title} {course.isPublished ? '(Published)' : '(Draft)'}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Content will be indexed for the AI tutor in the selected course
+                                </p>
+                            </div>
 
                     {/* File Upload */}
                     <div className="mb-6">
@@ -133,7 +181,7 @@ export default function ContentIngestion() {
                     {/* Upload Button */}
                     <button
                         onClick={handleUpload}
-                        disabled={!selectedFile || !courseId || uploading}
+                        disabled={!selectedFile || !courseId || uploading || courses.length === 0}
                         className="w-full bg-gradient-to-r from-primary to-secondary text-white py-4 rounded-xl hover:shadow-lg hover:shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
                     >
                         {uploading ? (
@@ -194,7 +242,8 @@ export default function ContentIngestion() {
                 </div>
 
                 {/* AI Indexing (Raw Text) */}
-                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 mt-6">
+                {!loadingCourses && courses.length > 0 && (
+                    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 mt-6">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
                             <FileText className="h-6 w-6 text-white" />
@@ -213,24 +262,26 @@ export default function ContentIngestion() {
                     />
                     
                     <button
-                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all font-semibold flex items-center justify-center gap-2"
                         onClick={async () => {
                             try {
                                 const token = await getToken()
                                 const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
-                                if (!courseId) { toast.error('Enter course ID'); return }
+                                if (!courseId) { toast.error('Select a course'); return }
                                 if (!rawText.trim()) { toast.error('Enter some text'); return }
                                 await axios.post('/api/ai/ingest-text', { courseId, text: rawText }, cfg)
                                 toast.success('Lesson indexed to AI!')
                                 setRawText('')
                             } catch (e) {
-                                toast.error('Failed to index')
+                                const errorMsg = e.response?.data?.error || 'Failed to index'
+                                toast.error(errorMsg)
                             }
                         }}
                     >
                         <Sparkles className="h-5 w-5" />
                         Index Lesson to AI
                     </button>
+                </div>
+                )}button>
                 </div>
             </div>
         </div>

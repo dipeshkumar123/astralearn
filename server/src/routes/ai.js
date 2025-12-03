@@ -10,11 +10,13 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 /**
  * POST /api/ai/ingest - Ingest content and create embeddings
+ * Requires course ownership - teachers can only index their own courses
  */
 router.post('/ingest', requireAuth(), requireTeacher(), upload.single('file'), async (req, res) => {
     try {
         const { courseId, contentType } = req.body;
         const file = req.file;
+        const { userId: clerkId } = req.auth();
 
         if (!file) {
             return res.status(400).json({ error: 'No file provided' });
@@ -24,13 +26,28 @@ router.post('/ingest', requireAuth(), requireTeacher(), upload.single('file'), a
             return res.status(400).json({ error: 'Course ID is required' });
         }
 
-        // Verify course exists
+        // Verify user exists and get their ID
+        const user = await prisma.user.findUnique({
+            where: { clerkId },
+            select: { id: true }
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Verify course exists and user is the instructor
         const course = await prisma.course.findUnique({
-            where: { id: courseId }
+            where: { id: courseId },
+            select: { instructorId: true }
         });
 
         if (!course) {
             return res.status(404).json({ error: 'Course not found' });
+        }
+
+        if (course.instructorId !== user.id) {
+            return res.status(403).json({ error: 'Access denied. You can only index content for your own courses.' });
         }
 
         // Process content into chunks
@@ -71,13 +88,35 @@ router.post('/ingest', requireAuth(), requireTeacher(), upload.single('file'), a
 router.post('/ingest-text', requireAuth(), requireTeacher(), async (req, res) => {
     try {
         const { courseId, text } = req.body;
+        const { userId: clerkId } = req.auth();
 
         if (!courseId || !text) {
             return res.status(400).json({ error: 'courseId and text are required' });
         }
 
-        const course = await prisma.course.findUnique({ where: { id: courseId } });
-        if (!course) return res.status(404).json({ error: 'Course not found' });
+        // Verify user exists and get their ID
+        const user = await prisma.user.findUnique({
+            where: { clerkId },
+            select: { id: true }
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Verify course exists and user is the instructor
+        const course = await prisma.course.findUnique({ 
+            where: { id: courseId },
+            select: { instructorId: true }
+        });
+        
+        if (!course) {
+            return res.status(404).json({ error: 'Course not found' });
+        }
+
+        if (course.instructorId !== user.id) {
+            return res.status(403).json({ error: 'Access denied. You can only index content for your own courses.' });
+        }
 
         const chunks = await processContent(Buffer.from(text), 'text');
         const saved = [];
