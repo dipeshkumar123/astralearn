@@ -95,7 +95,7 @@ export default function ContentIngestion() {
                     <h2 className="text-2xl font-bold mb-2">Upload Course Materials</h2>
                     <p className="text-gray-600 mb-6">
                         Upload PDFs or text files to make them searchable by the AI tutor
-                    </div>
+                    </p>
 
                     {loadingCourses ? (
                         <div className="text-center py-8">
@@ -213,6 +213,8 @@ export default function ContentIngestion() {
                             </div>
                         </div>
                     )}
+                        </>
+                    )}
                 </div>
 
                 {/* Info Box */}
@@ -276,13 +278,13 @@ export default function ContentIngestion() {
                                 toast.error(errorMsg)
                             }
                         }}
+                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl hover:shadow-lg font-semibold flex items-center justify-center gap-2 transition"
                     >
                         <Sparkles className="h-5 w-5" />
                         Index Lesson to AI
                     </button>
                 </div>
-                )}button>
-                </div>
+                )}
             </div>
         </div>
     )

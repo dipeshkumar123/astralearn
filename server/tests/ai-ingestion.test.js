@@ -1,0 +1,185 @@
+const request = require('supertest');
+const prisma = require('../src/lib/prisma');
+
+jest.mock('@clerk/express', () => ({
+  clerkMiddleware: () => (req, _res, next) => {
+    req.auth = () => ({ userId: 'user_test123' });
+    next();
+  },
+  requireAuth: () => (req, _res, next) => {
+    req.auth = () => ({ userId: 'user_test123' });
+    next();
+  }
+}));
+
+jest.mock('../src/lib/prisma');
+jest.mock('../src/lib/content-processor');
+
+const app = require('../src/index');
+
+describe('AI Content Ingestion Tests', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('POST /api/ai/ingest-text', () => {
+    test('Should ingest text content to owned course', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+      prisma.course.findUnique.mockResolvedValue({
+        id: 'c1',
+        instructorId: 'u1'
+      });
+
+      const contentProcessor = require('../src/lib/content-processor');
+      contentProcessor.processText.mockResolvedValue([
+        { content: 'Chunk 1', startIndex: 0, endIndex: 50 },
+        { content: 'Chunk 2', startIndex: 50, endIndex: 100 }
+      ]);
+
+      prisma.contentChunk.createMany.mockResolvedValue({
+        count: 2
+      });
+
+      const response = await request(app)
+        .post('/api/ai/ingest-text')
+        .set('Authorization', 'Bearer test_token')
+        .send({
+          courseId: 'c1',
+          text: 'This is sample course content that will be ingested'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.chunksCreated).toBe(2);
+    });
+
+    test('Should reject if user does not own course', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+      prisma.course.findUnique.mockResolvedValue({
+        id: 'c1',
+        instructorId: 'u2' // Different owner
+      });
+
+      const response = await request(app)
+        .post('/api/ai/ingest-text')
+        .set('Authorization', 'Bearer test_token')
+        .send({
+          courseId: 'c1',
+          text: 'Content'
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.error).toContain('Access denied');
+      expect(response.body.error).toContain('own courses');
+    });
+
+    test('Should validate courseId parameter', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+
+      const response = await request(app)
+        .post('/api/ai/ingest-text')
+        .set('Authorization', 'Bearer test_token')
+        .send({
+          text: 'Content without courseId'
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('Should return 404 if course not found', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+      prisma.course.findUnique.mockResolvedValue(null);
+
+      const response = await request(app)
+        .post('/api/ai/ingest-text')
+        .set('Authorization', 'Bearer test_token')
+        .send({
+          courseId: 'nonexistent',
+          text: 'Content'
+        });
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/ai/ingest (File Upload)', () => {
+    test('Should ingest PDF file to owned course', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+      prisma.course.findUnique.mockResolvedValue({
+        id: 'c1',
+        instructorId: 'u1'
+      });
+
+      const contentProcessor = require('../src/lib/content-processor');
+      contentProcessor.processPDF.mockResolvedValue([
+        { content: 'PDF Chunk 1', startIndex: 0, endIndex: 100 }
+      ]);
+
+      prisma.contentChunk.createMany.mockResolvedValue({
+        count: 1
+      });
+
+      const response = await request(app)
+        .post('/api/ai/ingest')
+        .set('Authorization', 'Bearer test_token')
+        .field('courseId', 'c1')
+        .field('contentType', 'pdf')
+        .attach('file', Buffer.from('PDF content'), 'test.pdf');
+
+      expect(response.status).toBe(200);
+      expect(response.body.chunksCreated).toBe(1);
+    });
+
+    test('Should reject file upload if not course owner', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+      prisma.course.findUnique.mockResolvedValue({
+        id: 'c1',
+        instructorId: 'u2' // Different owner
+      });
+
+      const response = await request(app)
+        .post('/api/ai/ingest')
+        .set('Authorization', 'Bearer test_token')
+        .field('courseId', 'c1')
+        .field('contentType', 'pdf')
+        .attach('file', Buffer.from('PDF content'), 'test.pdf');
+
+      expect(response.status).toBe(403);
+      expect(response.body.error).toContain('Access denied');
+    });
+
+    test('Should require courseId and file', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1' });
+
+      const response = await request(app)
+        .post('/api/ai/ingest')
+        .set('Authorization', 'Bearer test_token')
+        .field('contentType', 'pdf');
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('POST /api/ai/chat', () => {
+    test('Should return AI response for student query', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u1', role: 'STUDENT' });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: 'l1',
+        courseId: 'c1'
+      });
+      prisma.contentChunk.findMany.mockResolvedValue([
+        { content: 'Relevant content chunk' }
+      ]);
+
+      const response = await request(app)
+        .post('/api/ai/chat')
+        .set('Authorization', 'Bearer test_token')
+        .send({
+          lessonId: 'l1',
+          query: 'What is the main topic?'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('response');
+    });
+  });
+});

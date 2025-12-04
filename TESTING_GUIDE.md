@@ -1,286 +1,367 @@
-# Astralearn Testing Guide
+# AstraLearn - Comprehensive Testing Guide
 
-## System Status ✅
-Both servers are running successfully:
-- **Backend**: http://localhost:5000
-- **Frontend**: http://localhost:5173
+## Overview
+This document outlines all test files created for the AstraLearn application, covering both backend and frontend functionality with focus on updated features including role-based access control, course ownership security, video uploads, and AI content ingestion.
 
-## Testing Flows
+## Backend Tests
 
-### 1. Role-Based Access Control (RBAC) Flow
+### 1. Authentication & Security Tests (`server/tests/auth-security.test.js`)
+Tests critical security features and authentication flows.
 
-#### Teacher Registration & Onboarding
-1. Navigate to http://localhost:5173/signup
-2. Click on "Teacher" role option (GraduationCap icon)
-3. Complete Clerk signup form
-4. **Expected**: Redirect to `/onboard?role=TEACHER`
-5. OnboardPage will:
-   - Call `PATCH /api/users/me/role` with `{ role: "TEACHER" }`
-   - Create/update user record in database
-   - Redirect to `/teacher` (Teacher Dashboard)
+**Key Test Cases:**
+- ✅ Auto-user creation on first API call with unique email format
+- ✅ 401 Unauthorized without proper Bearer token
+- ✅ Course ownership verification - teachers can only edit their own courses
+- ✅ AI content ingestion security - teachers cannot index to courses they don't own
+- ✅ Role-based access control (STUDENT vs TEACHER)
+- ✅ Proper 403 Forbidden responses for unauthorized access
 
-#### Student Registration & Onboarding
-1. Navigate to http://localhost:5173/signup
-2. Click on "Student" role option (UserCircle icon)
-3. Complete Clerk signup form
-4. **Expected**: Redirect to `/onboard?role=STUDENT`
-5. OnboardPage will:
-   - Call `PATCH /api/users/me/role` with `{ role: "STUDENT" }`
-   - Create/update user record in database
-   - Redirect to `/dashboard` (Student Dashboard)
-
-### 2. Public Course Browsing
-
-#### Without Login
-1. Visit http://localhost:5173/courses (or click "Courses" in navbar)
-2. **Expected**: 
-   - Page loads without requiring authentication
-   - Shows only published courses (`isPublished: true`)
-   - Displays course cards with:
-     - Thumbnail image
-     - Title and instructor name
-     - Price and category
-     - Star ratings and review counts
-     - Category badge
-
-### 3. Course Preview & Enrollment Gating
-
-#### Course Preview (Not Enrolled)
-1. Click on any course card from `/courses`
-2. **Expected**:
-   - Shows course preview card with:
-     - Course thumbnail
-     - Title, instructor, category
-     - Full description
-     - Price information
-     - Reviews list
-     - "Enroll Now" button
-   - **Does NOT show**: Video player, lessons sidebar, course content
-
-#### After Enrollment
-1. Click "Enroll Now" button
-2. Complete Stripe checkout (if paid) or auto-enroll (if free)
-3. Return to course page
-4. **Expected**:
-   - Full course player with:
-     - Video player (Mux integration)
-     - Course sidebar with sections/lessons
-     - Tabs: Overview, Lessons, Quizzes, Notes, Roadmap, Bookmarks
-     - Full course content accessible
-
-### 4. Teacher Dashboard Experience
-
-#### Access Teacher Dashboard
-1. Login as Teacher user
-2. Navigate to http://localhost:5173/teacher
-3. **Expected Stats**:
-   - Total Courses (created by this teacher)
-   - Lessons Created (across all sections)
-   - Sections (total sections in all courses)
-   - Published (number of published courses)
-   - **Note**: NO student metrics (no enrollment counts)
-
-#### Quick Actions
-- Create New Course → `/teacher/course-builder`
-- Upload Content → `/teacher/content-upload`
-- View Analytics → `/teacher/analytics`
-- Manage Courses → `/teacher/courses`
-
-### 5. Teacher Course Management
-
-#### Course List
-1. Navigate to http://localhost:5173/teacher/courses
-2. **Expected**:
-   - Fetches only courses where `instructorId = current user`
-   - Each course card shows:
-     - Thumbnail
-     - Title and category
-     - Status badge (Draft/Published)
-     - Edit button
-     - Publish/Unpublish toggle
-
-#### Publish Toggle
-1. Click "Publish" or "Unpublish" button
-2. **Expected**:
-   - Calls `PUT /api/courses/:id` with `{ isPublished: !currentStatus }`
-   - Updates course status
-   - Badge updates (Draft ↔ Published)
-   - Toast notification confirms action
-
-### 6. AI Content Ingestion & Chat
-
-#### Upload Course Materials (Teacher)
-1. Login as Teacher
-2. Navigate to `/teacher/content-ingestion`
-3. Enter a course ID (from your created courses)
-4. Upload a PDF or TXT file
-5. Click "Upload and Index Content"
-6. **Expected**:
-   - Calls `POST /api/ai/ingest` with multipart/form-data
-   - File processed by `content-processor.js`:
-     - Extracts text from PDF
-     - Chunks text (1000 chars, 200 overlap)
-   - Generates embeddings via `gemini.js`
-   - Saves chunks to `CourseContent` table
-   - Shows success message: "X chunks created and indexed"
-
-#### Index Raw Text (Teacher)
-1. On same page, scroll to "AI Indexing" section
-2. Enter course ID
-3. Paste lesson text in textarea
-4. Click "Index Lesson to AI"
-5. **Expected**:
-   - Calls `POST /api/ai/ingest-text` with `{ courseId, text }`
-   - Text chunked and indexed
-   - Toast: "Lesson indexed to AI!"
-
-#### AI Chat (Student)
-1. Login as Student
-2. Enroll in a course that has indexed content
-3. Open course page
-4. Navigate to a lesson or use AIChatbot component
-5. Ask a question related to course materials
-6. **Expected**:
-   - Calls `POST /api/ai/chat` with `{ question, courseId }`
-   - Generates embedding for question
-   - Finds top 3 similar chunks via cosine similarity
-   - Groq generates response using LLaMA-3.3-70B
-   - Response shows:
-     - AI-generated answer
-     - Source references ([Source 1], [Source 2])
-     - Similarity scores
-
-### 7. Navigation & Routes
-
-#### Public Routes (No Auth Required)
-- `/` - Landing page
-- `/login` - Login page
-- `/signup` - Signup with role selection
-- `/courses` - Browse published courses
-- `/onboard` - Post-signup role handler
-
-#### Protected Student Routes (requireAuth)
-- `/dashboard` - Student dashboard
-- `/courses/:id` - Course detail (with enrollment gating)
-- `/profile` - User profile
-- `/learning` - My learning / enrolled courses
-- `/achievements` - Badges and gamification
-- `/settings` - User settings
-
-#### Protected Teacher Routes (requireAuth + requireTeacher)
-- `/teacher` - Teacher dashboard
-- `/teacher/courses` - Manage courses
-- `/teacher/course-builder` - Create/edit courses
-- `/teacher/lesson-editor/:id` - Edit lesson
-- `/teacher/content-upload` - Upload videos to Mux
-- `/teacher/content-ingestion` - AI indexing
-- `/teacher/analytics` - Course analytics
-
-## API Endpoints Summary
-
-### Auth & Users
-- `PATCH /api/users/me/role` - Set user role (onboarding)
-- `GET /api/users/me` - Get current user info
-
-### Courses
-- `GET /api/courses` - Get all published courses (public)
-- `GET /api/courses/instructor` - Get teacher's courses (auth)
-- `GET /api/courses/:id` - Get course details
-- `POST /api/courses` - Create course (teacher)
-- `PUT /api/courses/:id` - Update course (teacher, ownership)
-- `DELETE /api/courses/:id` - Delete course (teacher, ownership)
-
-### Enrollment
-- `POST /api/courses/:id/enroll` - Enroll in course
-- `GET /api/courses/:id/enrollment` - Check enrollment status
-
-### AI
-- `POST /api/ai/ingest` - Upload and index files (teacher)
-- `POST /api/ai/ingest-text` - Index raw text (teacher)
-- `POST /api/ai/chat` - Chat with AI tutor (student, enrolled)
-- `GET /api/ai/context/:courseId` - Get indexed content stats
-
-### Reviews
-- `GET /api/reviews/:courseId` - Get course reviews
-- `POST /api/reviews` - Create review (auth, enrolled)
-
-### Progress
-- `GET /api/progress/course/:courseId` - Get course progress
-- `POST /api/progress/update` - Update lesson progress
-
-## Known Issues & Notes
-
-### Fixed Issues ✅
-1. ✅ Teacher onboarding now correctly redirects to `/teacher`
-2. ✅ `/courses` route is public (accessible without login)
-3. ✅ Course preview shown before enrollment
-4. ✅ Student metrics removed from teacher dashboard
-5. ✅ AI text ingestion properly awaits async processContent
-6. ✅ Reviews route extracts userId from auth (not request body)
-
-### Environment Variables Required
-Server `.env`:
-```
-DATABASE_URL=postgresql://...
-CLERK_SECRET_KEY=sk_test_...
-MUX_TOKEN_ID=...
-MUX_TOKEN_SECRET=...
-STRIPE_SECRET_KEY=sk_test_...
-GROQ_API_KEY=gsk_...
+**Run Command:**
+```bash
+cd server
+npm test -- auth-security.test.js
 ```
 
-Client `.env`:
+### 2. Course Management Tests (`server/tests/courses.test.js`)
+Tests all course CRUD operations with ownership validation.
+
+**Key Test Cases:**
+- ✅ GET /api/courses/instructor returns teacher's courses only
+- ✅ Empty array returned for teachers with no courses (not 404)
+- ✅ POST /api/courses creates new course with correct instructorId
+- ✅ Title validation required
+- ✅ PUT /api/courses/:id enforces course ownership
+- ✅ DELETE /api/courses/:id prevents unauthorized deletion
+- ✅ 403 Forbidden when non-owner tries to modify
+
+**Run Command:**
+```bash
+cd server
+npm test -- courses.test.js
 ```
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+
+### 3. Video Upload & Mux Integration Tests (`server/tests/video-upload.test.js`)
+Tests video upload workflow and Mux API integration.
+
+**Key Test Cases:**
+- ✅ POST /api/mux/upload-url generates upload URL for teachers
+- ✅ Rejects upload if teacher doesn't own course (403)
+- ✅ Validates courseId parameter required (400)
+- ✅ Returns 404 for non-existent courses
+- ✅ GET /api/mux/asset/:assetId retrieves asset status
+- ✅ DELETE /api/mux/asset/:assetId removes video and clears lesson fields
+- ✅ Ownership verification on delete operations
+
+**Run Command:**
+```bash
+cd server
+npm test -- video-upload.test.js
 ```
 
-## Testing Checklist
+### 4. AI Content Ingestion Tests (`server/tests/ai-ingestion.test.js`)
+Tests AI content indexing with security and validation.
 
-- [ ] Teacher signup → redirects to `/teacher`
-- [ ] Student signup → redirects to `/dashboard`
-- [ ] `/courses` accessible without login
-- [ ] Only published courses shown on `/courses`
-- [ ] Course preview shown when not enrolled
-- [ ] Full content shown after enrollment
-- [ ] Teacher dashboard shows only instructor metrics
-- [ ] Publish/unpublish toggle works
-- [ ] AI file ingestion creates chunks
-- [ ] AI text ingestion works
-- [ ] AI chat returns relevant answers
-- [ ] Navigation between all routes works
-- [ ] Role-based route guards work (TeacherGuard)
+**Key Test Cases:**
+- ✅ POST /api/ai/ingest-text ingests text to owned courses
+- ✅ 403 Forbidden when user doesn't own course
+- ✅ courseId validation (400 if missing)
+- ✅ 404 when course not found
+- ✅ POST /api/ai/ingest (file upload) with ownership check
+- ✅ PDF and text file support
+- ✅ Content chunking and embedding generation
+- ✅ POST /api/ai/chat returns AI responses for student queries
 
-## Recommended Test Data
+**Run Command:**
+```bash
+cd server
+npm test -- ai-ingestion.test.js
+```
 
-### Create Test Courses
-1. Login as Teacher
-2. Create at least 2 courses:
-   - One published (to test public browsing)
-   - One draft (to test visibility filtering)
-3. Add sections and lessons
-4. Upload content for AI indexing
+### 5. Teacher Workflow Integration Tests (`server/tests/integration/teacher-workflow.integration.test.js`)
+End-to-end workflow testing for complete teacher scenarios.
 
-### Test AI Features
-1. Upload a PDF about a technical topic
-2. Index lesson descriptions as text
-3. Login as Student
-4. Enroll in the course
-5. Ask questions like:
-   - "What is [topic] about?"
-   - "Explain [concept] from the materials"
-   - "Summarize section 1"
+**Key Test Cases:**
+- ✅ Complete workflow: user creation → course creation → video upload → content ingestion → publish
+- ✅ Cross-teacher access prevention - no unauthorized course modification
+- ✅ Prevent students from creating courses
+- ✅ Prevent students from uploading videos
+- ✅ Prevent students from ingesting content
+- ✅ Course selector returns teacher's courses with proper fields
+- ✅ Unique email format for new users
+- ✅ Error handling: missing auth, invalid IDs, not found
 
-## Success Criteria
+**Run Command:**
+```bash
+cd server
+npm test:integration -- teacher-workflow
+```
 
-✅ **RBAC**: Teachers and students see appropriate dashboards
-✅ **Public Access**: Courses browsable without authentication
-✅ **Enrollment Gating**: Preview vs full content properly separated
-✅ **Teacher UX**: Dashboard focused on instructor metrics only
-✅ **AI System**: Content ingestion and chat working end-to-end
-✅ **Navigation**: All routes accessible with proper guards
-✅ **Security**: Auth middleware protecting sensitive endpoints
+## Frontend Tests
 
----
+### 1. RoleBasedRedirect Component Tests (`client/src/__tests__/RoleBasedRedirect.test.jsx`)
+Tests role-based post-login redirect functionality.
 
-**Last Updated**: December 3, 2025
-**Status**: All major features implemented and tested ✅
+**Key Test Cases:**
+- ✅ Redirects TEACHER role to /teacher
+- ✅ Redirects STUDENT role to /dashboard
+- ✅ Shows loading state initially
+- ✅ Handles API errors gracefully with fallback redirect
+
+**Run Command:**
+```bash
+cd client
+npm test -- RoleBasedRedirect.test.jsx
+```
+
+### 2. VideoUpload Component Tests (`client/src/__tests__/VideoUpload.test.jsx`)
+Tests video upload component with Mux integration.
+
+**Key Test Cases:**
+- ✅ Renders upload area when no video uploaded
+- ✅ Includes Authorization Bearer token in upload request
+- ✅ Displays MuxPlayer when video exists
+- ✅ Allows video removal with confirmation
+- ✅ Rejects non-video files with error toast
+- ✅ Includes Bearer token in delete requests
+- ✅ Proper Content-Type headers for file upload
+- ✅ Handles upload errors gracefully
+
+**Run Command:**
+```bash
+cd client
+npm test -- VideoUpload.test.jsx
+```
+
+### 3. ContentIngestion Component Tests (`client/src/__tests__/ContentIngestion.test.jsx`)
+Tests AI content indexing page functionality.
+
+**Key Test Cases:**
+- ✅ Fetches teacher's courses on mount with auth header
+- ✅ Shows loading state while fetching
+- ✅ Displays empty state for teachers with no courses
+- ✅ Auto-selects first course in dropdown
+- ✅ Allows file selection with drag-and-drop
+- ✅ Disables upload button until file selected
+- ✅ Sends upload request with Authorization header
+- ✅ Displays course titles with (Published) or (Draft) badges
+- ✅ Handles upload errors with specific error messages
+- ✅ Supports text indexing alongside file upload
+
+**Run Command:**
+```bash
+cd client
+npm test -- ContentIngestion.test.jsx
+```
+
+### 4. TeacherDashboard Component Tests (`client/src/__tests__/TeacherDashboard.test.jsx`)
+Tests teacher dashboard page.
+
+**Key Test Cases:**
+- ✅ Renders dashboard header
+- ✅ Displays statistics cards with correct counts
+- ✅ Shows action cards: Manage Courses, Upload Content, Analytics
+- ✅ Navigation links to correct routes
+- ✅ Fetches stats with authorization header
+- ✅ Handles API errors gracefully
+- ✅ Applies gradient styling to cards
+
+**Run Command:**
+```bash
+cd client
+npm test -- TeacherDashboard.test.jsx
+```
+
+## Running All Tests
+
+### Backend Tests
+```bash
+cd server
+
+# Run all unit tests
+npm test
+
+# Run all tests including integration
+npm test -- --testPathPattern="tests"
+
+# Run specific test file
+npm test -- auth-security.test.js
+
+# Run with coverage
+npm test -- --coverage
+```
+
+### Frontend Tests
+```bash
+cd client
+
+# Note: Frontend tests require Jest and @testing-library setup
+# Current setup uses Vite + Vitest (if configured) or can be set up with Jest
+
+# If using Vitest:
+npm run test
+
+# If using Jest (after setup):
+npm test -- --coverage
+```
+
+## Test Coverage Goals
+
+### Backend Coverage
+- **Authentication & Authorization**: 95%+ coverage
+  - User creation and email uniqueness
+  - Token validation
+  - Role-based access control
+  - Course ownership verification
+
+- **API Routes**: 90%+ coverage
+  - All CRUD operations
+  - Error handling
+  - Input validation
+  - Security checks
+
+- **AI Integration**: 85%+ coverage
+  - Content processing
+  - Embedding generation
+  - Chunk creation
+
+### Frontend Coverage
+- **Components**: 85%+ coverage
+  - User interactions
+  - API calls with auth headers
+  - Error handling
+  - State management
+
+- **Pages**: 80%+ coverage
+  - Page rendering
+  - Navigation
+  - Data loading
+
+## Key Security Features Tested
+
+✅ **Authentication**
+- Bearer token validation on all protected endpoints
+- Auto-user creation with unique email format
+- Clerk integration verification
+
+✅ **Authorization**
+- Role-based access (TEACHER vs STUDENT)
+- Course ownership verification
+- Instructor-only endpoints protected
+
+✅ **Course Security**
+- Teachers can only edit/delete their own courses
+- Teachers can only view their own courses
+- Cross-teacher access prevented with 403 responses
+
+✅ **AI Content Ingestion**
+- Ownership verification before allowing indexing
+- Teachers cannot index to courses they don't own
+- Proper error messages for security violations
+
+✅ **Video Upload**
+- Course ownership verified before upload
+- Teachers cannot upload to other courses
+- Proper cleanup on video removal
+
+## Updated Functionality Tested
+
+### 1. Role-Based Redirect System
+- `useUserRole` hook fetches and caches user role
+- `RoleBasedRedirect` component intelligently routes users
+- Navbar logo redirects based on user role
+- Proper handling of signup vs login flows
+
+### 2. Course Selector Dropdown
+- Auto-fetches teacher's courses on ContentIngestion mount
+- Displays course titles with publication status
+- Pre-selects first course
+- Shows loading/empty states appropriately
+
+### 3. Authorization Headers
+- VideoUpload includes Bearer token in upload and delete requests
+- ContentIngestion includes token in course fetch and upload
+- All teacher endpoints validate authorization
+
+### 4. User Auto-Creation
+- First API call creates user with unique email
+- Unique format: `user_{clerkId}@astralearn.local`
+- Prevents 404 errors on first endpoint access
+- Subsequent calls use existing user record
+
+### 5. Course Ownership Security
+- GET /api/courses/instructor returns empty array (not 404) for new teachers
+- AI ingestion routes verify course ownership
+- Video upload routes verify course ownership
+- Comprehensive 403 Forbidden responses with specific error messages
+
+## Test Data & Mocking
+
+### Mock User IDs
+- Teacher: `u1` or `user_teacher_123`
+- Another Teacher: `u2`
+- Student: Various IDs with STUDENT role
+
+### Mock Course IDs
+- `c1`, `c2`, `c3` with various instructorIds
+
+### Mock Clerk
+- All Clerk middleware mocked to return test IDs
+- Bearer tokens mocked as valid by default
+
+### Mock Prisma
+- All database calls mocked for isolation
+- Realistic response shapes maintained
+- Error scenarios testable
+
+## Continuous Integration
+
+### Recommended CI Configuration
+```yaml
+# Example: .github/workflows/test.yml
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+      - run: cd server && npm install && npm test
+      - run: cd client && npm install && npm run test (once Jest configured)
+```
+
+## Troubleshooting
+
+### Backend Tests Fail with "Cannot find module"
+- Ensure `jest.mock()` calls are at top of file
+- Check NODE_PATH environment variable
+- Run from project root: `npm test`
+
+### Frontend Tests Fail with "Invalid hook call"
+- Ensure components wrapped in necessary providers (Router, ClerkProvider)
+- Mock Clerk and react-router-dom at module level
+- Use `@testing-library/jest-dom` for extended matchers
+
+### Authorization Header Not Being Sent
+- Verify `useAuth().getToken()` is mocked to return a token
+- Check axios mock is returning responses with correct status codes
+- Ensure `cfg` or `headers` object is properly destructured in component
+
+## Future Testing Enhancements
+
+1. **E2E Tests**: Add Playwright or Cypress tests for full user flows
+2. **Performance Tests**: Benchmark content ingestion with large files
+3. **Load Tests**: Test multiple concurrent uploads
+4. **Accessibility Tests**: Verify keyboard navigation and screen reader support
+5. **Visual Regression**: Add screenshot comparison tests
+6. **API Contract Tests**: Validate API changes don't break contracts
+
+## Test Maintenance
+
+- Update tests when adding new features
+- Run tests before merging pull requests
+- Maintain >80% code coverage
+- Review test failures weekly
+- Document any test-specific setup requirements

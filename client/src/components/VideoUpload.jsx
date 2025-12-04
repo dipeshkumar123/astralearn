@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Upload, Video, X } from 'lucide-react'
 import MuxPlayer from '@mux/mux-player-react'
+import { useAuth } from '@clerk/clerk-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 
 export default function VideoUpload({ lesson, onUploadComplete }) {
+    const { getToken } = useAuth()
     const [uploading, setUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState(0)
 
@@ -22,7 +24,9 @@ export default function VideoUpload({ lesson, onUploadComplete }) {
             setUploadProgress(0)
 
             // Get upload URL from backend
-            const { data } = await axios.post('/api/mux/upload-url', { courseId: lesson.courseId })
+            const token = await getToken()
+            const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+            const { data } = await axios.post('/api/mux/upload-url', { courseId: lesson.courseId }, cfg)
             const { uploadUrl, uploadId } = data
 
             // Upload to Mux
@@ -78,11 +82,13 @@ export default function VideoUpload({ lesson, onUploadComplete }) {
         if (!confirm('Remove this video?')) return
 
         try {
-            await axios.delete(`/api/mux/asset/${lesson.muxAssetId}`)
+            const token = await getToken()
+            const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+            await axios.delete(`/api/mux/asset/${lesson.muxAssetId}`, cfg)
             await axios.patch(`/api/lessons/${lesson.id}`, {
                 muxAssetId: null,
                 muxPlaybackId: null
-            })
+            }, cfg)
             toast.success('Video removed')
             if (onUploadComplete) {
                 onUploadComplete(null)
