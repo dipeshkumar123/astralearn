@@ -39,6 +39,13 @@ app.get('/api/enrollments', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+// Export app for testing
+module.exports = app;
+
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== 'test' && !process.env.TEST_AUTH) {
+    app.listen(PORT, () => {
+        console.log(`🚀 Server running on http://localhost:${PORT}`);
+    });
+}
+

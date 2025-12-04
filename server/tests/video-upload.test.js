@@ -1,6 +1,3 @@
-const request = require('supertest');
-const prisma = require('../src/lib/prisma');
-
 jest.mock('@clerk/express', () => ({
   clerkMiddleware: () => (req, _res, next) => {
     req.auth = () => ({ userId: 'user_test123' });
@@ -12,9 +9,54 @@ jest.mock('@clerk/express', () => ({
   }
 }));
 
-jest.mock('../src/lib/prisma');
-jest.mock('@mux/mux-node');
+jest.mock('@mux/mux-node', () => {
+  return jest.fn(() => ({
+    video: {
+      uploads: {
+        create: jest.fn(),
+        get: jest.fn(),
+        cancel: jest.fn(),
+      },
+      assets: {
+        get: jest.fn(),
+      },
+    },
+  }));
+});
 
+jest.mock('../src/lib/prisma', () => ({
+  user: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  course: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  lesson: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  section: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+}));
+
+const request = require('supertest');
+const prisma = require('../src/lib/prisma');
 const app = require('../src/index');
 
 describe('Video Upload & Mux Integration Tests', () => {
