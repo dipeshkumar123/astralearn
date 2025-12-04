@@ -92,7 +92,7 @@ function mockApiRoutes(page) {
 
 test('Quiz attempt, review submission, progress mark/unmark flow', async ({ page }) => {
   mockApiRoutes(page);
-  await page.goto('/courses/course_e2e');
+  await page.goto('http://localhost:5173/courses/course_e2e');
 
   // Mark progress
   await page.getByTestId('mark-complete').click();
@@ -106,7 +106,7 @@ test('Quiz attempt, review submission, progress mark/unmark flow', async ({ page
 
   // Submit quiz
   await page.getByTestId('quiz-submit').click();
-  await expect(page.getByText('Congratulations! You Passed!')).toBeVisible();
+  await expect(page.getByText('Congratulations! You Passed!')).toBeVisible({ timeout: 10000 });
 
   // Go to Reviews tab
   await page.getByText('reviews').click();

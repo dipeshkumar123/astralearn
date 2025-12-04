@@ -229,9 +229,10 @@ describe('Authentication & Security Tests', () => {
         instructorId: 'u1'
       });
 
-      // Mock Mux client
-      const mockMux = require('@mux/mux-node').default;
-      mockMux().video.uploads.create.mockResolvedValue({
+      // Mock Mux client - the mock returns the constructor function
+      const mockMux = require('@mux/mux-node');
+      const muxInstance = mockMux();
+      muxInstance.video.uploads.create.mockResolvedValue({
         id: 'upload_123',
         url: 'https://upload.mux.com/upload_123'
       });

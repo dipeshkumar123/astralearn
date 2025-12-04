@@ -1,36 +1,44 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
+  // Set up authentication context (mock Clerk)
+  await page.addInitScript(() => {
+    window.__clerk_gte = () => true;
+  });
+
   // Mock course fetch
-  await page.route('**/api/courses/*', async route => {
-    const courseId = route.request().url().split('/').pop();
-    const json = {
-      id: courseId,
-      title: 'E2E Test Course',
-      description: 'A course used in E2E tests',
-      sections: [
-        {
-          id: 'sec-1',
-          title: 'Module One',
-          position: 0,
-          lessons: [
-            { id: 'l1', title: 'Intro', description: 'Welcome', position: 0, videoUrl: 'https://example.com/video1.mp4' },
-            { id: 'l2', title: 'Basics', description: 'Basics desc', position: 1, videoUrl: 'https://example.com/video2.mp4' },
-          ],
-        },
-        {
-          id: 'sec-2',
-          title: 'Module Two',
-          position: 1,
-          lessons: [
-            { id: 'l3', title: 'Advanced', description: 'Advanced desc', position: 0, videoUrl: 'https://example.com/video3.mp4' },
-          ],
-        },
-      ],
-      instructor: { id: 'u1', firstName: 'Test', lastName: 'Teacher', email: 'teacher@test.com' },
-      _count: { enrollments: 0 },
-    };
-    await route.fulfill({ json });
+  await page.route('**/api/courses/**', async route => {
+    if (route.request().method() === 'GET') {
+      const json = {
+        id: 'test-course',
+        title: 'E2E Test Course',
+        description: 'A course used in E2E tests',
+        sections: [
+          {
+            id: 'sec-1',
+            title: 'Module One',
+            position: 0,
+            lessons: [
+              { id: 'l1', title: 'Intro', description: 'Welcome', position: 0, videoUrl: 'https://example.com/video1.mp4' },
+              { id: 'l2', title: 'Basics', description: 'Basics desc', position: 1, videoUrl: 'https://example.com/video2.mp4' },
+            ],
+          },
+          {
+            id: 'sec-2',
+            title: 'Module Two',
+            position: 1,
+            lessons: [
+              { id: 'l3', title: 'Advanced', description: 'Advanced desc', position: 0, videoUrl: 'https://example.com/video3.mp4' },
+            ],
+          },
+        ],
+        instructor: { id: 'u1', firstName: 'Test', lastName: 'Teacher', email: 'teacher@test.com' },
+        _count: { enrollments: 0 },
+      };
+      await route.fulfill({ json });
+    } else {
+      await route.continue();
+    }
   });
 
   // Mock AI chat
@@ -48,7 +56,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('Course page loads, sidebar renders, AI chat works', async ({ page }) => {
-  await page.goto('/courses/test-course');
+  await page.goto('http://localhost:5173/courses/test-course');
 
   // Title and current lesson header
   await expect(page.getByRole('heading', { name: 'E2E Test Course' })).toBeVisible();

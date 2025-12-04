@@ -42,6 +42,7 @@ jest.mock('../src/lib/prisma', () => ({
   lesson: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -72,8 +73,9 @@ describe('Video Upload & Mux Integration Tests', () => {
         instructorId: 'u1'
       });
 
-      const mockMux = require('@mux/mux-node').default;
-      mockMux().video.uploads.create.mockResolvedValue({
+      const mockMux = require('@mux/mux-node');
+      const muxInstance = mockMux();
+      muxInstance.video.uploads.create.mockResolvedValue({
         id: 'upload_123',
         url: 'https://upload.mux.com/upload_123'
       });
@@ -132,8 +134,9 @@ describe('Video Upload & Mux Integration Tests', () => {
 
   describe('GET /api/mux/asset/:assetId', () => {
     test('Should retrieve asset status', async () => {
-      const mockMux = require('@mux/mux-node').default;
-      mockMux().video.assets.retrieve.mockResolvedValue({
+      const mockMux = require('@mux/mux-node');
+      const muxInstance = mockMux();
+      muxInstance.video.assets.retrieve.mockResolvedValue({
         id: 'asset_123',
         status: 'ready',
         playback_ids: [{ id: 'playback_123' }],
@@ -150,8 +153,9 @@ describe('Video Upload & Mux Integration Tests', () => {
     });
 
     test('Should handle asset not found', async () => {
-      const mockMux = require('@mux/mux-node').default;
-      mockMux().video.assets.retrieve.mockRejectedValue(
+      const mockMux = require('@mux/mux-node');
+      const muxInstance = mockMux();
+      muxInstance.video.assets.retrieve.mockRejectedValue(
         new Error('Asset not found')
       );
 
