@@ -13,12 +13,14 @@ jest.mock('@mux/mux-node', () => {
   return jest.fn(() => ({
     video: {
       uploads: {
-        create: jest.fn(),
-        get: jest.fn(),
-        cancel: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 'upload_123', url: 'https://upload.mux.com/upload_123' }),
+        get: jest.fn().mockResolvedValue({ id: 'upload_123', url: 'https://upload.mux.com/upload_123' }),
+        cancel: jest.fn().mockResolvedValue({ id: 'upload_123' }),
       },
       assets: {
-        get: jest.fn(),
+        get: jest.fn().mockResolvedValue({ id: 'asset_123', status: 'ready' }),
+        retrieve: jest.fn().mockResolvedValue({ id: 'asset_123', status: 'ready', playback_ids: [{ id: 'playback_123' }] }),
+        delete: jest.fn().mockResolvedValue({ id: 'asset_123' }),
       },
     },
   }));
