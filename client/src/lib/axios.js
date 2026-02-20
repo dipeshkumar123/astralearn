@@ -1,7 +1,10 @@
 import axios from 'axios'
 
 // Set base URL for all axios requests
-axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+// Prefer same-origin so Vite's dev proxy can handle `/api` without cross-origin issues.
+// Override with VITE_API_URL when deploying or when you want to hit a separate API host.
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || ''
+axios.defaults.timeout = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000)
 
 // Add request interceptor to include auth token from Clerk if available
 axios.interceptors.request.use(
@@ -30,6 +33,12 @@ axios.interceptors.response.use(
     return response;
   },
   (error) => {
+    const responseError = error?.response?.data?.error
+    const fallbackMessage = error.code === 'ECONNABORTED'
+      ? 'Request timed out. Please try again.'
+      : 'Something went wrong. Please try again.'
+    error.userMessage = responseError || fallbackMessage
+
     if (error.response) {
       // Server responded with error status
       console.error('[API Error]', {

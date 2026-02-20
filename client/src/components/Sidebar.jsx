@@ -15,7 +15,7 @@ export default function Sidebar() {
     ]
 
     return (
-        <div className="h-screen w-64 bg-white border-r border-slate-200 fixed left-0 top-0 flex flex-col z-40 hidden md:flex">
+        <div className="h-screen w-64 bg-white/90 backdrop-blur-xl border-r border-slate-200 fixed left-0 top-0 flex flex-col z-40 hidden md:flex">
             {/* Logo */}
             <div className="h-16 flex items-center px-6 border-b border-slate-100">
                 <Link to="/" className="flex items-center gap-2 group">
@@ -37,11 +37,11 @@ export default function Sidebar() {
                             key={link.path}
                             to={link.path}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-                                ? 'bg-primary/10 text-primary'
+                                ? 'bg-primary/10 text-primary shadow-sm'
                                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                 }`}
                         >
-                            <link.icon className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
+                            <link.icon className={`h-5 w-5 transition-colors ${isActive ? 'text-primary' : 'text-slate-400'}`} />
                             {link.name}
                         </Link>
                     )

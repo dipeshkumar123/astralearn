@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Trophy, Medal, Crown } from 'lucide-react'
+import { Trophy } from 'lucide-react'
 import { Card } from './ui/Card'
-import { Badge } from './ui/Badge'
 
 export default function Leaderboard() {
     const [users, setUsers] = useState([])
@@ -44,24 +43,16 @@ export default function Leaderboard() {
                 {users.map((user, index) => (
                     <div
                         key={user.id}
-                        className={`flex items-center justify-between p-3 rounded-xl transition-all ${index === 0 ? 'bg-yellow-50 border border-yellow-100' :
-                                index === 1 ? 'bg-slate-50 border border-slate-100' :
-                                    index === 2 ? 'bg-orange-50 border border-orange-100' :
-                                        'hover:bg-slate-50'
-                            }`}
+                        className={`flex items-center justify-between p-3 rounded-xl transition-all ${index === 0 ? 'bg-yellow-50 border border-yellow-100' : index === 1 ? 'bg-slate-50 border border-slate-100' : index === 2 ? 'bg-orange-50 border border-orange-100' : 'hover:bg-slate-50'}`}
                     >
                         <div className="flex items-center gap-4">
-                            <div className={`w-8 h-8 flex items-center justify-center rounded-full font-bold ${index === 0 ? 'bg-yellow-500 text-white' :
-                                    index === 1 ? 'bg-slate-400 text-white' :
-                                        index === 2 ? 'bg-orange-400 text-white' :
-                                            'text-slate-500'
-                                }`}>
+                            <div className={`w-8 h-8 flex items-center justify-center rounded-full font-bold ${index === 0 ? 'bg-yellow-500 text-white' : index === 1 ? 'bg-slate-400 text-white' : index === 2 ? 'bg-orange-400 text-white' : 'text-slate-500'}`}>
                                 {index + 1}
                             </div>
 
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                    {user.firstName[0]}{user.lastName[0]}
+                                    {(user.firstName?.[0] || 'U')}{(user.lastName?.[0] || '')}
                                 </div>
                                 <div>
                                     <p className="font-semibold text-slate-900">
@@ -71,7 +62,7 @@ export default function Leaderboard() {
                                         <span>{user.streak} day streak</span>
                                         {user.badges && user.badges.length > 0 && (
                                             <span className="flex items-center gap-1">
-                                                • {user.badges.length} badges
+                                                {user.badges.length} badges
                                             </span>
                                         )}
                                     </div>

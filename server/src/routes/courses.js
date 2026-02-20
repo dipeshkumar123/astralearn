@@ -2,6 +2,21 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requireAuth, requireTeacher, requireCourseOwnership } = require('../middleware/auth');
+const { z, validateBody } = require('../lib/validation');
+
+const courseBaseSchema = z.object({
+    title: z.string().trim().min(1, 'title is required').max(200).optional(),
+    description: z.string().max(20000).optional().nullable(),
+    category: z.string().trim().max(80).optional(),
+    level: z.string().trim().max(40).optional(),
+    price: z.coerce.number().min(0).max(100000).optional(),
+    thumbnail: z.string().trim().max(2000).optional().nullable(),
+    isPublished: z.boolean().optional(),
+}).passthrough();
+
+const createCourseSchema = courseBaseSchema.extend({
+    title: z.string().trim().min(1, 'title is required').max(200),
+});
 
 // GET all courses with filtering
 router.get('/', async (req, res) => {
@@ -183,14 +198,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create course
-router.post('/', requireAuth(), requireTeacher(), async (req, res) => {
+router.post('/', requireAuth(), requireTeacher(), validateBody(createCourseSchema), async (req, res) => {
     try {
         const { title, description, category, level, price, thumbnail } = req.body;
-
-        // Validation
-        if (!title) {
-            return res.status(400).json({ error: 'title is required' });
-        }
 
         const { userId: clerkId } = req.auth();
 
@@ -218,7 +228,7 @@ router.post('/', requireAuth(), requireTeacher(), async (req, res) => {
 });
 
 // PUT update course (full update)
-router.put('/:id', requireAuth(), requireCourseOwnership('id'), async (req, res) => {
+router.put('/:id', requireAuth(), requireCourseOwnership('id'), validateBody(courseBaseSchema), async (req, res) => {
     try {
         const { title, description, category, level, price, thumbnail, isPublished } = req.body;
         
@@ -242,7 +252,7 @@ router.put('/:id', requireAuth(), requireCourseOwnership('id'), async (req, res)
 });
 
 // PATCH update course
-router.patch('/:id', requireAuth(), requireCourseOwnership('id'), async (req, res) => {
+router.patch('/:id', requireAuth(), requireCourseOwnership('id'), validateBody(courseBaseSchema), async (req, res) => {
     try {
         const course = await prisma.course.update({
             where: { id: req.params.id },

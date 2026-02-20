@@ -96,7 +96,7 @@ export default function ProfilePage() {
                         <h2 className="text-xl font-bold text-slate-900">{user.fullName}</h2>
                         <p className="text-sm text-slate-500 mb-2">{user.primaryEmailAddress?.emailAddress}</p>
                         <Badge variant={userRole === 'TEACHER' ? 'primary' : 'secondary'} className="mb-6">
-                            {userRole === 'TEACHER' ? '👨‍🏫 Teacher' : '👨‍🎓 Student'}
+                            {userRole === 'TEACHER' ? 'Teacher' : 'Student'}
                         </Badge>
 
                         <div className="flex justify-center gap-4 mb-6 py-4 border-t border-b border-slate-100">
@@ -231,3 +231,4 @@ export default function ProfilePage() {
         </div>
     )
 }
+

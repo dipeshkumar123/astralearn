@@ -24,7 +24,9 @@ router.get('/me', requireAuth(), async (req, res) => {
 
         // If not found, create
         if (!user) {
-            console.log(`Creating new user for Clerk ID: ${clerkId}`);
+            if (process.env.NODE_ENV !== 'test') {
+                console.log(`Creating new user for Clerk ID: ${clerkId}`);
+            }
             const uniqueEmail = email || `user_${clerkId.replace('user_', '')}@astralearn.local`;
             user = await prisma.user.create({
                 data: {
@@ -45,9 +47,24 @@ router.get('/me', requireAuth(), async (req, res) => {
 });
 
 // GET /api/users/:userId/stats - Get user statistics
-router.get('/:userId/stats', async (req, res) => {
+router.get('/:userId/stats', requireAuth(), async (req, res) => {
     try {
         const { userId } = req.params;
+        const { userId: clerkId } = req.auth();
+
+        const requester = await prisma.user.findUnique({
+            where: { clerkId },
+            select: { id: true, role: true }
+        });
+
+        if (!requester) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Users can only read their own stats unless they are a teacher/admin role in future.
+        if (requester.id !== userId && requester.role !== 'TEACHER') {
+            return res.status(403).json({ error: 'Access denied' });
+        }
 
         // 1. Calculate Average Quiz Score
         const attempts = await prisma.quizAttempt.findMany({

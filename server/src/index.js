@@ -1,13 +1,22 @@
 const app = require('./app');
+const prisma = require('./lib/prisma');
+const { requireAuth } = require('./middleware/auth');
 
 // Enrollments route (handled by courses router for now)
-app.get('/api/enrollments', async (req, res) => {
+app.get('/api/enrollments', requireAuth(), async (req, res) => {
     try {
-        const { userId } = req.auth();
-        const { prisma } = require('./lib/prisma');
+        const { userId: clerkId } = req.auth();
+        const user = await prisma.user.findUnique({
+            where: { clerkId },
+            select: { id: true }
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
         const enrollments = await prisma.enrollment.findMany({
-            where: { userId },
+            where: { userId: user.id },
             include: {
                 course: {
                     include: {

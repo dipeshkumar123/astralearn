@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, BookOpen, Brain, Trophy, Users, Zap } from 'lucide-react'
+import { ArrowRight, Brain, Trophy, Zap } from 'lucide-react'
 
 export default function LandingPage() {
     return (
@@ -7,13 +7,13 @@ export default function LandingPage() {
             {/* Hero Section */}
             <section className="relative pt-20 pb-32 overflow-hidden">
                 {/* Background Elements */}
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-slate-100 -z-10" />
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent to-slate-100/60 -z-10" />
                 <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-primary/10 rounded-full blur-3xl animate-float" />
                 <div className="absolute bottom-0 left-0 w-1/3 h-1/3 bg-secondary/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1.5s' }} />
 
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
                     <div className="text-center max-w-3xl mx-auto animate-fade-in">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 shadow-sm mb-8 animate-slide-up">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 border border-slate-200 shadow-sm mb-8 animate-slide-up">
                             <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
                             <span className="text-sm font-medium text-slate-600">New: AI-Powered Tutoring Available</span>
                         </div>
@@ -51,7 +51,7 @@ export default function LandingPage() {
             </section>
 
             {/* Features Section */}
-            <section className="py-24 bg-white">
+            <section className="py-24 bg-white/70 backdrop-blur-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-16">
                         <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Why Choose Astralearn?</h2>
@@ -78,7 +78,7 @@ export default function LandingPage() {
                                 description: "Showcase your achievements with verified certificates upon course completion."
                             }
                         ].map((feature, idx) => (
-                            <div key={idx} className="p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 group">
+                            <div key={idx} className="p-8 rounded-2xl bg-white border border-slate-100 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 group">
                                 <div className="w-14 h-14 rounded-xl bg-white shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                                     <feature.icon className="h-7 w-7 text-primary" />
                                 </div>

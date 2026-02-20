@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { UserButton, useAuth } from '@clerk/clerk-react'
-import { ArrowLeft, Upload, FileText, CheckCircle, Sparkles, Loader2 } from 'lucide-react'
+import { useAuth } from '@clerk/clerk-react'
+import { Upload, FileText, CheckCircle, Sparkles, Loader2 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import TeacherHeader from '../../components/TeacherHeader'
@@ -225,19 +225,19 @@ export default function ContentIngestion() {
                     </h3>
                     <ul className="text-sm text-blue-800 space-y-2">
                         <li className="flex items-start gap-2">
-                            <span className="text-blue-500 font-bold">•</span>
+                            <span className="text-blue-500 font-bold">-</span>
                             <span>Upload course materials (PDFs, lecture notes, transcripts)</span>
                         </li>
                         <li className="flex items-start gap-2">
-                            <span className="text-blue-500 font-bold">•</span>
+                            <span className="text-blue-500 font-bold">-</span>
                             <span>Content is intelligently split into searchable chunks with overlap</span>
                         </li>
                         <li className="flex items-start gap-2">
-                            <span className="text-blue-500 font-bold">•</span>
+                            <span className="text-blue-500 font-bold">-</span>
                             <span>AI generates semantic embeddings for accurate context matching</span>
                         </li>
                         <li className="flex items-start gap-2">
-                            <span className="text-blue-500 font-bold">•</span>
+                            <span className="text-blue-500 font-bold">-</span>
                             <span>Students can ask questions and get instant answers from your materials</span>
                         </li>
                     </ul>

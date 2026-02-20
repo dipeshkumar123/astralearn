@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { UserButton, useAuth } from '@clerk/clerk-react'
 import { ArrowLeft, Video, ClipboardList } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import VideoUpload from '../../components/VideoUpload'
-import RichTextEditor from '../../components/RichTextEditor'
-import QuizBuilder from '../../components/QuizBuilder'
-import QuizPlayer from '../../components/QuizPlayer'
+
+const RichTextEditor = lazy(() => import('../../components/RichTextEditor'))
+const QuizBuilder = lazy(() => import('../../components/QuizBuilder'))
+const QuizPlayer = lazy(() => import('../../components/QuizPlayer'))
+
+function InlineLoader({ text }) {
+    return <div className="text-sm text-gray-500 py-4">{text}</div>
+}
 
 export default function LessonEditor() {
     const { courseId, lessonId } = useParams()
@@ -183,7 +188,9 @@ export default function LessonEditor() {
                     <h2 className="text-sm font-medium text-gray-500 mb-4">Description</h2>
                     {editingDescription ? (
                         <div>
-                            <RichTextEditor content={description} onChange={setDescription} />
+                            <Suspense fallback={<InlineLoader text="Loading editor..." />}>
+                                <RichTextEditor content={description} onChange={setDescription} />
+                            </Suspense>
                             <div className="flex gap-2 mt-4">
                                 <button onClick={updateDescription} className="bg-green-600 text-white px-4 py-2 rounded-lg">Save</button>
                                 <button onClick={() => { setDescription(lesson.description || ''); setEditingDescription(false) }} className="bg-gray-200 px-4 py-2 rounded-lg">Cancel</button>
@@ -200,13 +207,15 @@ export default function LessonEditor() {
 
             {/* Quiz Builder Modal */}
             {showQuizBuilder && (
-                <QuizBuilder
-                    lessonId={lessonId}
-                    onClose={() => {
-                        setShowQuizBuilder(false)
-                        fetchLesson()
-                    }}
-                />
+                <Suspense fallback={<InlineLoader text="Loading quiz builder..." />}>
+                    <QuizBuilder
+                        lessonId={lessonId}
+                        onClose={() => {
+                            setShowQuizBuilder(false)
+                            fetchLesson()
+                        }}
+                    />
+                </Suspense>
             )}
             {activeQuizId && !showQuizBuilder && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -219,7 +228,9 @@ export default function LessonEditor() {
                             >Close</button>
                         </div>
                         <div className="p-4">
-                            <QuizPlayer quizId={activeQuizId} />
+                            <Suspense fallback={<InlineLoader text="Loading quiz preview..." />}>
+                                <QuizPlayer quizId={activeQuizId} />
+                            </Suspense>
                         </div>
                     </div>
                 </div>

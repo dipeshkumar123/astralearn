@@ -56,7 +56,38 @@ router.post('/lesson/:lessonId', requireAuth(), async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        console.log(`DEBUG: Marking lesson ${lessonId} complete for user ${user.id}`);
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: { id: true, courseId: true }
+        });
+
+        if (!lesson) {
+            return res.status(404).json({ error: 'Lesson not found' });
+        }
+
+        const course = await prisma.course.findUnique({
+            where: { id: lesson.courseId },
+            select: { instructorId: true }
+        });
+
+        const isInstructor = course && course.instructorId === user.id;
+        if (!isInstructor) {
+            const enrollment = await prisma.enrollment.findUnique({
+                where: {
+                    userId_courseId: {
+                        userId: user.id,
+                        courseId: lesson.courseId
+                    }
+                },
+                select: { userId: true }
+            });
+
+            if (!enrollment) {
+                return res.status(403).json({
+                    error: 'Access denied. You must be enrolled in this course.'
+                });
+            }
+        }
 
         const progress = await prisma.progress.upsert({
             where: {
@@ -95,6 +126,39 @@ router.delete('/lesson/:lessonId', requireAuth(), async (req, res) => {
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
+        }
+
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: { id: true, courseId: true }
+        });
+
+        if (!lesson) {
+            return res.status(404).json({ error: 'Lesson not found' });
+        }
+
+        const course = await prisma.course.findUnique({
+            where: { id: lesson.courseId },
+            select: { instructorId: true }
+        });
+
+        const isInstructor = course && course.instructorId === user.id;
+        if (!isInstructor) {
+            const enrollment = await prisma.enrollment.findUnique({
+                where: {
+                    userId_courseId: {
+                        userId: user.id,
+                        courseId: lesson.courseId
+                    }
+                },
+                select: { userId: true }
+            });
+
+            if (!enrollment) {
+                return res.status(403).json({
+                    error: 'Access denied. You must be enrolled in this course.'
+                });
+            }
         }
 
         await prisma.progress.delete({

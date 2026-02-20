@@ -13,10 +13,11 @@ export default function AchievementsPage() {
     const fetchStats = async () => {
       try {
         const token = await getToken()
-        const userRes = await axios.get('/api/users/me', token ? { headers: { Authorization: `Bearer ${token}` } } : {})
+        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+        const userRes = await axios.get('/api/users/me', config)
         const userId = userRes.data.id
-        
-        const statsRes = await axios.get(`/api/users/${userId}/stats`)
+
+        const statsRes = await axios.get(`/api/users/${userId}/stats`, config)
         setStats(statsRes.data)
       } catch (e) {
         console.error('Failed to fetch stats:', e)
@@ -37,8 +38,8 @@ export default function AchievementsPage() {
 
   const badges = [
     { id: 'first-course', name: 'First Course', desc: 'Enrolled in your first course', icon: Book, earned: stats?.completedCourses > 0 },
-    { id: 'quiz-master', name: 'Quiz Master', desc: 'Scored 100% on a quiz', icon: Star, earned: stats?.avgQuizScore === 100 },
-    { id: 'consistent', name: 'Consistent Learner', desc: '7 day learning streak', icon: Flame, earned: (stats?.streak || 0) >= 7 },
+    { id: 'quiz-master', name: 'Quiz Master', desc: 'Scored 100% on a quiz', icon: Star, earned: stats?.avgScore === 100 },
+    { id: 'consistent', name: 'Consistent Learner', desc: '7 day learning streak', icon: Flame, earned: (stats?.currentStreak || 0) >= 7 },
     { id: 'achiever', name: 'Achiever', desc: 'Completed 5 courses', icon: Trophy, earned: stats?.completedCourses >= 5 },
     { id: 'dedicated', name: 'Dedicated', desc: 'Spent 50+ hours learning', icon: Target, earned: parseFloat(stats?.hoursLearned || 0) >= 50 },
     { id: 'overachiever', name: 'Overachiever', desc: 'Completed 10 courses', icon: Award, earned: stats?.completedCourses >= 10 },
@@ -54,7 +55,6 @@ export default function AchievementsPage() {
         <p className="text-slate-600 mt-1">Your learning milestones and badges</p>
       </div>
 
-      {/* Stats Overview */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-6">
           <div className="flex items-center justify-between">
@@ -72,7 +72,7 @@ export default function AchievementsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Current Streak</p>
-              <p className="text-3xl font-bold text-orange-600 mt-1">{stats?.streak || 0} days</p>
+              <p className="text-3xl font-bold text-orange-600 mt-1">{stats?.currentStreak || 0} days</p>
             </div>
             <div className="p-3 bg-orange-100 rounded-full">
               <Flame className="h-6 w-6 text-orange-600" />
@@ -105,7 +105,6 @@ export default function AchievementsPage() {
         </Card>
       </div>
 
-      {/* Earned Badges */}
       <div>
         <h2 className="text-2xl font-bold text-slate-900 mb-4">Earned Badges</h2>
         {earnedBadges.length === 0 ? (
@@ -123,7 +122,7 @@ export default function AchievementsPage() {
                   <div className="flex-1">
                     <h3 className="font-bold text-slate-900">{badge.name}</h3>
                     <p className="text-sm text-slate-600 mt-1">{badge.desc}</p>
-                    <p className="text-xs text-primary font-medium mt-2">✓ Unlocked</p>
+                    <p className="text-xs text-primary font-medium mt-2">Unlocked</p>
                   </div>
                 </div>
               </Card>
@@ -132,7 +131,6 @@ export default function AchievementsPage() {
         )}
       </div>
 
-      {/* Locked Badges */}
       {lockedBadges.length > 0 && (
         <div>
           <h2 className="text-2xl font-bold text-slate-900 mb-4">Locked Badges</h2>
@@ -146,7 +144,7 @@ export default function AchievementsPage() {
                   <div className="flex-1">
                     <h3 className="font-bold text-slate-700">{badge.name}</h3>
                     <p className="text-sm text-slate-500 mt-1">{badge.desc}</p>
-                    <p className="text-xs text-slate-400 font-medium mt-2">🔒 Locked</p>
+                    <p className="text-xs text-slate-400 font-medium mt-2">Locked</p>
                   </div>
                 </div>
               </Card>

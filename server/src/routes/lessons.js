@@ -2,6 +2,23 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requireAuth, requireCourseOwnership } = require('../middleware/auth');
+const { z, validateBody } = require('../lib/validation');
+
+const createLessonSchema = z.object({
+    title: z.string().trim().min(1, 'title is required').max(200),
+    sectionId: z.string().trim().min(1, 'sectionId is required'),
+    courseId: z.string().trim().min(1, 'courseId is required'),
+    description: z.string().max(20000).optional().nullable(),
+}).passthrough();
+
+const patchLessonSchema = z.object({
+    title: z.string().trim().min(1).max(200).optional(),
+    description: z.string().max(20000).optional().nullable(),
+    muxAssetId: z.string().trim().max(255).optional().nullable(),
+    muxPlaybackId: z.string().trim().max(255).optional().nullable(),
+    sectionId: z.string().trim().min(1).optional(),
+    position: z.coerce.number().int().min(0).optional(),
+}).passthrough();
 
 // GET lessons for a section
 router.get('/section/:sectionId', async (req, res) => {
@@ -53,13 +70,9 @@ router.param('id', async (req, res, next, id) => {
 });
 
 // POST create lesson
-router.post('/', requireAuth(), requireCourseOwnership('courseId'), async (req, res) => {
+router.post('/', requireAuth(), requireCourseOwnership('courseId'), validateBody(createLessonSchema), async (req, res) => {
     try {
         const { title, sectionId, description, courseId } = req.body;
-
-        if (!courseId) {
-            return res.status(400).json({ error: 'courseId is required' });
-        }
 
         // Get max position
         const maxPosition = await prisma.lesson.aggregate({
@@ -84,7 +97,7 @@ router.post('/', requireAuth(), requireCourseOwnership('courseId'), async (req, 
 });
 
 // PATCH update lesson
-router.patch('/:id', requireAuth(), requireCourseOwnership('courseId'), async (req, res) => {
+router.patch('/:id', requireAuth(), requireCourseOwnership('courseId'), validateBody(patchLessonSchema), async (req, res) => {
     try {
         const lesson = await prisma.lesson.update({
             where: { id: req.params.id },

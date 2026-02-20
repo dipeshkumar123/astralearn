@@ -25,7 +25,9 @@ const requireAuth = () => {
             });
 
             if (!user) {
-                console.log(`Auto-creating user for Clerk ID: ${clerkId}`);
+                if (process.env.NODE_ENV !== 'test') {
+                    console.log(`Auto-creating user for Clerk ID: ${clerkId}`);
+                }
                 // Use a unique email based on clerkId to avoid conflicts
                 const uniqueEmail = emailAddress || `user_${clerkId.replace('user_', '')}@astralearn.local`;
                 user = await prisma.user.create({

@@ -1,18 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
-const { requireAuth, requireTeacher, requireCourseOwnership } = require('../middleware/auth');
+const { requireAuth, requireTeacher, requireEnrollment } = require('../middleware/auth');
 const { generateEmbedding, generateResponse } = require('../lib/gemini');
 const { processContent, cosineSimilarity } = require('../lib/content-processor');
+const { z, validateBody } = require('../lib/validation');
 const multer = require('multer');
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+const ingestBodySchema = z.object({
+    courseId: z.string().trim().min(1, 'Course ID is required'),
+    contentType: z.enum(['pdf', 'text']),
+}).passthrough();
+
+const ingestTextSchema = z.object({
+    courseId: z.string().trim().min(1, 'courseId is required'),
+    text: z.string().trim().min(1, 'text is required').max(100000),
+}).passthrough();
+
+const chatSchema = z.object({
+    question: z.string().trim().min(1, 'Question is required').max(2000),
+    courseId: z.string().trim().min(1, 'courseId is required'),
+}).passthrough();
 
 /**
  * POST /api/ai/ingest - Ingest content and create embeddings
  * Requires course ownership - teachers can only index their own courses
  */
-router.post('/ingest', requireAuth(), requireTeacher(), upload.single('file'), async (req, res) => {
+router.post('/ingest', requireAuth(), requireTeacher(), upload.single('file'), validateBody(ingestBodySchema), async (req, res) => {
     try {
         const { courseId, contentType } = req.body;
         const file = req.file;
@@ -85,14 +101,10 @@ router.post('/ingest', requireAuth(), requireTeacher(), upload.single('file'), a
  * POST /api/ai/ingest-text - Ingest raw text content (e.g., lesson descriptions)
  * Restricted to teachers who own the course
  */
-router.post('/ingest-text', requireAuth(), requireTeacher(), async (req, res) => {
+router.post('/ingest-text', requireAuth(), requireTeacher(), validateBody(ingestTextSchema), async (req, res) => {
     try {
         const { courseId, text } = req.body;
         const { userId: clerkId } = req.auth();
-
-        if (!courseId || !text) {
-            return res.status(400).json({ error: 'courseId and text are required' });
-        }
 
         // Verify user exists and get their ID
         const user = await prisma.user.findUnique({
@@ -143,23 +155,46 @@ router.post('/ingest-text', requireAuth(), requireTeacher(), async (req, res) =>
 /**
  * POST /api/ai/chat - Chat with AI tutor
  */
-router.post('/chat', requireAuth(), async (req, res) => {
+router.post('/chat', requireAuth(), validateBody(chatSchema), async (req, res) => {
     try {
         const { question, courseId } = req.body;
         const { userId: clerkId } = req.auth();
 
-        if (!question || !courseId) {
-            return res.status(400).json({ error: 'Question and courseId required' });
-        }
-
         // Get internal user ID
         const user = await prisma.user.findUnique({
             where: { clerkId },
-            select: { id: true }
+            select: { id: true, role: true }
         });
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Ensure requester can access this course's indexed content
+        const course = await prisma.course.findUnique({
+            where: { id: courseId },
+            select: { instructorId: true }
+        });
+
+        if (!course) {
+            return res.status(404).json({ error: 'Course not found' });
+        }
+
+        const isInstructor = course.instructorId === user.id;
+        if (!isInstructor) {
+            const enrollment = await prisma.enrollment.findUnique({
+                where: {
+                    userId_courseId: {
+                        userId: user.id,
+                        courseId
+                    }
+                },
+                select: { userId: true }
+            });
+
+            if (!enrollment) {
+                return res.status(403).json({ error: 'Access denied. You must be enrolled in this course.' });
+            }
         }
 
         // Generate embedding for the question
@@ -218,7 +253,9 @@ router.post('/chat', requireAuth(), async (req, res) => {
             messageId: chatMessage.id
         });
     } catch (error) {
-        console.error('Chat error:', error);
+        if (process.env.NODE_ENV !== 'test') {
+            console.error('Chat error:', error);
+        }
         res.status(500).json({ error: error.message });
     }
 });
@@ -226,7 +263,7 @@ router.post('/chat', requireAuth(), async (req, res) => {
 /**
  * GET /api/ai/context/:courseId - Get indexed content stats
  */
-router.get('/context/:courseId', async (req, res) => {
+router.get('/context/:courseId', requireAuth(), requireEnrollment('courseId'), async (req, res) => {
     try {
         const { courseId } = req.params;
 

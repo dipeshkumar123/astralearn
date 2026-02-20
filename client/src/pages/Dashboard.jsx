@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, useUser } from '@clerk/clerk-react'
-import { BookOpen, Trophy, Clock, Search, Flame, Target } from 'lucide-react'
+import { Search, Flame, Target } from 'lucide-react'
 import axios from 'axios'
 import CourseCard from '../components/CourseCard'
 import SearchBar from '../components/SearchBar'
@@ -15,11 +15,11 @@ export default function Dashboard() {
     const [courses, setCourses] = useState([])
     const [enrolledCourses, setEnrolledCourses] = useState([])
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState('browse') // 'browse' or 'my-courses'
+    const [activeTab, setActiveTab] = useState('browse')
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedCategory, setSelectedCategory] = useState('All')
     const [selectedLevel, setSelectedLevel] = useState('All')
-    const [stats, setStats] = useState({ points: 0, streak: 0, hoursLearned: 0 })
+    const [stats, setStats] = useState({ points: 0, currentStreak: 0, hoursLearned: 0 })
 
     useEffect(() => {
         fetchCourses()
@@ -56,9 +56,10 @@ export default function Dashboard() {
                 setEnrolledCourses(enrolled)
             }
 
-            // Fetch stats
             if (res.data.id) {
-                const statsRes = await axios.get(`/api/users/${res.data.id}/stats`)
+                const statsRes = await axios.get(`/api/users/${res.data.id}/stats`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
                 setStats(statsRes.data)
             }
         } catch (error) {
@@ -66,9 +67,7 @@ export default function Dashboard() {
         }
     }
 
-    const calculateProgress = (course) => {
-        return 0 // Placeholder
-    }
+    const calculateProgress = () => 0
 
     if (loading) {
         return (
@@ -81,69 +80,54 @@ export default function Dashboard() {
     const categories = ['All', 'Development', 'Business', 'Design', 'Marketing', 'Lifestyle']
 
     return (
-        <div className="space-y-8 animate-fade-in">
-            {/* Welcome Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
+            <div className="glass-panel rounded-2xl p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">
-                        Welcome back, {user?.firstName}! 👋
-                    </h1>
-                    <p className="text-slate-500 mt-1">You've learned for {stats.hoursLearned} hours. Keep it up!</p>
+                    <h1 className="text-3xl font-bold text-slate-900">Welcome back, {user?.firstName || 'Learner'}</h1>
+                    <p className="text-slate-500 mt-1">You have learned for {stats.hoursLearned || 0} hours. Keep going.</p>
                 </div>
                 <div className="flex gap-3">
                     <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-xl border border-orange-100">
                         <Flame className="h-5 w-5" />
-                        <span className="font-bold">{stats.currentStreak} Day Streak</span>
+                        <span className="font-bold">{stats.currentStreak || 0} day streak</span>
                     </div>
                     <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
                         <Target className="h-5 w-5" />
-                        <span className="font-bold">{stats.points} Points</span>
+                        <span className="font-bold">{stats.points || 0} points</span>
                     </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Main Content */}
                 <div className="lg:col-span-2 space-y-8">
-                    {/* Continue Learning (if enrolled) */}
                     {enrolledCourses.length > 0 && (
                         <section>
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-xl font-bold text-slate-900">Continue Learning</h2>
-                                <Link to="/dashboard/courses" className="text-primary font-medium hover:underline text-sm">
-                                    View all
-                                </Link>
+                                <Link to="/learning" className="text-primary font-medium hover:underline text-sm">View all</Link>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {enrolledCourses.slice(0, 2).map(course => (
-                                    <CourseCard
-                                        key={course.id}
-                                        course={course}
-                                        progress={calculateProgress(course)}
-                                        compact
-                                    />
+                                    <CourseCard key={course.id} course={course} progress={calculateProgress(course)} compact />
                                 ))}
                             </div>
                         </section>
                     )}
 
-                    {/* Browse Section */}
-                    <section>
+                    <section className="glass-panel rounded-2xl p-5 md:p-6">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                             <h2 className="text-xl font-bold text-slate-900">Explore Courses</h2>
 
                             <div className="flex gap-2 bg-white p-1 rounded-xl border border-slate-200 w-fit">
                                 <button
                                     onClick={() => setActiveTab('browse')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'browse' ? 'bg-primary text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-                                        }`}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'browse' ? 'bg-primary text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
                                 >
                                     Browse
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('my-courses')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'my-courses' ? 'bg-primary text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-                                        }`}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'my-courses' ? 'bg-primary text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
                                 >
                                     My Courses
                                 </button>
@@ -168,19 +152,12 @@ export default function Dashboard() {
                                     </select>
                                 </div>
 
-                                <CategoryFilter
-                                    categories={categories}
-                                    selectedCategory={selectedCategory}
-                                    onSelectCategory={setSelectedCategory}
-                                />
+                                <CategoryFilter categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
 
                                 {courses.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-slide-up">
                                         {courses.map(course => (
-                                            <CourseCard
-                                                key={course.id}
-                                                course={course}
-                                            />
+                                            <CourseCard key={course.id} course={course} />
                                         ))}
                                     </div>
                                 ) : (
@@ -199,33 +176,22 @@ export default function Dashboard() {
                             enrolledCourses.length > 0 ? (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-slide-up">
                                     {enrolledCourses.map(course => (
-                                        <CourseCard
-                                            key={course.id}
-                                            course={course}
-                                            progress={calculateProgress(course)}
-                                        />
+                                        <CourseCard key={course.id} course={course} progress={calculateProgress(course)} />
                                     ))}
                                 </div>
                             ) : (
                                 <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
                                     <h3 className="text-lg font-medium text-slate-900">No enrollments yet</h3>
-                                    <p className="text-slate-500 mt-2 mb-6">Start your learning journey today!</p>
-                                    <Button
-                                        onClick={() => setActiveTab('browse')}
-                                    >
-                                        Browse Courses
-                                    </Button>
+                                    <p className="text-slate-500 mt-2 mb-6">Start your learning journey today.</p>
+                                    <Button onClick={() => setActiveTab('browse')}>Browse Courses</Button>
                                 </div>
                             )
                         )}
                     </section>
                 </div>
 
-                {/* Sidebar */}
                 <div className="space-y-8">
                     <Leaderboard />
-
-                    {/* Quick Actions or other sidebar content could go here */}
                 </div>
             </div>
         </div>

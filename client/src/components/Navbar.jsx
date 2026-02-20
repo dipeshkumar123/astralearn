@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { UserButton, useAuth } from '@clerk/clerk-react'
-import { Menu, X, Search, BookOpen, LayoutDashboard, LogIn } from 'lucide-react'
+import { Menu, X, Search, BookOpen, LayoutDashboard } from 'lucide-react'
 import { useUserRole } from '../hooks/useUserRole'
 
 export default function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false)
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [searchQuery, setSearchQuery] = useState('')
     const { isSignedIn } = useAuth()
-    const { role, isTeacher } = useUserRole()
+    const { isTeacher } = useUserRole()
     const location = useLocation()
     const navigate = useNavigate()
 
@@ -20,8 +21,32 @@ export default function Navbar() {
         return () => window.removeEventListener('scroll', handleScroll)
     }, [])
 
+    useEffect(() => {
+        setIsMobileMenuOpen(false)
+    }, [location.pathname])
+
+    useEffect(() => {
+        if (location.pathname !== '/courses') {
+            setSearchQuery('')
+            return
+        }
+
+        const params = new URLSearchParams(location.search)
+        setSearchQuery(params.get('search') || '')
+    }, [location.pathname, location.search])
+
     const getDashboardPath = () => {
         return isTeacher ? '/teacher' : '/dashboard'
+    }
+
+    const submitSearch = (event) => {
+        event.preventDefault()
+        const trimmed = searchQuery.trim()
+        if (!trimmed) {
+            navigate('/courses')
+            return
+        }
+        navigate(`/courses?search=${encodeURIComponent(trimmed)}`)
     }
 
     const navLinks = [
@@ -52,16 +77,18 @@ export default function Navbar() {
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center gap-8">
                         {/* Search Bar */}
-                        <div className="relative group">
+                        <form onSubmit={submitSearch} className="relative group">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <Search className="h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
                             </div>
                             <input
                                 type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Search courses..."
                                 className="pl-10 pr-4 py-2 rounded-full bg-slate-100/50 border border-transparent focus:bg-white focus:border-primary/30 focus:ring-2 focus:ring-primary/20 w-64 transition-all outline-none text-sm"
                             />
-                        </div>
+                        </form>
 
                         {/* Links */}
                         <div className="flex items-center gap-6">
@@ -69,7 +96,9 @@ export default function Navbar() {
                                 <Link
                                     key={link.path}
                                     to={link.path}
-                                    className={`text-sm font-medium transition-colors hover:text-primary ${location.pathname === link.path ? 'text-primary' : 'text-slate-600'
+                                    className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${location.pathname === link.path
+                                        ? 'text-primary bg-primary/10'
+                                        : 'text-slate-600 hover:text-primary hover:bg-primary/5'
                                         }`}
                                 >
                                     {link.name}
@@ -101,7 +130,7 @@ export default function Navbar() {
                     {/* Mobile Menu Button */}
                     <button
                         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+                        className="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100/80 transition-colors"
                     >
                         {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                     </button>
@@ -112,19 +141,24 @@ export default function Navbar() {
             {isMobileMenuOpen && (
                 <div className="md:hidden glass-panel border-t border-slate-200 absolute w-full animate-slide-up">
                     <div className="px-4 pt-2 pb-6 space-y-2">
-                        <div className="mb-4 mt-2">
+                        <form onSubmit={submitSearch} className="mb-4 mt-2">
                             <input
                                 type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Search courses..."
-                                className="w-full pl-4 pr-4 py-2 rounded-lg bg-slate-100 border border-transparent focus:bg-white focus:border-primary/30 outline-none"
+                                className="w-full pl-4 pr-4 py-2 rounded-xl bg-slate-100 border border-transparent focus:bg-white focus:border-primary/30 outline-none"
                             />
-                        </div>
+                        </form>
                         {navLinks.map((link) => (
                             <Link
                                 key={link.path}
                                 to={link.path}
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className="block px-3 py-2 rounded-lg text-base font-medium text-slate-600 hover:text-primary hover:bg-primary/5 transition-colors"
+                                className={`block px-3 py-2 rounded-xl text-base font-medium transition-colors ${location.pathname === link.path
+                                    ? 'text-primary bg-primary/10'
+                                    : 'text-slate-600 hover:text-primary hover:bg-primary/5'
+                                    }`}
                             >
                                 <div className="flex items-center gap-3">
                                     <link.icon className="h-5 w-5" />
