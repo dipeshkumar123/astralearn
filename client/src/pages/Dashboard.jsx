@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, useUser } from '@clerk/clerk-react'
-import { Search, Flame, Target } from 'lucide-react'
+import { Search, Flame, Target, BookOpen } from 'lucide-react'
 import axios from 'axios'
 import CourseCard from '../components/CourseCard'
 import SearchBar from '../components/SearchBar'
@@ -52,7 +52,7 @@ export default function Dashboard() {
             })
 
             if (res.data.enrollments) {
-                const enrolled = res.data.enrollments.map(e => e.course)
+                const enrolled = res.data.enrollments.map((enrollment) => enrollment.course)
                 setEnrolledCourses(enrolled)
             }
 
@@ -71,63 +71,97 @@ export default function Dashboard() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-96">
-                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="flex h-96 items-center justify-center">
+                <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" />
             </div>
         )
     }
 
     const categories = ['All', 'Development', 'Business', 'Design', 'Marketing', 'Lifestyle']
+    const quickStats = [
+        {
+            label: 'Study streak',
+            value: `${stats.currentStreak || 0} days`,
+            icon: Flame,
+            tone: 'from-secondary/25 to-secondary/10 text-secondary-dark border-secondary/30',
+        },
+        {
+            label: 'Total points',
+            value: `${stats.points || 0} pts`,
+            icon: Target,
+            tone: 'from-primary/20 to-accent/10 text-primary border-primary/30',
+        },
+        {
+            label: 'Hours learned',
+            value: `${stats.hoursLearned || 0} hrs`,
+            icon: BookOpen,
+            tone: 'from-accent/20 to-primary/10 text-accent-dark border-accent/30',
+        },
+        {
+            label: 'Active courses',
+            value: `${enrolledCourses.length}`,
+            icon: Search,
+            tone: 'from-slate-100 to-slate-50 text-slate-700 border-slate-200',
+        },
+    ]
 
     return (
-        <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
-            <div className="glass-panel rounded-2xl p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Welcome back, {user?.firstName || 'Learner'}</h1>
-                    <p className="text-slate-500 mt-1">You have learned for {stats.hoursLearned || 0} hours. Keep going.</p>
-                </div>
-                <div className="flex gap-3">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-xl border border-orange-100">
-                        <Flame className="h-5 w-5" />
-                        <span className="font-bold">{stats.currentStreak || 0} day streak</span>
-                    </div>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
-                        <Target className="h-5 w-5" />
-                        <span className="font-bold">{stats.points || 0} points</span>
-                    </div>
-                </div>
-            </div>
+        <div className="space-y-6 animate-fade-in">
+            <section className="glass-panel relative overflow-hidden rounded-3xl p-5 sm:p-7">
+                <div className="pointer-events-none absolute -right-20 -top-20 h-52 w-52 rounded-full bg-[radial-gradient(circle,rgba(14,165,233,0.28),transparent_70%)]" />
+                <div className="pointer-events-none absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.24),transparent_70%)]" />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
+                <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="max-w-2xl">
+                        <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">Welcome back, {user?.firstName || 'Learner'}</p>
+                        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">Let&apos;s keep your momentum going.</h1>
+                        <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
+                            You have already studied {stats.hoursLearned || 0} hours. Pick your next step and keep your streak alive.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 sm:max-w-xl">
+                        {quickStats.map((item) => (
+                            <div key={item.label} className={`rounded-2xl border bg-gradient-to-br p-3 sm:p-4 ${item.tone}`}>
+                                <item.icon className="mb-2 h-4 w-4 sm:h-5 sm:w-5" />
+                                <p className="text-xs font-semibold uppercase tracking-wide">{item.label}</p>
+                                <p className="mt-1 text-base font-bold sm:text-lg">{item.value}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="space-y-6">
                     {enrolledCourses.length > 0 && (
                         <section>
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="mb-4 flex items-center justify-between">
                                 <h2 className="text-xl font-bold text-slate-900">Continue Learning</h2>
-                                <Link to="/learning" className="text-primary font-medium hover:underline text-sm">View all</Link>
+                                <Link to="/learning" className="text-sm font-semibold text-primary hover:underline">View all</Link>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {enrolledCourses.slice(0, 2).map(course => (
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                {enrolledCourses.slice(0, 2).map((course) => (
                                     <CourseCard key={course.id} course={course} progress={calculateProgress(course)} compact />
                                 ))}
                             </div>
                         </section>
                     )}
 
-                    <section className="glass-panel rounded-2xl p-5 md:p-6">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <section className="glass-panel rounded-3xl p-4 sm:p-6">
+                        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <h2 className="text-xl font-bold text-slate-900">Explore Courses</h2>
 
-                            <div className="flex gap-2 bg-white p-1 rounded-xl border border-slate-200 w-fit">
+                            <div className="inline-flex w-fit items-center rounded-full bg-slate-100 p-1">
                                 <button
                                     onClick={() => setActiveTab('browse')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'browse' ? 'bg-primary text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+                                    className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'browse' ? 'bg-white text-primary shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                                 >
                                     Browse
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('my-courses')}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'my-courses' ? 'bg-primary text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+                                    className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'my-courses' ? 'bg-white text-primary shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                                 >
                                     My Courses
                                 </button>
@@ -135,15 +169,13 @@ export default function Dashboard() {
                         </div>
 
                         {activeTab === 'browse' && (
-                            <div className="space-y-6">
-                                <div className="flex flex-col md:flex-row gap-4">
-                                    <div className="flex-1">
-                                        <SearchBar onSearch={setSearchQuery} />
-                                    </div>
+                            <div className="space-y-5">
+                                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px]">
+                                    <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search by title or keyword" />
                                     <select
                                         value={selectedLevel}
-                                        onChange={(e) => setSelectedLevel(e.target.value)}
-                                        className="px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-medium text-slate-700 min-w-[150px]"
+                                        onChange={(event) => setSelectedLevel(event.target.value)}
+                                        className="h-11 rounded-xl border border-slate-200/80 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
                                     >
                                         <option value="All">All Levels</option>
                                         <option value="Beginner">Beginner</option>
@@ -155,18 +187,18 @@ export default function Dashboard() {
                                 <CategoryFilter categories={categories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
 
                                 {courses.length > 0 ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-slide-up">
-                                        {courses.map(course => (
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 animate-slide-up">
+                                        {courses.map((course) => (
                                             <CourseCard key={course.id} course={course} />
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
-                                        <div className="bg-slate-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                                            <Search className="h-8 w-8 text-slate-400" />
+                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 py-12 text-center">
+                                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+                                            <Search className="h-6 w-6 text-slate-400" />
                                         </div>
-                                        <h3 className="text-lg font-medium text-slate-900">No courses found</h3>
-                                        <p className="text-slate-500 mt-1">Try adjusting your search or filters</p>
+                                        <h3 className="text-lg font-semibold text-slate-900">No courses found</h3>
+                                        <p className="mt-1 text-sm text-slate-500">Try adjusting your search or filters.</p>
                                     </div>
                                 )}
                             </div>
@@ -174,15 +206,15 @@ export default function Dashboard() {
 
                         {activeTab === 'my-courses' && (
                             enrolledCourses.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-slide-up">
-                                    {enrolledCourses.map(course => (
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 animate-slide-up">
+                                    {enrolledCourses.map((course) => (
                                         <CourseCard key={course.id} course={course} progress={calculateProgress(course)} />
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
-                                    <h3 className="text-lg font-medium text-slate-900">No enrollments yet</h3>
-                                    <p className="text-slate-500 mt-2 mb-6">Start your learning journey today.</p>
+                                <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 py-12 text-center">
+                                    <h3 className="text-lg font-semibold text-slate-900">No enrollments yet</h3>
+                                    <p className="mb-6 mt-2 text-sm text-slate-500">Start your learning journey today.</p>
                                     <Button onClick={() => setActiveTab('browse')}>Browse Courses</Button>
                                 </div>
                             )
@@ -190,7 +222,7 @@ export default function Dashboard() {
                     </section>
                 </div>
 
-                <div className="space-y-8">
+                <div className="space-y-6">
                     <Leaderboard />
                 </div>
             </div>

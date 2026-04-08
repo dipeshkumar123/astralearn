@@ -1,21 +1,21 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
-import Navbar from '../components/Navbar' // We might want a different Topbar later, but Navbar works for now
+import Navbar from '../components/Navbar'
 
 export default function DashboardLayout() {
     return (
-        <div className="min-h-screen">
+        <div className="app-shell-bg min-h-screen">
             <Sidebar />
 
-            {/* Main Content Area */}
-            <div className="md:ml-64 min-h-screen flex flex-col">
-                {/* Mobile Header (Navbar handles mobile menu) */}
+            <div className="min-h-screen flex flex-col md:ml-72">
                 <div className="md:hidden">
                     <Navbar />
                 </div>
 
-                <main className="flex-1 p-4 md:p-8 pt-20 md:pt-8">
-                    <Outlet />
+                <main className="flex-1 px-3 pb-6 pt-24 sm:px-4 sm:pb-10 sm:pt-28 md:px-8 md:pt-8 lg:px-10">
+                    <div className="mx-auto w-full max-w-7xl">
+                        <Outlet />
+                    </div>
                 </main>
             </div>
         </div>

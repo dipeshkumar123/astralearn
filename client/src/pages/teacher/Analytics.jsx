@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { UserButton } from '@clerk/clerk-react'
 import { BarChart3, Users, TrendingUp, Award } from 'lucide-react'
 import axios from 'axios'
+import TeacherHeader from '../../components/TeacherHeader'
 
 export default function Analytics() {
     const [courses, setCourses] = useState([])
@@ -20,11 +20,9 @@ export default function Analytics() {
 
     const fetchAnalytics = async () => {
         try {
-            // Fetch all courses
             const coursesRes = await axios.get('/api/courses')
             setCourses(coursesRes.data)
 
-            // Calculate basic stats
             const totalCourses = coursesRes.data.length
             const totalEnrollments = coursesRes.data.reduce((sum, course) =>
                 sum + (course.enrollments?.length || 0), 0
@@ -33,128 +31,99 @@ export default function Analytics() {
             setStats({
                 totalCourses,
                 totalEnrollments,
-                avgCompletion: 0, // Placeholder
-                avgQuizScore: 0 // Placeholder
+                avgCompletion: 0,
+                avgQuizScore: 0
             })
-
-            setLoading(false)
         } catch (error) {
             console.error(error)
+        } finally {
             setLoading(false)
         }
     }
 
-    return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <div className="bg-white shadow-sm border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        <div className="flex items-center gap-4">
-                            <Link to="/teacher" className="text-gray-600 hover:text-gray-900">
-                                ← Back
-                            </Link>
-                            <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
-                        </div>
-                        <UserButton />
-                    </div>
-                </div>
-            </div>
+    const statCards = [
+        {
+            label: 'Total Courses',
+            value: stats.totalCourses,
+            icon: BarChart3,
+            tone: 'from-primary/15 to-accent/10 border-primary/25 text-primary',
+        },
+        {
+            label: 'Total Enrollments',
+            value: stats.totalEnrollments,
+            icon: Users,
+            tone: 'from-secondary/20 to-secondary/10 border-secondary/30 text-secondary-dark',
+        },
+        {
+            label: 'Avg Completion',
+            value: `${stats.avgCompletion}%`,
+            icon: TrendingUp,
+            tone: 'from-accent/20 to-primary/10 border-accent/30 text-accent-dark',
+        },
+        {
+            label: 'Avg Quiz Score',
+            value: `${stats.avgQuizScore}%`,
+            icon: Award,
+            tone: 'from-slate-100 to-slate-50 border-slate-200 text-slate-700',
+        },
+    ]
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    return (
+        <div className="min-h-screen">
+            <TeacherHeader title="Analytics" subtitle="Track course performance and publishing health" backLink="/teacher" />
+
+            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
                 {loading ? (
-                    <div className="text-center py-12">Loading analytics...</div>
+                    <div className="py-12 text-center">
+                        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
+                        <p className="mt-3 text-sm text-slate-600">Loading analytics...</p>
+                    </div>
                 ) : (
                     <div className="space-y-6">
-                        {/* Stats Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="bg-white rounded-lg shadow-md p-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-blue-100 p-3 rounded-lg">
-                                        <BarChart3 className="h-6 w-6 text-blue-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Total Courses</p>
-                                        <p className="text-2xl font-bold">{stats.totalCourses}</p>
-                                    </div>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            {statCards.map((item) => (
+                                <div key={item.label} className={`rounded-2xl border bg-gradient-to-br p-5 ${item.tone}`}>
+                                    <item.icon className="mb-3 h-5 w-5" />
+                                    <p className="text-xs font-semibold uppercase tracking-wide">{item.label}</p>
+                                    <p className="mt-1 text-2xl font-bold">{item.value}</p>
                                 </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg shadow-md p-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-green-100 p-3 rounded-lg">
-                                        <Users className="h-6 w-6 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Total Enrollments</p>
-                                        <p className="text-2xl font-bold">{stats.totalEnrollments}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg shadow-md p-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-purple-100 p-3 rounded-lg">
-                                        <TrendingUp className="h-6 w-6 text-purple-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Avg Completion</p>
-                                        <p className="text-2xl font-bold">{stats.avgCompletion}%</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg shadow-md p-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-orange-100 p-3 rounded-lg">
-                                        <Award className="h-6 w-6 text-orange-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Avg Quiz Score</p>
-                                        <p className="text-2xl font-bold">{stats.avgQuizScore}%</p>
-                                    </div>
-                                </div>
-                            </div>
+                            ))}
                         </div>
 
-                        {/* Course List with Basic Stats */}
-                        <div className="bg-white rounded-lg shadow-md">
-                            <div className="p-6 border-b">
-                                <h2 className="text-xl font-bold">Course Performance</h2>
+                        <section className="glass-panel rounded-3xl overflow-hidden">
+                            <div className="border-b border-slate-200/70 px-5 py-4">
+                                <h2 className="text-lg font-bold text-slate-900 sm:text-xl">Course Performance</h2>
                             </div>
                             <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-gray-50 border-b">
+                                <table className="min-w-full text-left">
+                                    <thead className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
                                         <tr>
-                                            <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Course</th>
-                                            <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Sections</th>
-                                            <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Lessons</th>
-                                            <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Status</th>
+                                            <th className="px-5 py-3 font-semibold">Course</th>
+                                            <th className="px-5 py-3 font-semibold">Sections</th>
+                                            <th className="px-5 py-3 font-semibold">Lessons</th>
+                                            <th className="px-5 py-3 font-semibold">Status</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y">
-                                        {courses.map(course => {
+                                    <tbody className="divide-y divide-slate-100 bg-white/70 text-sm">
+                                        {courses.map((course) => {
                                             const sectionCount = course.sections?.length || 0
                                             const lessonCount = course.sections?.reduce((sum, section) =>
                                                 sum + (section.lessons?.length || 0), 0
                                             ) || 0
 
                                             return (
-                                                <tr key={course.id} className="hover:bg-gray-50">
-                                                    <td className="px-6 py-4">
-                                                        <Link
-                                                            to={`/teacher/courses/${course.id}`}
-                                                            className="font-medium text-blue-600 hover:text-blue-800"
-                                                        >
+                                                <tr key={course.id} className="transition-colors hover:bg-slate-50/80">
+                                                    <td className="px-5 py-4">
+                                                        <Link to={`/teacher/courses/${course.id}`} className="font-semibold text-primary hover:underline">
                                                             {course.title}
                                                         </Link>
                                                     </td>
-                                                    <td className="px-6 py-4 text-gray-600">{sectionCount}</td>
-                                                    <td className="px-6 py-4 text-gray-600">{lessonCount}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className={`px-2 py-1 rounded text-sm ${course.isPublished
-                                                                ? 'bg-green-100 text-green-800'
-                                                                : 'bg-gray-100 text-gray-800'
+                                                    <td className="px-5 py-4 text-slate-600">{sectionCount}</td>
+                                                    <td className="px-5 py-4 text-slate-600">{lessonCount}</td>
+                                                    <td className="px-5 py-4">
+                                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${course.isPublished
+                                                            ? 'bg-emerald-100 text-emerald-700'
+                                                            : 'bg-slate-100 text-slate-600'
                                                             }`}>
                                                             {course.isPublished ? 'Published' : 'Draft'}
                                                         </span>
@@ -166,18 +135,14 @@ export default function Analytics() {
                                 </table>
 
                                 {courses.length === 0 && (
-                                    <div className="text-center py-12 text-gray-500">
-                                        No courses yet
-                                    </div>
+                                    <div className="py-12 text-center text-slate-500">No courses yet</div>
                                 )}
                             </div>
-                        </div>
+                        </section>
 
-                        {/* Info Box */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <p className="text-sm text-blue-800">
-                                <strong>Note:</strong> Advanced analytics including student engagement, quiz performance,
-                                and completion rates will be available once you have active enrollments and student activity.
+                        <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4">
+                            <p className="text-sm text-slate-700">
+                                <strong>Tip:</strong> As student activity grows, this dashboard will include richer metrics like engagement, completion trends, and quiz outcomes.
                             </p>
                         </div>
                     </div>

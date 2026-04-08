@@ -1,30 +1,28 @@
 import { SignUp } from '@clerk/clerk-react'
 import { useState } from 'react'
-import { GraduationCap, UserCircle } from 'lucide-react'
+import { GraduationCap, UserCircle, Sparkles } from 'lucide-react'
 
 export default function SignupPage() {
     const [selectedRole, setSelectedRole] = useState('STUDENT')
 
     return (
-        <div className="min-h-[calc(100vh-4rem)] flex">
-            {/* Left Side - Form */}
-            <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-white">
-                <div className="w-full max-w-md space-y-8 animate-fade-in">
+        <div className="mx-auto grid min-h-[calc(100vh-6rem)] max-w-7xl gap-4 px-4 pb-8 sm:gap-6 sm:px-6 lg:grid-cols-2 lg:px-8">
+            <div className="order-2 flex items-center justify-center lg:order-1">
+                <div className="glass-panel w-full max-w-xl space-y-6 rounded-3xl p-5 sm:p-7">
                     <div className="text-center">
-                        <h2 className="text-3xl font-bold text-slate-900">Create an account</h2>
-                        <p className="mt-2 text-slate-600">Choose your role and start your journey</p>
+                        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Create your account</h2>
+                        <p className="mt-2 text-sm text-slate-600 sm:text-base">Choose your role and start your journey.</p>
                     </div>
 
-                    {/* Role Selection */}
                     <div className="space-y-3">
-                        <label className="block text-sm font-medium text-slate-700 mb-2">I want to:</label>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">I want to:</label>
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 type="button"
                                 onClick={() => setSelectedRole('STUDENT')}
-                                className={`p-4 rounded-xl border-2 transition-all ${
+                                className={`rounded-2xl border-2 p-4 transition-all ${
                                     selectedRole === 'STUDENT'
-                                        ? 'border-primary bg-primary/5 shadow-md'
+                                        ? 'border-primary/60 bg-primary/10 shadow-md shadow-primary/20'
                                         : 'border-slate-200 hover:border-slate-300'
                                 }`}
                             >
@@ -39,9 +37,9 @@ export default function SignupPage() {
                             <button
                                 type="button"
                                 onClick={() => setSelectedRole('TEACHER')}
-                                className={`p-4 rounded-xl border-2 transition-all ${
+                                className={`rounded-2xl border-2 p-4 transition-all ${
                                     selectedRole === 'TEACHER'
-                                        ? 'border-primary bg-primary/5 shadow-md'
+                                        ? 'border-primary/60 bg-primary/10 shadow-md shadow-primary/20'
                                         : 'border-slate-200 hover:border-slate-300'
                                 }`}
                             >
@@ -57,29 +55,34 @@ export default function SignupPage() {
                     </div>
 
                     <div className="flex justify-center">
-                        <SignUp 
-                            routing="path" 
-                            path="/signup" 
+                        <SignUp
+                            routing="path"
+                            path="/signup"
                             signInUrl="/login"
-                            // After signup, bounce to onboarding to persist role in our DB
                             afterSignUpUrl={`/onboard?role=${selectedRole}`}
                         />
                     </div>
                 </div>
             </div>
 
-            {/* Right Side - Image/Pattern */}
-            <div className="hidden lg:flex flex-1 bg-slate-900 relative overflow-hidden items-center justify-center">
-                <div className="absolute inset-0 bg-gradient-to-br from-secondary/20 to-primary/20" />
-                <div className="absolute inset-0 bg-[url('/patterns/grid.svg')] opacity-20" />
-                <div className="relative z-10 text-center px-12 max-w-lg">
-                    <h2 className="text-4xl font-bold text-white mb-6">Join our community</h2>
-                    <p className="text-lg text-slate-300 mb-4">
-                        {selectedRole === 'TEACHER' 
-                            ? 'Share your knowledge and inspire thousands of learners worldwide.'
-                            : 'Connect with thousands of learners and mentors from around the world.'
-                        }
-                    </p>
+            <div className="order-1 rounded-3xl bg-gradient-to-br from-secondary to-primary p-6 text-slate-900 shadow-[0_24px_45px_-24px_rgba(180,83,9,0.75)] lg:order-2 lg:p-10">
+                <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-800">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Join the community
+                </p>
+                <h2 className="text-2xl font-bold leading-tight sm:text-3xl lg:text-4xl">
+                    {selectedRole === 'TEACHER' ? 'Teach with confidence and scale your impact' : 'Build the skills that open real opportunities'}
+                </h2>
+                <p className="mt-3 max-w-md text-sm text-slate-900/80 sm:text-base">
+                    {selectedRole === 'TEACHER'
+                        ? 'Create engaging lessons, publish faster, and guide students with AI-assisted tools.'
+                        : 'Track progress, learn in focused sessions, and stay motivated with a clear study plan.'}
+                </p>
+
+                <div className="mt-6 rounded-2xl border border-white/50 bg-white/45 p-4 backdrop-blur-sm sm:p-5">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-700">Role selected</p>
+                    <p className="mt-2 text-lg font-bold text-slate-900">{selectedRole === 'TEACHER' ? 'Teacher Mode' : 'Student Mode'}</p>
+                    <p className="mt-1 text-sm text-slate-700">You can change this later in profile settings.</p>
                 </div>
             </div>
         </div>

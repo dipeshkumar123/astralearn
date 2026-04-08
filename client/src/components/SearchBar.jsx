@@ -1,17 +1,22 @@
 import { Search } from 'lucide-react'
 
-export default function SearchBar({ value, onChange }) {
+export default function SearchBar({ value = '', onChange, onSearch, placeholder = 'Search for courses...' }) {
+    const handleChange = (nextValue) => {
+        if (typeof onChange === 'function') onChange(nextValue)
+        if (typeof onSearch === 'function') onSearch(nextValue)
+    }
+
     return (
-        <div className="relative max-w-md w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
+        <div className="relative w-full">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <Search className="h-4 w-4 text-slate-400" />
             </div>
             <input
                 type="text"
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
-                placeholder="Search for courses..."
+                onChange={(event) => handleChange(event.target.value)}
+                className="h-11 w-full rounded-xl border border-slate-200/80 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                placeholder={placeholder}
             />
         </div>
     )

@@ -7,25 +7,25 @@ export default {
         extend: {
             colors: {
                 primary: {
-                    DEFAULT: '#6366f1', // Indigo 500
-                    dark: '#4f46e5', // Indigo 600
-                    light: '#818cf8', // Indigo 400
-                    50: '#eef2ff',
-                    100: '#e0e7ff',
-                    900: '#312e81',
+                    DEFAULT: '#0f766e', // Teal 700
+                    dark: '#115e59', // Teal 800
+                    light: '#2dd4bf', // Teal 400
+                    50: '#f0fdfa',
+                    100: '#ccfbf1',
+                    900: '#134e4a',
                 },
                 secondary: {
-                    DEFAULT: '#ec4899', // Pink 500
-                    dark: '#db2777', // Pink 600
-                    light: '#f472b6', // Pink 400
-                    50: '#fdf2f8',
-                    100: '#fce7f3',
-                    900: '#831843',
+                    DEFAULT: '#f59e0b', // Amber 500
+                    dark: '#d97706', // Amber 600
+                    light: '#fbbf24', // Amber 400
+                    50: '#fffbeb',
+                    100: '#fef3c7',
+                    900: '#78350f',
                 },
                 accent: {
-                    DEFAULT: '#14b8a6', // Teal 500
-                    dark: '#0d9488', // Teal 600
-                    light: '#2dd4bf', // Teal 400
+                    DEFAULT: '#0ea5e9', // Sky 500
+                    dark: '#0284c7', // Sky 600
+                    light: '#38bdf8', // Sky 400
                 },
                 dark: {
                     DEFAULT: '#0f172a', // Slate 900
@@ -41,8 +41,8 @@ export default {
                 }
             },
             fontFamily: {
-                sans: ['Inter', 'sans-serif'],
-                display: ['Outfit', 'sans-serif'],
+                sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                display: ['Sora', 'sans-serif'],
             },
             animation: {
                 'fade-in': 'fadeIn 0.6s ease-out forwards',
@@ -55,6 +55,7 @@ export default {
                 'float-delayed': 'float 6s ease-in-out 3s infinite',
                 'bounce-slow': 'bounce 3s infinite',
                 'spin-slow': 'spin 3s linear infinite',
+                'glow': 'glowPulse 3.2s ease-in-out infinite',
             },
             keyframes: {
                 fadeIn: {
@@ -80,7 +81,11 @@ export default {
                 float: {
                     '0%, 100%': { transform: 'translateY(0)' },
                     '50%': { transform: 'translateY(-20px)' },
-                }
+                },
+                glowPulse: {
+                    '0%, 100%': { boxShadow: '0 0 0 0 rgba(15, 118, 110, 0.15)' },
+                    '50%': { boxShadow: '0 0 0 16px rgba(15, 118, 110, 0)' },
+                },
             },
             backgroundImage: {
                 'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

@@ -1,13 +1,13 @@
 export default function CategoryFilter({ categories = [], selectedCategory, onSelectCategory }) {
     return (
-        <div className="flex flex-wrap gap-2">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
             {categories.map((category) => (
                 <button
                     key={category}
                     onClick={() => onSelectCategory(category)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedCategory === category
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all ${selectedCategory === category
+                        ? 'bg-gradient-to-r from-primary to-accent text-white shadow-md shadow-primary/20'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                 >
                     {category}

@@ -25,32 +25,29 @@ export default function CourseCard({ course, progress, compact = false }) {
 
     return (
         <Link to={`/courses/${course.id}`} className="block h-full">
-            <Card className="h-full p-0 overflow-hidden flex flex-col group" hover>
-                {/* Thumbnail */}
-                <div className={`relative ${compact ? 'h-32' : 'h-48'} bg-slate-100 overflow-hidden`}>
+            <Card className="group flex h-full flex-col overflow-hidden border-white/90 p-0" hover>
+                <div className={`relative overflow-hidden bg-slate-100 ${compact ? 'h-32 sm:h-36' : 'h-44 sm:h-48'}`}>
                     {course.thumbnail ? (
                         <img
                             src={course.thumbnail}
                             alt={course.title}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                     ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center">
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10">
                             <BookOpen className="h-12 w-12 text-primary/40" />
                         </div>
                     )}
 
-                    {/* Overlay Play Button */}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                        <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
+                        <div className="flex h-12 w-12 translate-y-4 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
                             <PlayCircle className="h-6 w-6 text-primary ml-1" />
                         </div>
                     </div>
                 </div>
 
-                {/* Content */}
-                <div className="p-5 flex-1 flex flex-col">
-                    <div className="flex items-center justify-between mb-3">
+                <div className="flex flex-1 flex-col p-4 sm:p-5">
+                    <div className="mb-3 flex items-center justify-between">
                         <Badge variant="primary">Course</Badge>
                         {stats.count > 0 && (
                             <div className="flex items-center gap-1 text-xs font-medium text-slate-600">
@@ -61,17 +58,17 @@ export default function CourseCard({ course, progress, compact = false }) {
                         )}
                     </div>
 
-                    <h3 className="text-lg font-bold text-slate-900 mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+                    <h3 className="mb-2 line-clamp-2 text-base font-bold text-slate-900 transition-colors group-hover:text-primary sm:text-lg">
                         {course.title}
                     </h3>
 
                     {!compact && (
-                        <p className="text-slate-500 text-sm line-clamp-2 mb-4 flex-1">
+                        <p className="mb-4 flex-1 line-clamp-2 text-sm text-slate-500">
                             {course.description || "No description available."}
                         </p>
                     )}
 
-                    <div className="mt-auto pt-4 border-t border-slate-50">
+                    <div className="mt-auto border-t border-slate-100 pt-4">
                         {progress ? (
                             <div className="space-y-2">
                                 <div className="flex justify-between text-xs font-medium">

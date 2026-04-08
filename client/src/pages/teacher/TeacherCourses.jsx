@@ -47,15 +47,15 @@ export default function TeacherCourses() {
         <div className="min-h-screen">
             <TeacherHeader title="My Courses" subtitle="Create and manage your courses" backLink="/teacher" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="glass-panel rounded-2xl p-6 mb-8 flex justify-between items-center gap-4 flex-wrap">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                <div className="glass-panel mb-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5 sm:p-6">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-900">Course Library</h2>
                         <p className="text-slate-600 mt-1">Manage your course content and settings</p>
                     </div>
                     <button
                         onClick={() => setCreating(!creating)}
-                        className="flex items-center gap-2 bg-gradient-to-r from-primary to-secondary text-white px-5 py-2.5 rounded-xl hover:shadow-lg hover:shadow-primary/30 transition-all font-medium"
+                        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent px-5 py-2.5 font-medium text-white transition-all hover:shadow-lg hover:shadow-primary/30"
                     >
                         {creating ? <X className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
                         {creating ? 'Cancel' : 'New Course'}
@@ -63,7 +63,7 @@ export default function TeacherCourses() {
                 </div>
 
                 {creating && (
-                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 mb-8 animate-slide-up">
+                    <div className="glass-panel mb-8 rounded-2xl p-5 sm:p-6 animate-slide-up">
                         <h3 className="text-lg font-semibold text-slate-900 mb-4">Create New Course</h3>
                         <form onSubmit={handleCreateCourse} className="space-y-4">
                             <input
@@ -94,13 +94,13 @@ export default function TeacherCourses() {
                         </div>
                         <h3 className="text-xl font-semibold text-slate-900 mb-2">No courses yet</h3>
                         <p className="text-slate-600 mb-6">Get started by creating your first course</p>
-                        <button onClick={() => setCreating(true)} className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-medium">Create Your First Course</button>
+                        <button onClick={() => setCreating(true)} className="bg-gradient-to-r from-primary to-accent text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-medium">Create Your First Course</button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {courses.map(course => (
-                            <div key={course.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-xl hover:border-slate-300 transition-all duration-300 overflow-hidden group">
-                                <div className="h-40 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 relative overflow-hidden">
+                            <div key={course.id} className="bg-white/95 rounded-2xl shadow-sm border border-slate-200 hover:shadow-xl hover:border-slate-300 transition-all duration-300 overflow-hidden group">
+                                <div className="h-40 bg-gradient-to-br from-primary via-accent to-secondary relative overflow-hidden">
                                     {course.thumbnail ? (
                                         <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
                                     ) : (

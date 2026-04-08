@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { UserButton, useAuth } from '@clerk/clerk-react'
-import { Menu, X, Search, BookOpen, LayoutDashboard } from 'lucide-react'
+import { Menu, X, Search, BookOpen, LayoutDashboard, Sparkles } from 'lucide-react'
 import { useUserRole } from '../hooks/useUserRole'
 
 export default function Navbar() {
@@ -54,139 +54,144 @@ export default function Navbar() {
         ...(isSignedIn ? [{ name: 'Dashboard', path: getDashboardPath(), icon: LayoutDashboard }] : []),
     ]
 
+    const isActivePath = (path) => {
+        return location.pathname === path || location.pathname.startsWith(`${path}/`)
+    }
+
     return (
-        <nav
-            className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'glass-panel border-b-0' : 'bg-transparent'
-                }`}
-        >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
-                    {/* Logo */}
-                    <div 
-                        onClick={() => navigate(isSignedIn ? getDashboardPath() : '/')}
-                        className="flex items-center gap-2 group cursor-pointer"
-                    >
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform">
-                            A
+        <nav className="fixed inset-x-0 top-0 z-50 px-2 pt-2 sm:px-4 sm:pt-3">
+            <div className="mx-auto max-w-7xl">
+                <div className={`glass-panel rounded-2xl border transition-all duration-300 ${isScrolled ? 'shadow-[0_22px_40px_-26px_rgba(15,23,42,0.55)]' : 'shadow-[0_10px_24px_-22px_rgba(15,23,42,0.45)]'}`}>
+                    <div className="flex h-16 items-center justify-between px-3 sm:px-5">
+                        <button
+                            type="button"
+                            onClick={() => navigate(isSignedIn ? getDashboardPath() : '/')}
+                            className="flex items-center gap-2 rounded-xl p-1 transition-colors hover:bg-white/60"
+                            aria-label="Go to home"
+                        >
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-md shadow-primary/30">
+                                <Sparkles className="h-4 w-4" />
+                            </div>
+                            <span className="text-lg font-extrabold tracking-tight text-slate-900">Astralearn</span>
+                        </button>
+
+                        <div className="hidden items-center gap-3 md:flex lg:gap-5">
+                            <form onSubmit={submitSearch} className="relative hidden lg:block">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                    placeholder="Search courses"
+                                    className="h-10 w-64 rounded-full border border-slate-200/80 bg-white/80 pl-10 pr-4 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                                />
+                            </form>
+
+                            <div className="flex items-center gap-1 rounded-full bg-slate-100/70 p-1">
+                                {navLinks.map((link) => (
+                                    <Link
+                                        key={link.path}
+                                        to={link.path}
+                                        className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-all ${isActivePath(link.path)
+                                            ? 'bg-white text-primary shadow-sm'
+                                            : 'text-slate-600 hover:bg-white/80 hover:text-primary'
+                                            }`}
+                                    >
+                                        <link.icon className="h-4 w-4" />
+                                        {link.name}
+                                    </Link>
+                                ))}
+                            </div>
+
+                            {isSignedIn ? (
+                                <UserButton
+                                    appearance={{
+                                        elements: {
+                                            avatarBox: 'w-10 h-10 border-2 border-primary/20 hover:border-primary transition-colors'
+                                        }
+                                    }}
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <Link to="/login" className="btn-secondary px-4 py-2 text-sm">Log in</Link>
+                                    <Link to="/signup" className="btn-primary px-4 py-2 text-sm">Sign up</Link>
+                                </div>
+                            )}
                         </div>
-                        <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-dark to-secondary-dark">
-                            Astralearn
-                        </span>
+
+                        <button
+                            type="button"
+                            onClick={() => setIsMobileMenuOpen((open) => !open)}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200/80 bg-white/80 text-slate-700 transition-colors hover:bg-white md:hidden"
+                            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+                        >
+                            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                        </button>
                     </div>
 
-                    {/* Desktop Navigation */}
-                    <div className="hidden md:flex items-center gap-8">
-                        {/* Search Bar */}
-                        <form onSubmit={submitSearch} className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Search className="h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                            </div>
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search courses..."
-                                className="pl-10 pr-4 py-2 rounded-full bg-slate-100/50 border border-transparent focus:bg-white focus:border-primary/30 focus:ring-2 focus:ring-primary/20 w-64 transition-all outline-none text-sm"
-                            />
-                        </form>
+                    {isMobileMenuOpen && (
+                        <div className="animate-slide-up border-t border-slate-200/80 px-3 pb-4 pt-3 md:hidden">
+                            <form onSubmit={submitSearch} className="relative mb-3">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                    placeholder="Search courses"
+                                    className="h-11 w-full rounded-xl border border-slate-200/80 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                                />
+                            </form>
 
-                        {/* Links */}
-                        <div className="flex items-center gap-6">
-                            {navLinks.map((link) => (
-                                <Link
-                                    key={link.path}
-                                    to={link.path}
-                                    className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${location.pathname === link.path
-                                        ? 'text-primary bg-primary/10'
-                                        : 'text-slate-600 hover:text-primary hover:bg-primary/5'
-                                        }`}
-                                >
-                                    {link.name}
-                                </Link>
-                            ))}
+                            <div className="space-y-1.5">
+                                {navLinks.map((link) => (
+                                    <Link
+                                        key={link.path}
+                                        to={link.path}
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${isActivePath(link.path)
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+                                            }`}
+                                    >
+                                        <link.icon className="h-4 w-4" />
+                                        {link.name}
+                                    </Link>
+                                ))}
+                            </div>
+
+                            {isSignedIn ? (
+                                <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
+                                    <p className="text-sm font-semibold text-slate-700">Account</p>
+                                    <UserButton
+                                        appearance={{
+                                            elements: {
+                                                avatarBox: 'w-9 h-9 border-2 border-primary/20 hover:border-primary transition-colors'
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                    <Link
+                                        to="/login"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className="btn-secondary text-sm"
+                                    >
+                                        Log in
+                                    </Link>
+                                    <Link
+                                        to="/signup"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className="btn-primary text-sm"
+                                    >
+                                        Sign up
+                                    </Link>
+                                </div>
+                            )}
                         </div>
-
-                        {/* Auth Buttons */}
-                        {isSignedIn ? (
-                            <UserButton
-                                appearance={{
-                                    elements: {
-                                        avatarBox: "w-9 h-9 border-2 border-primary/20 hover:border-primary transition-colors"
-                                    }
-                                }}
-                            />
-                        ) : (
-                            <div className="flex items-center gap-3">
-                                <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-primary transition-colors">
-                                    Log in
-                                </Link>
-                                <Link to="/signup" className="btn-primary py-2 px-4 text-sm shadow-lg shadow-primary/20">
-                                    Sign up
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Mobile Menu Button */}
-                    <button
-                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        className="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100/80 transition-colors"
-                    >
-                        {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                    </button>
+                    )}
                 </div>
             </div>
-
-            {/* Mobile Menu */}
-            {isMobileMenuOpen && (
-                <div className="md:hidden glass-panel border-t border-slate-200 absolute w-full animate-slide-up">
-                    <div className="px-4 pt-2 pb-6 space-y-2">
-                        <form onSubmit={submitSearch} className="mb-4 mt-2">
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search courses..."
-                                className="w-full pl-4 pr-4 py-2 rounded-xl bg-slate-100 border border-transparent focus:bg-white focus:border-primary/30 outline-none"
-                            />
-                        </form>
-                        {navLinks.map((link) => (
-                            <Link
-                                key={link.path}
-                                to={link.path}
-                                onClick={() => setIsMobileMenuOpen(false)}
-                                className={`block px-3 py-2 rounded-xl text-base font-medium transition-colors ${location.pathname === link.path
-                                    ? 'text-primary bg-primary/10'
-                                    : 'text-slate-600 hover:text-primary hover:bg-primary/5'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <link.icon className="h-5 w-5" />
-                                    {link.name}
-                                </div>
-                            </Link>
-                        ))}
-                        {!isSignedIn && (
-                            <div className="pt-4 mt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
-                                <Link
-                                    to="/login"
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                    className="btn-secondary text-center py-2 text-sm"
-                                >
-                                    Log in
-                                </Link>
-                                <Link
-                                    to="/signup"
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                    className="btn-primary text-center py-2 text-sm"
-                                >
-                                    Sign up
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
         </nav>
     )
 }

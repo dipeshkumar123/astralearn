@@ -7,191 +7,201 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BookOpen, Star, Search, SlidersHorizontal } from 'lucide-react'
 
 export default function CoursesListPage() {
-  const [courses, setCourses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [reviews, setReviews] = useState({})
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('All')
-  const [level, setLevel] = useState('All')
-  const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
+    const [courses, setCourses] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [reviews, setReviews] = useState({})
+    const [search, setSearch] = useState('')
+    const [category, setCategory] = useState('All')
+    const [level, setLevel] = useState('All')
+    const [searchParams, setSearchParams] = useSearchParams()
+    const navigate = useNavigate()
 
-  useEffect(() => {
-    const searchParam = searchParams.get('search') || ''
-    const categoryParam = searchParams.get('category') || 'All'
-    const levelParam = searchParams.get('level') || 'All'
-    setSearch(searchParam)
-    setCategory(categoryParam)
-    setLevel(levelParam)
-  }, [searchParams])
+    useEffect(() => {
+        const searchParam = searchParams.get('search') || ''
+        const categoryParam = searchParams.get('category') || 'All'
+        const levelParam = searchParams.get('level') || 'All'
+        setSearch(searchParam)
+        setCategory(categoryParam)
+        setLevel(levelParam)
+    }, [searchParams])
 
-  useEffect(() => {
-    const fetch = async () => {
-      setLoading(true)
-      try {
-        const params = {}
-        const searchParam = searchParams.get('search')
-        const categoryParam = searchParams.get('category')
-        const levelParam = searchParams.get('level')
+    useEffect(() => {
+        const fetch = async () => {
+            setLoading(true)
+            try {
+                const params = {}
+                const searchParam = searchParams.get('search')
+                const categoryParam = searchParams.get('category')
+                const levelParam = searchParams.get('level')
 
-        if (searchParam) params.search = searchParam
-        if (categoryParam && categoryParam !== 'All') params.category = categoryParam
-        if (levelParam && levelParam !== 'All') params.level = levelParam
+                if (searchParam) params.search = searchParam
+                if (categoryParam && categoryParam !== 'All') params.category = categoryParam
+                if (levelParam && levelParam !== 'All') params.level = levelParam
 
-        const res = await axios.get('/api/courses', { params })
-        const published = res.data.filter(c => c.isPublished)
-        setCourses(published)
+                const res = await axios.get('/api/courses', { params })
+                const published = res.data.filter((course) => course.isPublished)
+                setCourses(published)
 
-        const reviewPromises = published.map(c =>
-          axios.get(`/api/reviews/stats/${c.id}`).then(r => ({ id: c.id, ...r.data })).catch(() => ({ id: c.id, average: 0, count: 0 }))
-        )
-        const reviewData = await Promise.all(reviewPromises)
-        const reviewMap = {}
-        reviewData.forEach(r => { reviewMap[r.id] = r })
-        setReviews(reviewMap)
-      } finally {
-        setLoading(false)
-      }
+                const reviewPromises = published.map((course) =>
+                    axios
+                        .get(`/api/reviews/stats/${course.id}`)
+                        .then((response) => ({ id: course.id, ...response.data }))
+                        .catch(() => ({ id: course.id, average: 0, count: 0 }))
+                )
+                const reviewData = await Promise.all(reviewPromises)
+                const reviewMap = {}
+                reviewData.forEach((review) => { reviewMap[review.id] = review })
+                setReviews(reviewMap)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetch()
+    }, [searchParams])
+
+    const applyFilters = (event) => {
+        event.preventDefault()
+        const params = new URLSearchParams()
+        if (search.trim()) params.set('search', search.trim())
+        if (category !== 'All') params.set('category', category)
+        if (level !== 'All') params.set('level', level)
+        setSearchParams(params)
     }
-    fetch()
-  }, [searchParams])
 
-  const applyFilters = (event) => {
-    event.preventDefault()
-    const params = new URLSearchParams()
-    if (search.trim()) params.set('search', search.trim())
-    if (category !== 'All') params.set('category', category)
-    if (level !== 'All') params.set('level', level)
-    setSearchParams(params)
-  }
+    const clearFilters = () => {
+        setSearch('')
+        setCategory('All')
+        setLevel('All')
+        setSearchParams({})
+    }
 
-  const clearFilters = () => {
-    setSearch('')
-    setCategory('All')
-    setLevel('All')
-    setSearchParams({})
-  }
+    const categories = ['All', ...new Set([
+        ...courses.map((course) => course.category).filter(Boolean),
+        ...(category !== 'All' ? [category] : []),
+    ])]
+    const levels = ['All', ...new Set([
+        ...courses.map((course) => course.level).filter(Boolean),
+        ...(level !== 'All' ? [level] : []),
+    ])]
 
-  const categories = ['All', ...new Set([
-    ...courses.map(c => c.category).filter(Boolean),
-    ...(category !== 'All' ? [category] : []),
-  ])]
-  const levels = ['All', ...new Set([
-    ...courses.map(c => c.level).filter(Boolean),
-    ...(level !== 'All' ? [level] : []),
-  ])]
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
-      </div>
-    )
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-8">
-      <div className="glass-panel rounded-2xl p-6 text-center space-y-2">
-        <h1 className="text-4xl font-bold text-slate-900">Explore Courses</h1>
-        <p className="text-lg text-slate-600">Discover your next learning adventure</p>
-      </div>
-
-      <form onSubmit={applyFilters} className="glass-panel rounded-2xl p-4 md:p-5">
-        <div className="grid gap-3 md:grid-cols-[1.6fr,1fr,1fr,auto] items-end">
-          <div>
-            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">
-              Search
-            </label>
-            <div className="relative">
-              <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by title or description"
-                className="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-              />
+    if (loading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center">
+                <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-primary" />
             </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">
-              Category
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
-            >
-              {categories.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide block mb-2">
-              Level
-            </label>
-            <select
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
-            >
-              {levels.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex gap-2">
-            <Button type="submit" className="flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4" />
-              Apply
-            </Button>
-            <Button type="button" variant="secondary" onClick={clearFilters}>Reset</Button>
-          </div>
-        </div>
-      </form>
+        )
+    }
 
-      {courses.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">
-          <p className="text-lg">No courses match the current filters.</p>
-          <Button className="mt-4" variant="secondary" onClick={clearFilters}>Clear filters</Button>
-        </div>
-      ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map(c => {
-            const review = reviews[c.id] || { average: 0, count: 0 }
-            return (
-              <Card key={c.id} className="overflow-hidden hover:shadow-xl transition-shadow">
-                <div className="h-48 bg-gradient-to-br from-primary to-secondary relative">
-                  {c.thumbnail && <img src={c.thumbnail} alt={c.title} className="w-full h-full object-cover" />}
-                  <div className="absolute top-3 right-3">
-                    <Badge variant="secondary" className="bg-white/90 backdrop-blur">{c.category}</Badge>
-                  </div>
-                </div>
-                <div className="p-5 space-y-3">
-                  <h3 className="font-bold text-xl text-slate-900 line-clamp-2">{c.title}</h3>
-                  <p className="text-sm text-slate-600 line-clamp-3">{c.description || 'No description available.'}</p>
+    return (
+        <div className="mx-auto max-w-7xl space-y-6 px-4 pb-8 sm:space-y-8 sm:px-6 sm:pb-12 lg:px-8">
+            <section className="glass-panel overflow-hidden rounded-3xl p-5 sm:p-8">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-primary">Course Discovery</p>
+                <h1 className="text-3xl font-bold text-slate-900 sm:text-4xl">Find your next learning path</h1>
+                <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">
+                    Search published courses, match your level, and jump straight into lessons that fit your goals.
+                </p>
+            </section>
 
-                  <div className="flex items-center gap-4 text-xs text-slate-500">
-                    <div className="flex items-center gap-1">
-                      <BookOpen className="h-4 w-4" />
-                      <span>{c.sections?.length || 0} modules</span>
+            <form onSubmit={applyFilters} className="glass-panel rounded-3xl p-4 sm:p-5">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.7fr_1fr_1fr_auto] lg:items-end">
+                    <div>
+                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-600">Search</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search by title or description"
+                                className="h-11 w-full rounded-xl border border-slate-200/80 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                            />
+                        </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 text-yellow-500" />
-                      <span>{review.average.toFixed(1)} ({review.count})</span>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between pt-3">
-                    <span className="text-2xl font-bold text-primary">${c.price || 0}</span>
-                    <Button size="sm" onClick={() => navigate(`/courses/${c.id}`)}>View Course</Button>
-                  </div>
+                    <div>
+                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-600">Category</label>
+                        <select
+                            value={category}
+                            onChange={(event) => setCategory(event.target.value)}
+                            className="h-11 w-full rounded-xl border border-slate-200/80 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                        >
+                            {categories.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-600">Level</label>
+                        <select
+                            value={level}
+                            onChange={(event) => setLevel(event.target.value)}
+                            className="h-11 w-full rounded-xl border border-slate-200/80 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                        >
+                            {levels.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <Button type="submit" className="h-11 px-4">
+                            <SlidersHorizontal className="h-4 w-4" />
+                            Apply
+                        </Button>
+                        <Button type="button" variant="secondary" onClick={clearFilters} className="h-11 px-4">Reset</Button>
+                    </div>
                 </div>
-              </Card>
-            )
-          })}
+            </form>
+
+            {courses.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-300/80 bg-white/70 py-14 text-center text-slate-500">
+                    <p className="text-lg font-semibold text-slate-700">No courses match these filters.</p>
+                    <Button className="mt-4" variant="secondary" onClick={clearFilters}>Clear filters</Button>
+                </div>
+            ) : (
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {courses.map((course) => {
+                        const review = reviews[course.id] || { average: 0, count: 0 }
+                        return (
+                            <Card key={course.id} className="group overflow-hidden p-0">
+                                <div className="relative h-44 overflow-hidden bg-gradient-to-br from-primary to-accent sm:h-48">
+                                    {course.thumbnail ? (
+                                        <img src={course.thumbnail} alt={course.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center">
+                                            <BookOpen className="h-12 w-12 text-white/60" />
+                                        </div>
+                                    )}
+                                    <div className="absolute right-3 top-3">
+                                        <Badge variant="secondary" className="bg-white/90 text-slate-800">{course.category || 'General'}</Badge>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 p-5">
+                                    <h3 className="line-clamp-2 text-lg font-bold text-slate-900 sm:text-xl">{course.title}</h3>
+                                    <p className="line-clamp-3 text-sm text-slate-600">{course.description || 'No description available.'}</p>
+
+                                    <div className="flex items-center gap-4 text-xs text-slate-500 sm:text-sm">
+                                        <div className="flex items-center gap-1">
+                                            <BookOpen className="h-4 w-4" />
+                                            <span>{course.sections?.length || 0} modules</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Star className="h-4 w-4 text-secondary-dark" />
+                                            <span>{review.average.toFixed(1)} ({review.count})</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                                        <span className="text-2xl font-bold text-primary">${course.price || 0}</span>
+                                        <Button onClick={() => navigate(`/courses/${course.id}`)} className="px-4 py-2 text-sm">View Course</Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        )
+                    })}
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  )
+    )
 }
