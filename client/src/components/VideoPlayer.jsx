@@ -1,13 +1,16 @@
-import React from 'react';
-import { PlayCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import MuxPlayer from '@mux/mux-player-react';
+import { PlayCircle, VideoOff } from 'lucide-react';
 
 export default function VideoPlayer({ playbackId, videoUrl, poster, title }) {
+    const [isLoading, setIsLoading] = useState(true);
+
     if (!playbackId && !videoUrl) {
         return (
-            <div className="aspect-video bg-slate-900 rounded-xl flex items-center justify-center text-white">
+            <div className="aspect-video bg-slate-900 rounded-xl flex items-center justify-center">
                 <div className="text-center">
-                    <PlayCircle className="h-16 w-16 mx-auto mb-4 text-slate-700" />
-                    <p className="text-slate-500 font-medium">Select a lesson to start watching</p>
+                    <VideoOff className="h-12 w-12 mx-auto mb-3 text-slate-600" />
+                    <p className="text-slate-400 font-medium text-sm">Select a lesson to start watching</p>
                 </div>
             </div>
         );
@@ -15,21 +18,36 @@ export default function VideoPlayer({ playbackId, videoUrl, poster, title }) {
 
     return (
         <div className="aspect-video bg-black rounded-xl overflow-hidden relative shadow-2xl">
-            {playbackId ? (
-                <div className="w-full h-full flex items-center justify-center text-white bg-slate-900">
-                    {/* Placeholder for Mux Player - In a real app, use @mux/mux-player-react */}
+            {/* Loading skeleton */}
+            {isLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900">
                     <div className="text-center">
-                        <PlayCircle className="h-20 w-20 mx-auto mb-6 text-primary animate-pulse-slow" />
-                        <h3 className="text-xl font-bold mb-2">Video Player</h3>
-                        <p className="text-slate-400">Playback ID: {playbackId}</p>
+                        <div className="h-14 w-14 mx-auto mb-4 rounded-full border-4 border-slate-700 border-t-primary animate-spin" />
+                        <p className="text-sm text-slate-500">Loading video…</p>
                     </div>
                 </div>
+            )}
+
+            {playbackId ? (
+                <MuxPlayer
+                    playbackId={playbackId}
+                    streamType="on-demand"
+                    autoPlay={false}
+                    metadata={{
+                        video_title: title || 'Lesson Video',
+                    }}
+                    style={{ width: '100%', height: '100%', '--media-object-fit': 'contain' }}
+                    onLoadedData={() => setIsLoading(false)}
+                    onError={() => setIsLoading(false)}
+                />
             ) : (
                 <video
                     src={videoUrl}
                     poster={poster}
                     controls
                     className="w-full h-full object-contain"
+                    onLoadedData={() => setIsLoading(false)}
+                    onError={() => setIsLoading(false)}
                 >
                     Your browser does not support the video tag.
                 </video>

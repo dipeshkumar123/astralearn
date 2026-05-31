@@ -1,6 +1,16 @@
 const { getAuth } = require('@clerk/express');
 const prisma = require('../lib/prisma');
 
+const ROLES = {
+    STUDENT: 'STUDENT',
+    TEACHER: 'TEACHER',
+    ADMIN: 'ADMIN'
+};
+
+function hasAnyRole(user, roles) {
+    return Boolean(user && roles.includes(user.role));
+}
+
 const requireAuth = () => {
     return async (req, res, next) => {
         // Test bypass: allow injecting auth when TEST_AUTH=1
@@ -52,7 +62,7 @@ const requireAuth = () => {
 };
 
 /**
- * Middleware to check if user is a teacher
+ * Middleware to check if user is a teacher or admin
  */
 const requireTeacher = () => {
     return async (req, res, next) => {
@@ -67,10 +77,38 @@ const requireTeacher = () => {
                 select: { role: true }
             });
 
-            if (!user || user.role !== 'TEACHER') {
+            if (!hasAnyRole(user, [ROLES.TEACHER, ROLES.ADMIN])) {
                 return res.status(403).json({ error: 'Access denied. Teacher role required.' });
             }
 
+            next();
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    };
+};
+
+/**
+ * Middleware to check if user is an admin.
+ */
+const requireAdmin = () => {
+    return async (req, res, next) => {
+        try {
+            const auth = req.auth ? req.auth() : getAuth(req);
+            if (!auth || !auth.userId) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+
+            const user = await prisma.user.findUnique({
+                where: { clerkId: auth.userId },
+                select: { id: true, role: true }
+            });
+
+            if (!hasAnyRole(user, [ROLES.ADMIN])) {
+                return res.status(403).json({ error: 'Access denied. Admin role required.' });
+            }
+
+            req.user = user;
             next();
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -110,7 +148,7 @@ const requireEnrollment = (courseIdParam = 'courseId') => {
                 select: { instructorId: true }
             });
 
-            if (course && course.instructorId === user.id) {
+            if (user.role === ROLES.ADMIN || (course && course.instructorId === user.id)) {
                 req.user = user;
                 return next();
             }
@@ -158,7 +196,7 @@ const requireCourseOwnership = (courseIdParam = 'courseId') => {
 
             const user = await prisma.user.findUnique({
                 where: { clerkId },
-                select: { id: true }
+                select: { id: true, role: true }
             });
 
             if (!user) {
@@ -170,7 +208,7 @@ const requireCourseOwnership = (courseIdParam = 'courseId') => {
                 select: { instructorId: true }
             });
 
-            if (!course || course.instructorId !== user.id) {
+            if (user.role !== ROLES.ADMIN && (!course || course.instructorId !== user.id)) {
                 return res.status(403).json({ 
                     error: 'Access denied. You must be the course instructor.' 
                 });
@@ -185,7 +223,9 @@ const requireCourseOwnership = (courseIdParam = 'courseId') => {
 };
 
 module.exports = { 
+    ROLES,
     requireAuth, 
+    requireAdmin,
     requireTeacher, 
     requireEnrollment, 
     requireCourseOwnership 

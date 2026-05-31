@@ -1,26 +1,121 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
+const { z, validateBody } = require('../lib/validation');
 
-const prisma = new PrismaClient();
+// --- Validation schemas ---
+const createQuizSchema = z.object({
+    lessonId: z.string().trim().min(1, 'lessonId is required'),
+    title: z.string().trim().min(1, 'title is required').max(200),
+    description: z.string().max(2000).optional().nullable(),
+    passingScore: z.coerce.number().int().min(0).max(100).optional(),
+    timeLimit: z.coerce.number().int().min(1).max(600).optional().nullable(),
+}).passthrough();
+
+const createQuestionSchema = z.object({
+    type: z.enum(['multiple_choice', 'true_false']),
+    question: z.string().trim().min(1, 'question text is required').max(5000),
+    options: z.any().optional().nullable(),
+    correctAnswer: z.string().trim().min(1, 'correctAnswer is required').max(1000),
+    explanation: z.string().max(5000).optional().nullable(),
+    order: z.coerce.number().int().min(0).optional(),
+    points: z.coerce.number().int().min(1).max(100).optional(),
+}).passthrough();
+
+const submitAttemptSchema = z.object({
+    answers: z.record(z.string(), z.string()),
+    timeSpent: z.coerce.number().int().min(0).optional().nullable(),
+}).passthrough();
+
+// --- Helpers ---
+async function getStaffUser(req) {
+    const auth = req.auth ? req.auth() : null;
+    if (!auth?.userId) return null;
+
+    const user = await prisma.user.findUnique({
+        where: { clerkId: auth.userId },
+        select: { id: true, role: true }
+    });
+
+    if (!user || !['TEACHER', 'ADMIN'].includes(user.role)) return null;
+    return user;
+}
+
+async function canManageLesson(req, lessonId) {
+    const user = await getStaffUser(req);
+    if (!user) return false;
+    if (user.role === 'ADMIN') return true;
+
+    const lesson = await prisma.lesson.findUnique({
+        where: { id: lessonId },
+        select: {
+            course: {
+                select: { instructorId: true }
+            }
+        }
+    });
+
+    return lesson?.course?.instructorId === user.id;
+}
+
+async function canManageQuiz(req, quizId) {
+    const user = await getStaffUser(req);
+    if (!user) return false;
+    if (user.role === 'ADMIN') return true;
+
+    const quiz = await prisma.quiz.findUnique({
+        where: { id: quizId },
+        select: {
+            lesson: {
+                select: {
+                    course: {
+                        select: { instructorId: true }
+                    }
+                }
+            }
+        }
+    });
+
+    return quiz?.lesson?.course?.instructorId === user.id;
+}
+
+async function canManageQuestion(req, questionId) {
+    const user = await getStaffUser(req);
+    if (!user) return false;
+    if (user.role === 'ADMIN') return true;
+
+    const question = await prisma.question.findUnique({
+        where: { id: questionId },
+        select: {
+            quiz: {
+                select: {
+                    lesson: {
+                        select: {
+                            course: {
+                                select: { instructorId: true }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    return question?.quiz?.lesson?.course?.instructorId === user.id;
+}
 
 /**
  * @route   POST /api/quizzes
  * @desc    Create a new quiz
  * @access  Teacher
  */
-router.post('/', requireAuth(), async (req, res) => {
+router.post('/', requireAuth(), validateBody(createQuizSchema), async (req, res) => {
     try {
         const { lessonId, title, description, passingScore, timeLimit } = req.body;
 
-        // Validation
-        if (!lessonId || !title) {
-            return res.status(400).json({ error: 'lessonId and title are required' });
-        }
-
-        if (passingScore && (passingScore < 0 || passingScore > 100)) {
-            return res.status(400).json({ error: 'passingScore must be between 0 and 100' });
+        if (!(await canManageLesson(req, lessonId))) {
+            return res.status(403).json({ error: 'Access denied. Teacher role and course ownership required.' });
         }
 
         const quiz = await prisma.quiz.create({
@@ -42,13 +137,20 @@ router.post('/', requireAuth(), async (req, res) => {
 
 /**
  * @route   GET /api/quizzes/:id
- * @desc    Get quiz with questions
- * @access  Public
+ * @desc    Get quiz with questions. Answers only visible to course staff.
+ * @access  Public (answers restricted)
  */
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { includeAnswers } = req.query;
+
+        // Determine if requester is a teacher/admin who can see answers
+        let canSeeAnswers = false;
+        try {
+            canSeeAnswers = await canManageQuiz(req, id);
+        } catch {
+            // Not authenticated or lookup failed — default to no answers
+        }
 
         const quiz = await prisma.quiz.findUnique({
             where: { id },
@@ -60,8 +162,8 @@ router.get('/:id', async (req, res) => {
                         type: true,
                         question: true,
                         options: true,
-                        correctAnswer: includeAnswers === 'true',
-                        explanation: includeAnswers === 'true',
+                        correctAnswer: canSeeAnswers,
+                        explanation: canSeeAnswers,
                         order: true,
                         points: true
                     }
@@ -81,7 +183,7 @@ router.get('/:id', async (req, res) => {
 });
 
 /**
- * @route   GET /api/lessons/:lessonId/quizzes
+ * @route   GET /api/quizzes/lesson/:lessonId
  * @desc    Get all quizzes for a lesson
  * @access  Public
  */
@@ -113,17 +215,21 @@ router.get('/lesson/:lessonId', async (req, res) => {
  * @desc    Update quiz
  * @access  Teacher
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAuth(), async (req, res) => {
     try {
         const { id } = req.params;
         const { title, description, passingScore, timeLimit } = req.body;
+
+        if (!(await canManageQuiz(req, id))) {
+            return res.status(403).json({ error: 'Access denied. Teacher role and course ownership required.' });
+        }
 
         const quiz = await prisma.quiz.update({
             where: { id },
             data: {
                 ...(title && { title }),
                 ...(description !== undefined && { description }),
-                ...(passingScore && { passingScore }),
+                ...(passingScore !== undefined && { passingScore }),
                 ...(timeLimit !== undefined && { timeLimit })
             }
         });
@@ -140,9 +246,13 @@ router.patch('/:id', async (req, res) => {
  * @desc    Delete quiz
  * @access  Teacher
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth(), async (req, res) => {
     try {
         const { id } = req.params;
+
+        if (!(await canManageQuiz(req, id))) {
+            return res.status(403).json({ error: 'Access denied. Teacher role and course ownership required.' });
+        }
 
         await prisma.quiz.delete({
             where: { id }
@@ -160,10 +270,14 @@ router.delete('/:id', async (req, res) => {
  * @desc    Add question to quiz
  * @access  Teacher
  */
-router.post('/:id/questions', async (req, res) => {
+router.post('/:id/questions', requireAuth(), validateBody(createQuestionSchema), async (req, res) => {
     try {
         const { id: quizId } = req.params;
         const { type, question, options, correctAnswer, explanation, order, points } = req.body;
+
+        if (!(await canManageQuiz(req, quizId))) {
+            return res.status(403).json({ error: 'Access denied. Teacher role and course ownership required.' });
+        }
 
         const newQuestion = await prisma.question.create({
             data: {
@@ -173,7 +287,7 @@ router.post('/:id/questions', async (req, res) => {
                 options,
                 correctAnswer,
                 explanation,
-                order,
+                order: order || 0,
                 points: points || 1
             }
         });
@@ -190,10 +304,14 @@ router.post('/:id/questions', async (req, res) => {
  * @desc    Update question
  * @access  Teacher
  */
-router.patch('/questions/:id', async (req, res) => {
+router.patch('/questions/:id', requireAuth(), async (req, res) => {
     try {
         const { id } = req.params;
         const { type, question, options, correctAnswer, explanation, order, points } = req.body;
+
+        if (!(await canManageQuestion(req, id))) {
+            return res.status(403).json({ error: 'Access denied. Teacher role and course ownership required.' });
+        }
 
         const updated = await prisma.question.update({
             where: { id },
@@ -204,7 +322,7 @@ router.patch('/questions/:id', async (req, res) => {
                 ...(correctAnswer && { correctAnswer }),
                 ...(explanation !== undefined && { explanation }),
                 ...(order !== undefined && { order }),
-                ...(points && { points })
+                ...(points !== undefined && { points })
             }
         });
 
@@ -220,9 +338,13 @@ router.patch('/questions/:id', async (req, res) => {
  * @desc    Delete question
  * @access  Teacher
  */
-router.delete('/questions/:id', async (req, res) => {
+router.delete('/questions/:id', requireAuth(), async (req, res) => {
     try {
         const { id } = req.params;
+
+        if (!(await canManageQuestion(req, id))) {
+            return res.status(403).json({ error: 'Access denied. Teacher role and course ownership required.' });
+        }
 
         await prisma.question.delete({
             where: { id }
@@ -238,9 +360,9 @@ router.delete('/questions/:id', async (req, res) => {
 /**
  * @route   POST /api/quizzes/:id/attempt
  * @desc    Submit quiz attempt
- * @access  Student
+ * @access  Student (authenticated)
  */
-router.post('/:id/attempt', requireAuth(), async (req, res) => {
+router.post('/:id/attempt', requireAuth(), validateBody(submitAttemptSchema), async (req, res) => {
     try {
         const { id: quizId } = req.params;
         const { answers, timeSpent } = req.body;

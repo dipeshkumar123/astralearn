@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Trophy, Settings, LogOut, User, Sparkles } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Trophy, Settings, LogOut, User, Sparkles, Compass } from 'lucide-react'
 import { useClerk } from '@clerk/clerk-react'
 
 export default function Sidebar() {
@@ -7,28 +7,26 @@ export default function Sidebar() {
     const { signOut } = useClerk()
 
     const links = [
-        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { name: 'My Courses', path: '/learning', icon: BookOpen },
-        { name: 'Achievements', path: '/achievements', icon: Trophy },
-        { name: 'Profile', path: '/profile', icon: User },
-        { name: 'Settings', path: '/settings', icon: Settings },
+        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, hint: 'Your study hub' },
+        { name: 'Browse Courses', path: '/courses', icon: Compass, hint: 'Discover new courses' },
+        { name: 'My Courses', path: '/learning', icon: BookOpen, hint: 'Continue lessons' },
+        { name: 'Achievements', path: '/achievements', icon: Trophy, hint: 'Badges and points' },
+        { name: 'Profile', path: '/profile', icon: User, hint: 'Progress summary' },
+        { name: 'Settings', path: '/settings', icon: Settings, hint: 'Preferences' },
     ]
 
     return (
-        <aside className="hidden h-screen w-72 flex-col border-r border-white/70 bg-white/70 backdrop-blur-2xl md:fixed md:left-0 md:top-0 md:z-40 md:flex">
-            <div className="border-b border-slate-100 px-5 pb-4 pt-5">
+        <aside className="hidden h-screen w-64 flex-col border-r border-white/70 bg-white/80 backdrop-blur-2xl md:fixed md:left-0 md:top-0 md:z-40 md:flex">
+            <div className="border-b border-slate-100 px-5 pb-5 pt-5">
                 <Link to="/" className="group flex items-center gap-2.5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-md shadow-primary/30 transition-transform group-hover:scale-105">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white shadow-md shadow-primary/30 transition-transform group-hover:scale-105">
                         <Sparkles className="h-4 w-4" />
                     </div>
                     <div>
                         <span className="block text-lg font-extrabold tracking-tight text-slate-900">Astralearn</span>
-                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Student Space</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Student Studio</span>
                     </div>
                 </Link>
-                <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                    Focus mode on. Keep your learning streak alive today.
-                </p>
             </div>
 
             <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-6">
@@ -38,21 +36,21 @@ export default function Sidebar() {
                         <Link
                             key={link.path}
                             to={link.path}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-                                ? 'bg-gradient-to-r from-primary/12 to-accent/12 text-primary shadow-sm'
-                                : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                            className={`group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${isActive
+                                ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/20'
+                                : 'text-slate-600 hover:bg-white hover:text-slate-900 hover:shadow-sm'
                                 }`}
                         >
-                            <link.icon className={`h-5 w-5 transition-colors ${isActive ? 'text-primary' : 'text-slate-400'}`} />
-                            {link.name}
+                            <span className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary'}`}>
+                                <link.icon className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block">{link.name}</span>
+                                <span className={`block text-xs font-medium ${isActive ? 'text-white/75' : 'text-slate-400'}`}>{link.hint}</span>
+                            </span>
                         </Link>
                     )
                 })}
-            </div>
-
-            <div className="mx-4 mb-3 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/12 to-accent/12 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Daily Tip</p>
-                <p className="mt-2 text-sm text-slate-700">Complete one short lesson before noon to build consistency.</p>
             </div>
 
             <div className="border-t border-slate-100 p-4">

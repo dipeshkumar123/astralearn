@@ -2,12 +2,22 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requireAuth, requireTeacher, requireEnrollment } = require('../middleware/auth');
-const { generateEmbedding, generateResponse } = require('../lib/gemini');
+const { generateEmbedding, generateResponse } = require('../lib/llm');
 const { processContent, cosineSimilarity } = require('../lib/content-processor');
 const { z, validateBody } = require('../lib/validation');
 const multer = require('multer');
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+    fileFilter: (_req, file, cb) => {
+        if (file.mimetype === 'application/pdf' || file.mimetype === 'text/plain') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF and text files are allowed'), false);
+        }
+    }
+});
 
 const ingestBodySchema = z.object({
     courseId: z.string().trim().min(1, 'Course ID is required'),
@@ -45,7 +55,7 @@ router.post('/ingest', requireAuth(), requireTeacher(), upload.single('file'), v
         // Verify user exists and get their ID
         const user = await prisma.user.findUnique({
             where: { clerkId },
-            select: { id: true }
+            select: { id: true, role: true }
         });
 
         if (!user) {
@@ -62,7 +72,7 @@ router.post('/ingest', requireAuth(), requireTeacher(), upload.single('file'), v
             return res.status(404).json({ error: 'Course not found' });
         }
 
-        if (course.instructorId !== user.id) {
+        if (user.role !== 'ADMIN' && course.instructorId !== user.id) {
             return res.status(403).json({ error: 'Access denied. You can only index content for your own courses.' });
         }
 
@@ -109,7 +119,7 @@ router.post('/ingest-text', requireAuth(), requireTeacher(), validateBody(ingest
         // Verify user exists and get their ID
         const user = await prisma.user.findUnique({
             where: { clerkId },
-            select: { id: true }
+            select: { id: true, role: true }
         });
 
         if (!user) {
@@ -126,7 +136,7 @@ router.post('/ingest-text', requireAuth(), requireTeacher(), validateBody(ingest
             return res.status(404).json({ error: 'Course not found' });
         }
 
-        if (course.instructorId !== user.id) {
+        if (user.role !== 'ADMIN' && course.instructorId !== user.id) {
             return res.status(403).json({ error: 'Access denied. You can only index content for your own courses.' });
         }
 
@@ -285,6 +295,61 @@ router.get('/context/:courseId', requireAuth(), requireEnrollment('courseId'), a
             }))
         });
     } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * GET /api/ai/recommendations - Get personalized AI recommendations
+ */
+router.get('/recommendations', requireAuth(), async (req, res) => {
+    try {
+        const { userId: clerkId } = req.auth();
+
+        const user = await prisma.user.findUnique({
+            where: { clerkId },
+            select: { id: true }
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Fetch recent quiz attempts and study goals
+        const recentAttempts = await prisma.quizAttempt.findMany({
+            where: { userId: user.id },
+            orderBy: { completedAt: 'desc' },
+            take: 5,
+            include: {
+                quiz: { select: { title: true } }
+            }
+        });
+
+        const studyGoal = await prisma.studyGoal.findUnique({
+            where: { userId: user.id }
+        });
+
+        const progress = await prisma.progress.findMany({
+            where: { userId: user.id },
+            orderBy: { updatedAt: 'desc' },
+            take: 10,
+            include: {
+                lesson: { select: { title: true } }
+            }
+        });
+
+        const studentData = {
+            recentQuizzes: recentAttempts.map(a => ({ quiz: a.quiz.title, score: a.score, passed: a.passed })),
+            studyGoal: studyGoal || "No specific goal set",
+            recentLessonsCompleted: progress.filter(p => p.isCompleted).map(p => p.lesson.title)
+        };
+
+        const { generatePersonalizedRecommendations } = require('../lib/llm');
+        const recommendations = await generatePersonalizedRecommendations(studentData);
+        
+        res.json(recommendations);
+    } catch (error) {
+        console.error('Recommendations error:', error);
         res.status(500).json({ error: error.message });
     }
 });

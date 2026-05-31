@@ -122,7 +122,7 @@ export default function VideoUpload({ lesson, onUploadComplete }) {
     }
 
     return (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8">
+        <div className="rounded-lg border-2 border-dashed border-gray-300 p-5 sm:p-8">
             {uploading ? (
                 <div className="text-center">
                     <div className="mb-4">
@@ -137,9 +137,9 @@ export default function VideoUpload({ lesson, onUploadComplete }) {
                 </div>
             ) : (
                 <div className="text-center">
-                    <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <Upload className="mx-auto mb-4 h-10 w-10 text-gray-400 sm:h-12 sm:w-12" />
                     <label className="cursor-pointer">
-                        <span className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 inline-block">
+                        <span className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 sm:text-base">
                             Choose Video File
                         </span>
                         <input
@@ -149,7 +149,7 @@ export default function VideoUpload({ lesson, onUploadComplete }) {
                             className="hidden"
                         />
                     </label>
-                    <p className="text-sm text-gray-500 mt-2">MP4, MOV, or AVI recommended</p>
+                    <p className="mt-2 text-xs text-gray-500 sm:text-sm">MP4, MOV, or AVI recommended</p>
                 </div>
             )}
         </div>

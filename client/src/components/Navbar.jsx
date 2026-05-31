@@ -9,7 +9,7 @@ export default function Navbar() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const { isSignedIn } = useAuth()
-    const { isTeacher } = useUserRole()
+    const { isAdmin, isTeacher } = useUserRole()
     const location = useLocation()
     const navigate = useNavigate()
 
@@ -36,6 +36,7 @@ export default function Navbar() {
     }, [location.pathname, location.search])
 
     const getDashboardPath = () => {
+        if (isAdmin) return '/admin'
         return isTeacher ? '/teacher' : '/dashboard'
     }
 

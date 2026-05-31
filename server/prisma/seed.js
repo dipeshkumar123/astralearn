@@ -1,5 +1,7 @@
 const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
+const { generateEmbedding } = require('../src/lib/llm')
+const { processContent } = require('../src/lib/content-processor')
 
 async function main() {
     console.log('🌱 Starting database seed...')
@@ -137,7 +139,7 @@ async function main() {
     const c1s1l1 = await prisma.lesson.create({
         data: {
             title: 'Introduction to HTML',
-            description: '<h2>What is HTML?</h2><p>HTML is the standard markup language for creating web pages.</p>',
+            description: '<h2>What is HTML?</h2><p>HTML is the standard markup language for creating web pages.</p><h3>Example Table</h3><table class="w-full text-left border-collapse mt-4"><thead><tr><th class="border-b pb-2">Tag</th><th class="border-b pb-2">Description</th></tr></thead><tbody><tr><td class="py-2 border-b">&lt;div&gt;</td><td class="py-2 border-b">A generic container</td></tr><tr><td class="py-2 border-b">&lt;span&gt;</td><td class="py-2 border-b">Inline text container</td></tr></tbody></table>',
             position: 1,
             isPublished: true,
             isFree: true,
@@ -150,7 +152,7 @@ async function main() {
     const c1s1l2 = await prisma.lesson.create({
         data: {
             title: 'CSS Styling Basics',
-            description: '<h2>Cascading Style Sheets</h2><p>CSS is used to style web pages.</p>',
+            description: '<h2>Cascading Style Sheets</h2><p>CSS is used to style web pages.</p><div class="p-6 my-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl shadow-lg animate-pulse">This is a pure CSS animated box!</div>',
             position: 2,
             isPublished: true,
             isFree: true,
@@ -555,6 +557,32 @@ async function main() {
         }
     })
 
+    console.log('🤖 Ingesting AI content for all courses...')
+    const allCourses = await prisma.course.findMany({ include: { lessons: true } })
+    let chunksCreated = 0;
+    for (const c of allCourses) {
+        let fullText = c.title + ".\n" + c.description + "\n";
+        for (const l of c.lessons) {
+            // Very simple HTML stripping for the AI
+            fullText += "Lesson: " + l.title + "\n" + (l.description ? l.description.replace(/<[^>]+>/g, '') : '') + "\n";
+        }
+        
+        const chunks = await processContent(Buffer.from(fullText), 'text');
+        for (let i = 0; i < chunks.length; i++) {
+            const embedding = await generateEmbedding(chunks[i]);
+            await prisma.courseContent.create({
+                data: {
+                    courseId: c.id,
+                    contentType: 'text',
+                    chunkIndex: i,
+                    content: chunks[i],
+                    embedding: JSON.stringify(embedding)
+                }
+            });
+            chunksCreated++;
+        }
+    }
+
     console.log('✅ Seeding complete!')
     console.log(`
     📊 Summary:
@@ -568,6 +596,7 @@ async function main() {
     - 3 Quiz attempts
     - 4 Reviews
     - 2 Discussions with 4 replies
+    - ${chunksCreated} AI Context Chunks created
     `)
 }
 

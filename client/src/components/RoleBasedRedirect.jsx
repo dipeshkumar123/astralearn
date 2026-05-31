@@ -8,11 +8,15 @@ export default function RoleBasedRedirect() {
 
     useEffect(() => {
         if (!loading && role) {
-            if (role === 'TEACHER') {
+            if (role === 'ADMIN') {
+                navigate('/admin', { replace: true })
+            } else if (role === 'TEACHER') {
                 navigate('/teacher', { replace: true })
             } else {
                 navigate('/dashboard', { replace: true })
             }
+        } else if (!loading) {
+            navigate('/dashboard', { replace: true })
         }
     }, [role, loading, navigate])
 

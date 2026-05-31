@@ -20,17 +20,29 @@ export default function NotesPanel({ courseId, lessonId }) {
     return () => clearTimeout(handler)
   }, [value, key])
 
+  const handleExport = () => {
+    const blob = new Blob([value], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `notes-${courseId}-${lessonId}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-lg font-bold text-slate-900">My Notes</h3>
-        <Button size="sm" variant="secondary">
+        <Button size="sm" variant="secondary" onClick={handleExport}>
           <FileText className="h-4 w-4 mr-2" />
           Export Notes
         </Button>
       </div>
       <textarea
-        className="w-full h-64 p-4 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none font-sans text-slate-700"
+        className="h-56 sm:h-64 w-full p-4 rounded-xl border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none font-mono text-sm text-slate-700"
         placeholder="Take notes here... (Auto-saved)"
         value={value}
         onChange={(e) => setValue(e.target.value)}

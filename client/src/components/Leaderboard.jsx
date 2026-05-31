@@ -43,7 +43,7 @@ export default function Leaderboard() {
             </div>
 
             <div className="space-y-3">
-                {users.map((user, index) => (
+                {users.slice(0, 10).map((user, index) => (
                     <div
                         key={user.id}
                         className={`rounded-2xl border p-3 transition-all ${index === 0
@@ -62,7 +62,7 @@ export default function Leaderboard() {
                                     : index === 1
                                         ? 'bg-slate-300 text-slate-700'
                                         : index === 2
-                                            ? 'bg-amber-300 text-amber-900'
+                                            ? 'bg-orange-400 text-white'
                                             : 'bg-slate-100 text-slate-500'
                                     }`}>
                                     {index + 1}

@@ -13,10 +13,18 @@ router.post('/checkout', requireAuth(), async (req, res) => {
         const { courseId } = req.body;
         const { userId } = req.auth();
 
+        if (!courseId) {
+            return res.status(400).json({ error: 'Course ID is required' });
+        }
+
         const user = await prisma.user.findUnique({ where: { clerkId: userId } });
         const course = await prisma.course.findUnique({ where: { id: courseId } });
 
+        if (!user) return res.status(404).json({ error: 'User not found' });
         if (!course) return res.status(404).json({ error: 'Course not found' });
+        if (Number(course.price || 0) <= 0) {
+            return res.status(400).json({ error: 'Checkout is only required for paid courses' });
+        }
 
         // Check if already purchased
         const purchase = await prisma.purchase.findUnique({
@@ -41,7 +49,7 @@ router.post('/checkout', requireAuth(), async (req, res) => {
                         description: course.description ? course.description.substring(0, 100) : undefined,
                         images: course.thumbnail ? [course.thumbnail] : undefined,
                     },
-                    unit_amount: Math.round(course.price * 100), // Amount in cents
+                    unit_amount: Math.round(course.price * 100),
                 },
                 quantity: 1,
             }
@@ -83,9 +91,8 @@ router.post('/checkout', requireAuth(), async (req, res) => {
     }
 });
 
-// Webhook handler (needs to be raw body in real app, simplified here)
-// For local dev without webhook forwarding, we might need a manual "verify" endpoint or just rely on the success URL to trigger a check (less secure but works for MVP)
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+// Webhook handler
+router.post('/webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
 
@@ -97,24 +104,30 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
-        const userId = session.metadata.userId;
-        const courseId = session.metadata.courseId;
+        const userId = session.metadata?.userId;
+        const courseId = session.metadata?.courseId;
 
         if (userId && courseId) {
-            await prisma.purchase.create({
-                data: {
-                    userId,
-                    courseId,
-                }
-            });
+            try {
+                await prisma.purchase.upsert({
+                    where: {
+                        userId_courseId: { userId, courseId }
+                    },
+                    update: {},
+                    create: { userId, courseId }
+                });
 
-            // Also create enrollment
-            await prisma.enrollment.create({
-                data: {
-                    userId,
-                    courseId
-                }
-            });
+                await prisma.enrollment.upsert({
+                    where: {
+                        userId_courseId: { userId, courseId }
+                    },
+                    update: {},
+                    create: { userId, courseId }
+                });
+            } catch (dbError) {
+                console.error('[STRIPE_WEBHOOK_DB_ERROR]', dbError);
+                return res.status(500).json({ error: 'Failed to process payment record' });
+            }
         }
     }
 

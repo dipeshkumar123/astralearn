@@ -1,30 +1,27 @@
 import { useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@clerk/clerk-react'
 import axios from 'axios'
 
 export default function OnboardPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { getToken } = useAuth()
 
   useEffect(() => {
     const run = async () => {
-      const params = new URLSearchParams(location.search)
-      const role = params.get('role') || 'STUDENT'
       try {
         const token = await getToken()
         const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
-        await axios.patch('/api/users/me/role', { role }, cfg)
+        const res = await axios.get('/api/users/me', cfg)
+        if (res.data?.role === 'ADMIN') navigate('/admin', { replace: true })
+        else if (res.data?.role === 'TEACHER') navigate('/teacher', { replace: true })
+        else navigate('/dashboard', { replace: true })
       } catch (e) {
-        // ignore; fallback to default role
+        navigate('/dashboard', { replace: true })
       }
-      // Always redirect based on selected role
-      if (role === 'TEACHER') navigate('/teacher', { replace: true })
-      else navigate('/dashboard', { replace: true })
     }
     run()
-  }, [location.search])
+  }, [getToken, navigate])
 
   return (
     <div className="min-h-screen flex items-center justify-center">

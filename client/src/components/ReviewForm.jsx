@@ -42,7 +42,7 @@ export default function ReviewForm({ courseId, userId, onReviewSubmitted }) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+        <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Write a Review</h3>
 
             <div className="mb-4">
@@ -58,7 +58,7 @@ export default function ReviewForm({ courseId, userId, onReviewSubmitted }) {
                             className="focus:outline-none transition-transform hover:scale-110"
                         >
                             <Star
-                                className={`h-8 w-8 ${star <= (hoveredRating || rating)
+                                className={`h-7 w-7 sm:h-8 sm:w-8 ${star <= (hoveredRating || rating)
                                         ? 'text-yellow-400 fill-yellow-400'
                                         : 'text-gray-300'
                                     }`}
@@ -74,7 +74,7 @@ export default function ReviewForm({ courseId, userId, onReviewSubmitted }) {
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     rows={4}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full rounded-lg border px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                     placeholder="What did you think of the course?"
                     required
                 />
@@ -84,7 +84,7 @@ export default function ReviewForm({ courseId, userId, onReviewSubmitted }) {
                 type="submit"
                 disabled={submitting}
                 data-testid="review-submit"
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors"
+                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50 font-medium"
             >
                 {submitting ? 'Submitting...' : 'Submit Review'}
             </button>

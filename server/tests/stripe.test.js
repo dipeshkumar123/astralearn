@@ -25,8 +25,8 @@ jest.mock('../src/lib/prisma', () => ({
   course: {
     findUnique: jest.fn(async ({ where }) => ({ id: where.id, title: 'Stripe Test Course', description: 'Desc', price: 49.99 })),
   },
-  purchase: { findUnique: jest.fn(async () => null), create: jest.fn(async () => ({ id: 'p1' })) },
-  enrollment: { create: jest.fn(async () => ({ id: 'e1' })) }
+  purchase: { findUnique: jest.fn(async () => null), upsert: jest.fn(async () => ({ id: 'p1' })) },
+  enrollment: { upsert: jest.fn(async () => ({ id: 'e1' })) }
 }));
 
 const app = require('../src/app');

@@ -20,6 +20,8 @@ const MyLearningPage = lazy(() => import('./pages/MyLearningPage'))
 const OnboardPage = lazy(() => import('./pages/OnboardPage'))
 const AchievementsPage = lazy(() => import('./pages/AchievementsPage'))
 const CoursesListPage = lazy(() => import('./pages/CoursesListPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 // Teacher Pages
 const TeacherDashboard = lazy(() => import('./pages/teacher/TeacherDashboard'))
@@ -107,7 +109,7 @@ function App() {
                                 <MainLayout />
                             ) : (
                                 <SignedIn>
-                                    <TeacherGuard>
+                                    <TeacherGuard allowedRoles={['TEACHER', 'ADMIN']}>
                                         <MainLayout />
                                     </TeacherGuard>
                                 </SignedIn>
@@ -121,6 +123,24 @@ function App() {
                             <Route path="content-ingestion" element={<ContentIngestion />} />
                             <Route path="analytics" element={<Analytics />} />
                         </Route>
+
+                        {/* Admin Routes */}
+                        <Route path="/admin" element={
+                            E2E_AUTH_BYPASS ? (
+                                <MainLayout />
+                            ) : (
+                                <SignedIn>
+                                    <TeacherGuard allowedRoles={['ADMIN']}>
+                                        <MainLayout />
+                                    </TeacherGuard>
+                                </SignedIn>
+                            )
+                        }>
+                            <Route index element={<AdminPage />} />
+                        </Route>
+
+                        {/* 404 Catch-all */}
+                        <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                 </Suspense>
             </BrowserRouter>

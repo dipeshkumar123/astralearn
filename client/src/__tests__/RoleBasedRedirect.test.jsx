@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/clerk-react';
 import '@testing-library/jest-dom';
@@ -39,7 +39,19 @@ describe('RoleBasedRedirect Component', () => {
     renderWithRouter(<RoleBasedRedirect />);
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/teacher');
+      expect(mockNavigate).toHaveBeenCalledWith('/teacher', { replace: true });
+    });
+  });
+
+  test('Should redirect admin to /admin', async () => {
+    axios.get.mockResolvedValue({
+      data: { role: 'ADMIN' }
+    });
+
+    renderWithRouter(<RoleBasedRedirect />);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/admin', { replace: true });
     });
   });
 
@@ -51,7 +63,7 @@ describe('RoleBasedRedirect Component', () => {
     renderWithRouter(<RoleBasedRedirect />);
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true });
     });
   });
 
@@ -69,7 +81,7 @@ describe('RoleBasedRedirect Component', () => {
     renderWithRouter(<RoleBasedRedirect />);
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/');
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true });
     });
   });
 });

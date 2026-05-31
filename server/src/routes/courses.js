@@ -18,10 +18,13 @@ const createCourseSchema = courseBaseSchema.extend({
     title: z.string().trim().min(1, 'title is required').max(200),
 });
 
-// GET all courses with filtering
+// GET all courses with filtering and pagination
 router.get('/', async (req, res) => {
     try {
         const { search, category, level } = req.query;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+        const skip = (page - 1) * limit;
 
         const where = {
             isPublished: true
@@ -42,27 +45,40 @@ router.get('/', async (req, res) => {
             where.level = level;
         }
 
-        const courses = await prisma.course.findMany({
-            where,
-            include: {
-                sections: {
-                    include: {
-                        lessons: {
-                            include: {
-                                quizzes: true
+        const [courses, total] = await Promise.all([
+            prisma.course.findMany({
+                where,
+                include: {
+                    sections: {
+                        include: {
+                            lessons: {
+                                select: { id: true, title: true, position: true, isFree: true }
                             }
                         }
+                    },
+                    instructor: {
+                        select: { id: true, firstName: true, lastName: true }
+                    },
+                    _count: {
+                        select: { enrollments: true }
                     }
                 },
-                _count: {
-                    select: {
-                        enrollments: true
-                    }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit
+            }),
+            prisma.course.count({ where })
+        ]);
+
+        res.json({
+            courses,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
         });
-        res.json(courses);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -150,7 +166,7 @@ router.get('/instructor', requireAuth(), async (req, res) => {
     }
 });
 
-// GET single course
+// GET single course (only published courses unless user is instructor/admin)
 router.get('/:id', async (req, res) => {
     try {
         const course = await prisma.course.findUnique({
@@ -189,6 +205,27 @@ router.get('/:id', async (req, res) => {
 
         if (!course) {
             return res.status(404).json({ error: 'Course not found' });
+        }
+
+        // Block access to unpublished courses for non-owners
+        if (!course.isPublished) {
+            // Check if requester is the instructor or admin
+            let isOwner = false;
+            try {
+                const { getAuth } = require('@clerk/express');
+                const auth = getAuth(req);
+                if (auth?.userId) {
+                    const user = await prisma.user.findUnique({
+                        where: { clerkId: auth.userId },
+                        select: { id: true, role: true }
+                    });
+                    isOwner = user && (user.role === 'ADMIN' || user.id === course.instructor?.id);
+                }
+            } catch { /* not authenticated */ }
+
+            if (!isOwner) {
+                return res.status(404).json({ error: 'Course not found' });
+            }
         }
 
         res.json(course);

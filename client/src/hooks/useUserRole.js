@@ -31,5 +31,12 @@ export function useUserRole() {
         fetchRole()
     }, [isSignedIn, getToken])
 
-    return { role, loading, isTeacher: role === 'TEACHER', isStudent: role === 'STUDENT' }
+    return {
+        role,
+        loading,
+        isAdmin: role === 'ADMIN',
+        isTeacher: role === 'TEACHER',
+        isTeacherOrAdmin: role === 'TEACHER' || role === 'ADMIN',
+        isStudent: role === 'STUDENT'
+    }
 }

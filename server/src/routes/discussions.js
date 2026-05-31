@@ -2,6 +2,17 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
+const { z, validateBody } = require('../lib/validation');
+
+const createDiscussionSchema = z.object({
+    title: z.string().trim().min(1, 'title is required').max(300),
+    content: z.string().trim().min(1, 'content is required').max(10000),
+    lessonId: z.string().trim().min(1, 'lessonId is required'),
+}).passthrough();
+
+const replySchema = z.object({
+    content: z.string().trim().min(1, 'content is required').max(5000),
+}).passthrough();
 
 // GET discussions for a lesson
 router.get('/lesson/:lessonId', async (req, res) => {
@@ -41,18 +52,12 @@ router.get('/lesson/:lessonId', async (req, res) => {
 });
 
 // POST create discussion
-router.post('/', requireAuth(), async (req, res) => {
+router.post('/', requireAuth(), validateBody(createDiscussionSchema), async (req, res) => {
     try {
         const { title, content, lessonId } = req.body;
 
-        // Validation
-        if (!title || !content || !lessonId) {
-            return res.status(400).json({ error: 'title, content, and lessonId are required' });
-        }
-
         const { userId } = req.auth();
 
-        // Get internal user ID
         const user = await prisma.user.findUnique({ where: { clerkId: userId } });
         if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -83,15 +88,10 @@ router.post('/', requireAuth(), async (req, res) => {
 });
 
 // POST reply to discussion
-router.post('/:id/reply', requireAuth(), async (req, res) => {
+router.post('/:id/reply', requireAuth(), validateBody(replySchema), async (req, res) => {
     try {
         const { content } = req.body;
         const discussionId = req.params.id;
-
-        // Validation
-        if (!content) {
-            return res.status(400).json({ error: 'content is required' });
-        }
 
         if (!discussionId) {
             return res.status(400).json({ error: 'discussion ID is required' });
@@ -99,7 +99,6 @@ router.post('/:id/reply', requireAuth(), async (req, res) => {
 
         const { userId } = req.auth();
 
-        // Get internal user ID
         const user = await prisma.user.findUnique({ where: { clerkId: userId } });
         if (!user) return res.status(404).json({ error: 'User not found' });
 

@@ -58,9 +58,10 @@ router.post('/', requireAuth(), requireCourseOwnership('courseId'), async (req, 
 // PATCH update section
 router.patch('/:id', requireAuth(), requireCourseOwnership('courseId'), async (req, res) => {
     try {
+        const { title } = req.body;
         const section = await prisma.section.update({
             where: { id: req.params.id },
-            data: req.body
+            data: { ...(title !== undefined && { title }) }
         });
         res.json(section);
     } catch (error) {

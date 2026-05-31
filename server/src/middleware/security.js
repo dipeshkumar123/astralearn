@@ -16,6 +16,12 @@ function securityHeaders(_req, res, next) {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('X-XSS-Protection', '0'); // Modern best practice: disable browser XSS filter, rely on CSP
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.clerk.dev https://*.clerk.accounts.dev https://api.mux.com https://api.stripe.com; frame-src 'self' https://js.stripe.com https://stream.mux.com"
+  );
   next();
 }
 

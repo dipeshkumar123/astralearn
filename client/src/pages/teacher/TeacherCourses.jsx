@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@clerk/clerk-react'
-import { Plus, Edit, Eye, EyeOff, Layers, X } from 'lucide-react'
+import { Plus, Edit, Eye, EyeOff, Layers, X, Trash2 } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import TeacherHeader from '../../components/TeacherHeader'
@@ -12,6 +12,7 @@ export default function TeacherCourses() {
     const [loading, setLoading] = useState(true)
     const [creating, setCreating] = useState(false)
     const [newCourseTitle, setNewCourseTitle] = useState('')
+    const [deletingCourseId, setDeletingCourseId] = useState(null)
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -40,6 +41,26 @@ export default function TeacherCourses() {
             navigate(`/teacher/courses/${res.data.id}`)
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to create course')
+        }
+    }
+
+    const handleDeleteCourse = async (course) => {
+        if (!course?.id) return
+
+        const ok = window.confirm(`Delete "${course.title}"? This action cannot be undone.`)
+        if (!ok) return
+
+        setDeletingCourseId(course.id)
+        try {
+            const token = await getToken()
+            const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+            await axios.delete(`/api/courses/${course.id}`, cfg)
+            setCourses((prev) => prev.filter((item) => item.id !== course.id))
+            toast.success('Course deleted')
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to delete course')
+        } finally {
+            setDeletingCourseId(null)
         }
     }
 
@@ -130,7 +151,7 @@ export default function TeacherCourses() {
                                         <span>{course.category || 'Uncategorized'}</span>
                                     </div>
 
-                                    <div className="flex gap-2 pt-2">
+                                    <div className="flex flex-wrap gap-2 pt-2">
                                         <button className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition font-medium text-sm flex items-center justify-center gap-2" onClick={() => navigate(`/teacher/courses/${course.id}`)}>
                                             <Edit className="h-4 w-4" />
                                             Edit
@@ -151,6 +172,14 @@ export default function TeacherCourses() {
                                         >
                                             {course.isPublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                             {course.isPublished ? 'Unpublish' : 'Publish'}
+                                        </button>
+                                        <button
+                                            className="flex-1 px-4 py-2.5 rounded-xl transition font-medium text-sm flex items-center justify-center gap-2 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60"
+                                            onClick={() => handleDeleteCourse(course)}
+                                            disabled={deletingCourseId === course.id}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            {deletingCourseId === course.id ? 'Deleting...' : 'Delete'}
                                         </button>
                                     </div>
                                 </div>

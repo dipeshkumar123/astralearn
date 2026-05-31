@@ -171,17 +171,45 @@ export default function QuizBuilder({ lessonId, onClose }) {
         }
     }
 
+    const deleteQuiz = async () => {
+        if (!quiz) return
+        if (!window.confirm('Delete this quiz and all questions?')) return
+
+        setSaving(true)
+        try {
+            const token = await getToken()
+            await axios.delete(`/api/quizzes/${quiz.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+
+            setQuiz(null)
+            setTitle('')
+            setDescription('')
+            setPassingScore(70)
+            setTimeLimit('')
+            setQuestions([])
+            setEditingQuestion(null)
+
+            toast.success('Quiz deleted')
+        } catch (error) {
+            toast.error('Failed to delete quiz')
+            console.error(error)
+        } finally {
+            setSaving(false)
+        }
+    }
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6 border-b flex justify-between items-center">
-                    <h2 className="text-2xl font-bold">Quiz Builder</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
+            <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4 sm:p-6">
+                    <h2 className="text-xl font-bold sm:text-2xl">Quiz Builder</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
                         <X className="h-6 w-6" />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="space-y-6 p-4 sm:p-6">
                     {/* Quiz Settings */}
                     <div className="space-y-4">
                         <div>
@@ -206,7 +234,7 @@ export default function QuizBuilder({ lessonId, onClose }) {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
                                 <label className="block text-sm font-medium mb-2">Passing Score (%)</label>
                                 <input
@@ -232,23 +260,34 @@ export default function QuizBuilder({ lessonId, onClose }) {
                             </div>
                         </div>
 
-                        <button
-                            onClick={handleSaveQuiz}
-                            disabled={saving}
-                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            {saving ? 'Saving...' : quiz ? 'Update Quiz Settings' : 'Create Quiz'}
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={handleSaveQuiz}
+                                disabled={saving}
+                                className="w-full rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-50 sm:w-auto"
+                            >
+                                {saving ? 'Saving...' : quiz ? 'Update Quiz Settings' : 'Create Quiz'}
+                            </button>
+                            {quiz && (
+                                <button
+                                    onClick={deleteQuiz}
+                                    disabled={saving}
+                                    className="w-full rounded-lg bg-red-600 px-6 py-2 text-white hover:bg-red-700 disabled:opacity-50 sm:w-auto"
+                                >
+                                    Delete Quiz
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Questions */}
                     {quiz && (
                         <div className="border-t pt-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-semibold">Questions ({questions.length})</h3>
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                                <h3 className="text-lg font-semibold sm:text-xl">Questions ({questions.length})</h3>
                                 <button
                                     onClick={addQuestion}
-                                    className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                                    className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700 sm:text-base"
                                 >
                                     <Plus className="h-4 w-4" />
                                     Add Question
@@ -298,7 +337,7 @@ function QuestionEditor({ question, number, isEditing, onEdit, onSave, onDelete,
     if (!isEditing) {
         return (
             <div className="border rounded-lg p-4 hover:border-blue-300 transition">
-                <div className="flex justify-between items-start">
+                <div className="flex flex-wrap justify-between items-start gap-3">
                     <div className="flex-1">
                         <p className="font-semibold mb-2">Q{number}: {question.question || 'Untitled question'}</p>
                         <p className="text-sm text-gray-600">
@@ -338,7 +377,7 @@ function QuestionEditor({ question, number, isEditing, onEdit, onSave, onDelete,
                     />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label className="block text-sm font-medium mb-2">Type</label>
                         <select
@@ -390,7 +429,7 @@ function QuestionEditor({ question, number, isEditing, onEdit, onSave, onDelete,
                 ) : (
                     <div>
                         <label className="block text-sm font-medium mb-2">Correct Answer *</label>
-                        <div className="flex gap-4">
+                        <div className="flex flex-wrap gap-4">
                             <label className="flex items-center gap-2">
                                 <input
                                     type="radio"
@@ -422,7 +461,7 @@ function QuestionEditor({ question, number, isEditing, onEdit, onSave, onDelete,
                     />
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <button
                         onClick={() => onSave(question)}
                         className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"

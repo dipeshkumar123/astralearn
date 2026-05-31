@@ -3,8 +3,11 @@ import axios from 'axios'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import { EmptyState } from '../components/ui/EmptyState'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BookOpen, Star, Search, SlidersHorizontal } from 'lucide-react'
+import { useAuth } from '@clerk/clerk-react'
+import { BookOpen, Star, Search, SlidersHorizontal, ArrowRight, Compass } from 'lucide-react'
+import SaveCourseButton from '../components/SaveCourseButton'
 
 export default function CoursesListPage() {
     const [courses, setCourses] = useState([])
@@ -13,8 +16,10 @@ export default function CoursesListPage() {
     const [search, setSearch] = useState('')
     const [category, setCategory] = useState('All')
     const [level, setLevel] = useState('All')
+    const [savedCourseIds, setSavedCourseIds] = useState([])
     const [searchParams, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
+    const { getToken, isSignedIn } = useAuth()
 
     useEffect(() => {
         const searchParam = searchParams.get('search') || ''
@@ -26,7 +31,7 @@ export default function CoursesListPage() {
     }, [searchParams])
 
     useEffect(() => {
-        const fetch = async () => {
+        const fetchData = async () => {
             setLoading(true)
             try {
                 const params = {}
@@ -39,7 +44,9 @@ export default function CoursesListPage() {
                 if (levelParam && levelParam !== 'All') params.level = levelParam
 
                 const res = await axios.get('/api/courses', { params })
-                const published = res.data.filter((course) => course.isPublished)
+                // Handle both paginated { courses: [...] } and legacy array responses
+                const courseData = Array.isArray(res.data) ? res.data : (res.data.courses || [])
+                const published = courseData.filter((course) => course.isPublished)
                 setCourses(published)
 
                 const reviewPromises = published.map((course) =>
@@ -56,8 +63,28 @@ export default function CoursesListPage() {
                 setLoading(false)
             }
         }
-        fetch()
+        fetchData()
     }, [searchParams])
+
+    useEffect(() => {
+        const fetchSaved = async () => {
+            if (!isSignedIn) {
+                setSavedCourseIds([])
+                return
+            }
+
+            try {
+                const token = await getToken()
+                const cfg = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+                const res = await axios.get('/api/saved-courses', cfg)
+                setSavedCourseIds(res.data.map((item) => item.courseId || item.course?.id).filter(Boolean))
+            } catch {
+                setSavedCourseIds([])
+            }
+        }
+
+        fetchSaved()
+    }, [getToken, isSignedIn])
 
     const applyFilters = (event) => {
         event.preventDefault()
@@ -94,15 +121,42 @@ export default function CoursesListPage() {
 
     return (
         <div className="mx-auto max-w-7xl space-y-6 px-4 pb-8 sm:space-y-8 sm:px-6 sm:pb-12 lg:px-8">
-            <section className="glass-panel overflow-hidden rounded-3xl p-5 sm:p-8">
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-primary">Course Discovery</p>
-                <h1 className="text-3xl font-bold text-slate-900 sm:text-4xl">Find your next learning path</h1>
-                <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">
-                    Search published courses, match your level, and jump straight into lessons that fit your goals.
-                </p>
+            <section className="surface-panel soft-grid overflow-hidden p-5 sm:p-8">
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-center">
+                    <div>
+                        <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
+                            <Compass className="h-3.5 w-3.5" />
+                            Course Discovery
+                        </p>
+                        <h1 className="max-w-3xl text-3xl font-bold text-slate-950 sm:text-4xl lg:text-5xl">Find your next learning path</h1>
+                        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">
+                            Search published courses, match your level, and jump straight into lessons that fit your goals.
+                        </p>
+                    </div>
+
+                    <div className="learning-visual hidden min-h-52 rounded-3xl p-4 text-white shadow-[0_24px_44px_-30px_rgba(15,23,42,0.8)] sm:block">
+                        <div className="flex h-full flex-col justify-between rounded-2xl border border-white/25 bg-white/15 p-5 backdrop-blur-md">
+                            <p className="text-xs font-bold uppercase tracking-wide text-white/75">Available now</p>
+                            <div className="mt-2">
+                                <p className="text-4xl font-extrabold tracking-tight">{courses.length}</p>
+                                <p className="mt-1 text-sm font-medium text-white/80">Published courses</p>
+                            </div>
+                            <div className="mt-3 flex items-center gap-3">
+                                <div className="rounded-lg bg-white/20 px-3 py-1.5 text-center backdrop-blur-sm">
+                                    <p className="text-lg font-bold">{new Set(courses.map(c => c.category).filter(Boolean)).size}</p>
+                                    <p className="text-[10px] uppercase tracking-wide text-white/70">Categories</p>
+                                </div>
+                                <div className="rounded-lg bg-white/20 px-3 py-1.5 text-center backdrop-blur-sm">
+                                    <p className="text-lg font-bold">{new Set(courses.map(c => c.level).filter(Boolean)).size}</p>
+                                    <p className="text-[10px] uppercase tracking-wide text-white/70">Levels</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
-            <form onSubmit={applyFilters} className="glass-panel rounded-3xl p-4 sm:p-5">
+            <form onSubmit={applyFilters} className="surface-panel p-4 sm:p-5">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.7fr_1fr_1fr_auto] lg:items-end">
                     <div>
                         <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-600">Search</label>
@@ -154,22 +208,26 @@ export default function CoursesListPage() {
             </form>
 
             {courses.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-slate-300/80 bg-white/70 py-14 text-center text-slate-500">
-                    <p className="text-lg font-semibold text-slate-700">No courses match these filters.</p>
-                    <Button className="mt-4" variant="secondary" onClick={clearFilters}>Clear filters</Button>
-                </div>
+                <EmptyState
+                    icon={Search}
+                    title="No courses match these filters"
+                    description="Try broadening your search or resetting filters to discover available courses."
+                    action={{ label: 'Clear filters', onClick: clearFilters }}
+                />
             ) : (
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     {courses.map((course) => {
                         const review = reviews[course.id] || { average: 0, count: 0 }
                         return (
-                            <Card key={course.id} className="group overflow-hidden p-0">
+                            <Card key={course.id} className="card-shine group overflow-hidden p-0">
                                 <div className="relative h-44 overflow-hidden bg-gradient-to-br from-primary to-accent sm:h-48">
                                     {course.thumbnail ? (
                                         <img src={course.thumbnail} alt={course.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                     ) : (
-                                        <div className="flex h-full w-full items-center justify-center">
-                                            <BookOpen className="h-12 w-12 text-white/60" />
+                                        <div className="course-fallback-visual flex h-full w-full items-center justify-center">
+                                            <div className="rounded-2xl border border-white/30 bg-white/20 p-4 text-white backdrop-blur-md">
+                                                <BookOpen className="h-10 w-10" />
+                                            </div>
                                         </div>
                                     )}
                                     <div className="absolute right-3 top-3">
@@ -194,7 +252,22 @@ export default function CoursesListPage() {
 
                                     <div className="flex items-center justify-between border-t border-slate-100 pt-3">
                                         <span className="text-2xl font-bold text-primary">${course.price || 0}</span>
-                                        <Button onClick={() => navigate(`/courses/${course.id}`)} className="px-4 py-2 text-sm">View Course</Button>
+                                        <div className="flex items-center gap-2">
+                                            <SaveCourseButton
+                                                courseId={course.id}
+                                                initialSaved={savedCourseIds.includes(course.id)}
+                                                onChange={(isSaved) => {
+                                                    setSavedCourseIds((current) => isSaved
+                                                        ? [...new Set([...current, course.id])]
+                                                        : current.filter((id) => id !== course.id))
+                                                }}
+                                                className="px-3 py-2"
+                                            />
+                                            <Button onClick={() => navigate(`/courses/${course.id}`)} className="px-4 py-2 text-sm">
+                                                View
+                                                <ArrowRight className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             </Card>

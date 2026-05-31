@@ -30,7 +30,7 @@ export default function AchievementsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
       </div>
     )
@@ -49,14 +49,14 @@ export default function AchievementsPage() {
   const lockedBadges = badges.filter(b => !b.earned)
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8 px-4 sm:px-6 lg:px-8">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Achievements</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Achievements</h1>
         <p className="text-slate-600 mt-1">Your learning milestones and badges</p>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-6">
+        <Card className="p-5 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Total Points</p>
@@ -68,7 +68,7 @@ export default function AchievementsPage() {
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-5 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Current Streak</p>
@@ -80,7 +80,7 @@ export default function AchievementsPage() {
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-5 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Badges Earned</p>
@@ -92,7 +92,7 @@ export default function AchievementsPage() {
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-5 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Courses Done</p>
@@ -108,7 +108,7 @@ export default function AchievementsPage() {
       <div>
         <h2 className="text-2xl font-bold text-slate-900 mb-4">Earned Badges</h2>
         {earnedBadges.length === 0 ? (
-          <Card className="p-10 text-center">
+          <Card className="p-6 sm:p-10 text-center">
             <p className="text-slate-500">No badges earned yet. Keep learning to unlock achievements!</p>
           </Card>
         ) : (

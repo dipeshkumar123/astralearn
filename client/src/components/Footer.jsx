@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Github, Twitter, Linkedin, Sparkles } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function Footer() {
     const linkGroups = [
@@ -44,14 +45,14 @@ export default function Footer() {
                             <h3 className="text-2xl font-bold text-slate-900">Get one smart study tip every Friday</h3>
                             <p className="mt-2 text-sm text-slate-600 sm:text-base">Short, practical, and made for busy students.</p>
                         </div>
-                        <div className="flex w-full max-w-xl flex-col gap-2 sm:flex-row">
+                        <form onSubmit={(e) => { e.preventDefault(); toast.success('Thanks! Weekly tips coming soon.') }} className="flex w-full max-w-xl flex-col gap-2 sm:flex-row">
                             <input
                                 type="email"
                                 placeholder="you@example.com"
                                 className="input-field h-11"
                             />
-                            <button className="btn-primary h-11 whitespace-nowrap px-5">Subscribe</button>
-                        </div>
+                            <button type="submit" className="btn-primary h-11 whitespace-nowrap px-5">Subscribe</button>
+                        </form>
                     </div>
                 </div>
 

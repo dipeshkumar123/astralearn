@@ -17,8 +17,8 @@ jest.mock('stripe', () => {
 });
 
 jest.mock('../src/lib/prisma', () => ({
-  purchase: { create: jest.fn(async () => ({ id: 'pWH' })) },
-  enrollment: { create: jest.fn(async () => ({ id: 'eWH' })) },
+  purchase: { upsert: jest.fn(async () => ({ id: 'pWH' })) },
+  enrollment: { upsert: jest.fn(async () => ({ id: 'eWH' })) },
 }));
 
 const app = require('../src/app');
@@ -32,7 +32,11 @@ describe('Stripe webhook simulation', () => {
       .send(rawBody);
     expect(res.status).toBe(200);
     const prisma = require('../src/lib/prisma');
-    expect(prisma.purchase.create).toHaveBeenCalled();
-    expect(prisma.enrollment.create).toHaveBeenCalled();
+    expect(prisma.purchase.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId_courseId: { userId: 'uWH', courseId: 'cWH' } },
+    }));
+    expect(prisma.enrollment.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId_courseId: { userId: 'uWH', courseId: 'cWH' } },
+    }));
   });
 });

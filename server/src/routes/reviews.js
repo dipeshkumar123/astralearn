@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
-const { requireAuth } = require('@clerk/express');
+const { requireAuth } = require('../middleware/auth');
 
 // GET /api/reviews/course/:courseId - Get reviews for a course
 router.get('/course/:courseId', async (req, res) => {

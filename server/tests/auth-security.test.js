@@ -248,5 +248,43 @@ describe('Authentication & Security Tests', () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('uploadUrl');
     });
+
+    test('Student cannot promote themselves to teacher', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'u1',
+        role: 'STUDENT'
+      });
+
+      const response = await request(app)
+        .patch('/api/users/me/role')
+        .set('Authorization', 'Bearer test_token')
+        .send({ role: 'TEACHER' });
+
+      expect(response.status).toBe(403);
+      expect(response.body.error).toMatch(/Only admins/i);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    test('Admin can assign teacher role to another user', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'admin1',
+        role: 'ADMIN'
+      });
+      prisma.user.update.mockResolvedValue({
+        id: 'u2',
+        role: 'TEACHER'
+      });
+
+      const response = await request(app)
+        .patch('/api/users/u2/role')
+        .set('Authorization', 'Bearer test_token')
+        .send({ role: 'TEACHER' });
+
+      expect(response.status).toBe(200);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u2' },
+        data: { role: 'TEACHER' }
+      });
+    });
   });
 });

@@ -7,6 +7,8 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import Achievements from '../components/Achievements'
+import { hydrateCoursesWithProgress } from '../lib/courseProgress'
+import ProgressBar from '../components/ProgressBar'
 
 export default function ProfilePage() {
     const { user } = useUser()
@@ -19,6 +21,8 @@ export default function ProfilePage() {
         currentStreak: 0
     })
     const [enrolledCourses, setEnrolledCourses] = useState([])
+    const [progressByCourse, setProgressByCourse] = useState({})
+    const [loading, setLoading] = useState(true)
     const [userRole, setUserRole] = useState('STUDENT')
     const [changingRole, setChangingRole] = useState(false)
 
@@ -45,9 +49,12 @@ export default function ProfilePage() {
             // 3. Get Enrolled Courses
             const coursesRes = await axios.get(`/api/courses/my-courses`, config)
             setEnrolledCourses(coursesRes.data)
+            setProgressByCourse(await hydrateCoursesWithProgress(coursesRes.data, token, axios))
 
         } catch (error) {
             console.error('Error fetching profile:', error)
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -70,7 +77,13 @@ export default function ProfilePage() {
         }
     }
 
-    if (!user) return null
+    if (!user || loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+        )
+    }
 
     return (
         <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
@@ -207,22 +220,33 @@ export default function ProfilePage() {
                                     No courses enrolled yet.
                                 </div>
                             ) : (
-                                enrolledCourses.map((course) => (
-                                    <div key={course.id} className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary/20 transition-colors">
-                                        <div className="w-16 h-16 rounded-lg bg-slate-200 flex-shrink-0 overflow-hidden">
-                                            {course.thumbnail && (
-                                                <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
-                                            )}
+                                enrolledCourses.map((course) => {
+                                    const totalLessons = course.sections?.reduce((acc, s) => acc + (s.lessons?.length || 0), 0) || 0
+                                    const progress = progressByCourse[course.id] || { completedLessons: [], percentComplete: 0 }
+                                    return (
+                                    <div key={course.id} className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary/20 transition-colors">
+                                        <div className="flex gap-3 flex-1 min-w-0">
+                                            <div className="h-16 w-16 rounded-lg bg-slate-200 flex-shrink-0 overflow-hidden">
+                                                {course.thumbnail && (
+                                                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-semibold text-slate-900 truncate">{course.title}</h4>
+                                                <div className="text-xs text-slate-500 mt-1 mb-2">
+                                                    {progress.completedLessons.length} of {totalLessons} lessons complete
+                                                </div>
+                                                <ProgressBar value={progress.percentComplete} />
+                                            </div>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-semibold text-slate-900 truncate">{course.title}</h4>
-                                            <div className="text-xs text-slate-500 mt-1">In Progress</div>
+                                        <div className="flex sm:flex-col justify-end sm:justify-center">
+                                            <Button size="sm" variant="secondary" onClick={() => navigate(`/courses/${course.id}`)}>
+                                                Continue
+                                            </Button>
                                         </div>
-                                        <Button size="sm" variant="secondary" className="hidden sm:flex">
-                                            Continue
-                                        </Button>
                                     </div>
-                                ))
+                                    )
+                                })
                             )}
                         </div>
                     </Card>

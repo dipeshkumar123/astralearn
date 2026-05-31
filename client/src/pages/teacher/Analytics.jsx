@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '@clerk/clerk-react'
 import { BarChart3, Users, TrendingUp, Award } from 'lucide-react'
 import axios from 'axios'
 import TeacherHeader from '../../components/TeacherHeader'
 
 export default function Analytics() {
+    const { getToken } = useAuth()
     const [courses, setCourses] = useState([])
     const [loading, setLoading] = useState(true)
     const [stats, setStats] = useState({
         totalCourses: 0,
         totalEnrollments: 0,
-        avgCompletion: 0,
-        avgQuizScore: 0
     })
 
     useEffect(() => {
@@ -20,19 +20,23 @@ export default function Analytics() {
 
     const fetchAnalytics = async () => {
         try {
-            const coursesRes = await axios.get('/api/courses')
-            setCourses(coursesRes.data)
+            const token = await getToken()
+            const coursesRes = await axios.get('/api/courses/instructor', {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            const courseData = Array.isArray(coursesRes.data)
+                ? coursesRes.data
+                : (coursesRes.data.courses || [])
+            setCourses(courseData)
 
-            const totalCourses = coursesRes.data.length
-            const totalEnrollments = coursesRes.data.reduce((sum, course) =>
+            const totalCourses = courseData.length
+            const totalEnrollments = courseData.reduce((sum, course) =>
                 sum + (course.enrollments?.length || 0), 0
             )
 
             setStats({
                 totalCourses,
                 totalEnrollments,
-                avgCompletion: 0,
-                avgQuizScore: 0
             })
         } catch (error) {
             console.error(error)
@@ -56,13 +60,13 @@ export default function Analytics() {
         },
         {
             label: 'Avg Completion',
-            value: `${stats.avgCompletion}%`,
+            value: 'Coming soon',
             icon: TrendingUp,
             tone: 'from-accent/20 to-primary/10 border-accent/30 text-accent-dark',
         },
         {
             label: 'Avg Quiz Score',
-            value: `${stats.avgQuizScore}%`,
+            value: 'Coming soon',
             icon: Award,
             tone: 'from-slate-100 to-slate-50 border-slate-200 text-slate-700',
         },

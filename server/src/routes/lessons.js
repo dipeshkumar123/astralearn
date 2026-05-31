@@ -74,7 +74,6 @@ router.post('/', requireAuth(), requireCourseOwnership('courseId'), validateBody
     try {
         const { title, sectionId, description, courseId } = req.body;
 
-        // Get max position
         const maxPosition = await prisma.lesson.aggregate({
             where: { sectionId },
             _max: { position: true }
@@ -96,12 +95,20 @@ router.post('/', requireAuth(), requireCourseOwnership('courseId'), validateBody
     }
 });
 
-// PATCH update lesson
+// PATCH update lesson — whitelisted fields only (prevents mass-assignment)
 router.patch('/:id', requireAuth(), requireCourseOwnership('courseId'), validateBody(patchLessonSchema), async (req, res) => {
     try {
+        const { title, description, muxAssetId, muxPlaybackId, sectionId, position } = req.body;
         const lesson = await prisma.lesson.update({
             where: { id: req.params.id },
-            data: req.body
+            data: {
+                ...(title !== undefined && { title }),
+                ...(description !== undefined && { description }),
+                ...(muxAssetId !== undefined && { muxAssetId }),
+                ...(muxPlaybackId !== undefined && { muxPlaybackId }),
+                ...(sectionId !== undefined && { sectionId }),
+                ...(position !== undefined && { position }),
+            }
         });
         res.json(lesson);
     } catch (error) {

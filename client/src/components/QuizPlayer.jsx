@@ -132,25 +132,25 @@ export default function QuizPlayer({ quizId, onComplete, quiz: propQuiz }) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-4xl space-y-5 sm:space-y-6">
       {/* Quiz Header */}
-      <Card className="p-6 bg-white border-l-4 border-l-primary">
-        <div className="flex justify-between items-start">
+      <Card className="border-l-4 border-l-primary bg-white p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">{quiz.title}</h2>
+            <h2 className="mb-2 text-xl font-bold text-slate-900 sm:text-2xl">{quiz.title}</h2>
             {quiz.description && (
               <p className="text-slate-600 mb-4">{quiz.description}</p>
             )}
           </div>
           {quiz.timeLimit && !result && (
-            <Badge variant="warning" className="flex items-center gap-2 text-lg px-3 py-1">
+            <Badge variant="warning" className="inline-flex items-center gap-2 px-3 py-1 text-sm sm:text-base">
               <Clock className="h-4 w-4" />
               <span>{formatTime(timeRemaining)}</span>
             </Badge>
           )}
         </div>
 
-        <div className="flex gap-6 text-sm text-slate-600 mt-4 pt-4 border-t border-slate-100">
+        <div className="mt-4 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-sm text-slate-600 sm:gap-6">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-900">Questions:</span> {quiz.questions.length}
           </div>
@@ -162,11 +162,11 @@ export default function QuizPlayer({ quizId, onComplete, quiz: propQuiz }) {
 
       {/* Questions */}
       {!result ? (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {quiz.questions.map((question, idx) => (
-            <Card key={question.id} className="p-6">
+            <Card key={question.id} className="p-4 sm:p-6">
               <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">Question {idx + 1}</span>
                   <Badge variant="neutral">{question.points} pts</Badge>
                 </div>
@@ -200,7 +200,7 @@ export default function QuizPlayer({ quizId, onComplete, quiz: propQuiz }) {
                   ))}
                 </div>
               ) : (
-                <div className="flex gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
                   {['true', 'false'].map((val) => (
                     <label
                       key={val}
@@ -225,8 +225,8 @@ export default function QuizPlayer({ quizId, onComplete, quiz: propQuiz }) {
           ))}
 
           {/* Submit Button */}
-          <Card className="p-6 sticky bottom-6 shadow-xl border-t-4 border-t-primary z-10">
-            <div className="flex items-center justify-between">
+          <Card className="sticky bottom-3 z-10 border-t-4 border-t-primary p-4 shadow-xl sm:bottom-6 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-slate-600 font-medium">
                 {Object.keys(answers).length} of {quiz.questions.length} questions answered
               </p>
@@ -236,7 +236,7 @@ export default function QuizPlayer({ quizId, onComplete, quiz: propQuiz }) {
                 isLoading={submitting}
                 variant="primary"
                 size="lg"
-                className="px-8"
+                className="w-full sm:w-auto sm:px-8"
                 data-testid="quiz-submit"
               >
                 <Send className="h-5 w-5 mr-2" />
@@ -247,23 +247,23 @@ export default function QuizPlayer({ quizId, onComplete, quiz: propQuiz }) {
         </div>
       ) : (
         /* Results */
-        <div className="space-y-6 animate-fade-in">
-          <Card className={`p-8 text-center border-2 ${result.passed ? 'border-green-100 bg-green-50/50' : 'border-red-100 bg-red-50/50'}`}>
+        <div className="space-y-5 sm:space-y-6 animate-fade-in">
+          <Card className={`border-2 p-5 text-center sm:p-8 ${result.passed ? 'border-green-100 bg-green-50/50' : 'border-red-100 bg-red-50/50'}`}>
             <div className="mb-6">
               {result.passed ? (
-                <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce-slow">
+                <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 sm:h-24 sm:w-24 animate-bounce-slow">
                   <CheckCircle className="h-12 w-12 text-green-600" />
                 </div>
               ) : (
-                <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-red-100 sm:h-24 sm:w-24">
                   <XCircle className="h-12 w-12 text-red-600" />
                 </div>
               )}
             </div>
-            <h3 className={`text-3xl font-bold mb-2 ${result.passed ? 'text-green-800' : 'text-red-800'}`}>
+            <h3 className={`mb-2 text-2xl font-bold sm:text-3xl ${result.passed ? 'text-green-800' : 'text-red-800'}`}>
               {result.passed ? 'Congratulations! You Passed!' : 'Not Passed'}
             </h3>
-            <div className="text-5xl font-black mb-4 text-slate-900 tracking-tight">
+            <div className="mb-4 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
               {result.score.toFixed(1)}%
             </div>
             <Badge variant={result.passed ? 'success' : 'error'} size="lg">
@@ -286,7 +286,7 @@ export default function QuizPlayer({ quizId, onComplete, quiz: propQuiz }) {
               return (
                 <Card
                   key={question.id}
-                  className={`p-6 border-l-4 ${isCorrect ? 'border-l-green-500' : 'border-l-red-500'}`}
+                  className={`border-l-4 p-4 sm:p-6 ${isCorrect ? 'border-l-green-500' : 'border-l-red-500'}`}
                 >
                   <div className="flex items-start gap-4 mb-4">
                     {isCorrect ? (
@@ -299,7 +299,7 @@ export default function QuizPlayer({ quizId, onComplete, quiz: propQuiz }) {
                     </div>
                   </div>
 
-                  <div className="ml-10 space-y-3 text-sm">
+                  <div className="space-y-3 text-sm sm:ml-10">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-slate-500">Your answer: </span>
                       <Badge variant={isCorrect ? 'success' : 'error'}>
@@ -327,9 +327,9 @@ export default function QuizPlayer({ quizId, onComplete, quiz: propQuiz }) {
           {pastAttempts.length > 0 && (
             <div className="space-y-3">
               <h4 className="text-lg font-semibold text-slate-800 px-2">Past Attempts</h4>
-              <ul className="px-2 text-sm text-slate-600 space-y-1" data-testid="past-attempts">
+              <ul className="space-y-1 px-2 text-xs text-slate-600 sm:text-sm" data-testid="past-attempts">
                 {pastAttempts.map(a => (
-                  <li key={a.id} className="flex justify-between border-b border-slate-100 py-1">
+                  <li key={a.id} className="flex flex-col gap-0.5 border-b border-slate-100 py-1 sm:flex-row sm:items-center sm:justify-between">
                     <span>{new Date(a.completedAt).toLocaleString()}</span>
                     <span className="font-medium">{a.score.toFixed(1)}% {a.passed ? '✅' : '❌'}</span>
                   </li>

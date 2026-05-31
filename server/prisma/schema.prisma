@@ -25,11 +25,40 @@ model User {
   discussions     Discussion[]
   replies         DiscussionReply[]
   purchases       Purchase[]
+  savedCourses    SavedCourse[]
+  studyGoal       StudyGoal?
   stripeCustomerId String? @unique
   points          Int      @default(0)
   streak          Int      @default(0)
   lastActivityDate DateTime?
   badges          Json?    @default("[]") // Array of badge IDs/names
+}
+
+model SavedCourse {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+}
+
+model StudyGoal {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  weeklyTargetLessons   Int      @default(5)
+  targetMinutesPerDay   Int      @default(25)
+  focusAreas            Json?    @default("[]")
+  preferredStudyTime    String   @default("Evening")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Purchase {
@@ -82,6 +111,7 @@ model Course {
   courseContent CourseContent[]
   reviews       Review[]
   purchases     Purchase[]
+  savedBy       SavedCourse[]
   lessons       Lesson[]
 }
 

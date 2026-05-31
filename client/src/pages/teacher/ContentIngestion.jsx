@@ -40,6 +40,10 @@ export default function ContentIngestion() {
     const handleFileSelect = (e) => {
         const file = e.target.files?.[0]
         if (file) {
+            if (file.size > 10 * 1024 * 1024) {
+                toast.error('File size must be less than 10MB')
+                return
+            }
             if (file.type === 'application/pdf' || file.type.startsWith('text/')) {
                 setSelectedFile(file)
             } else {
@@ -90,10 +94,10 @@ export default function ContentIngestion() {
             />
 
             {/* Main Content */}
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
-                    <h2 className="text-2xl font-bold mb-2">Upload Course Materials</h2>
-                    <p className="text-gray-600 mb-6">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-5 sm:p-8">
+                    <h2 className="text-xl sm:text-2xl font-bold mb-2">Upload Course Materials</h2>
+                    <p className="text-gray-600 mb-6 text-sm sm:text-base">
                         Upload PDFs or text files to make them searchable by the AI tutor
                     </p>
 
@@ -141,21 +145,21 @@ export default function ContentIngestion() {
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Select File
                         </label>
-                        <div className="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center hover:border-primary transition-colors">
+                        <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 sm:p-10 text-center hover:border-primary transition-colors">
                             {selectedFile ? (
-                                <div className="flex items-center justify-center gap-4">
-                                    <div className="bg-blue-50 p-4 rounded-xl">
+                                <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-center">
+                                    <div className="bg-blue-50 p-4 rounded-xl self-center sm:self-auto">
                                         <FileText className="h-10 w-10 text-blue-600" />
                                     </div>
                                     <div className="text-left flex-1">
-                                        <p className="font-semibold text-slate-900">{selectedFile.name}</p>
+                                        <p className="font-semibold text-slate-900 break-all">{selectedFile.name}</p>
                                         <p className="text-sm text-slate-500">
                                             {(selectedFile.size / 1024).toFixed(2)} KB
                                         </p>
                                     </div>
                                     <button
                                         onClick={() => setSelectedFile(null)}
-                                        className="text-red-600 hover:text-red-800 font-medium px-4 py-2 rounded-lg hover:bg-red-50 transition"
+                                        className="text-red-600 hover:text-red-800 font-medium px-4 py-2 rounded-lg hover:bg-red-50 transition self-stretch sm:self-auto"
                                     >
                                         Remove
                                     </button>
@@ -165,7 +169,7 @@ export default function ContentIngestion() {
                                     <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <Upload className="h-8 w-8 text-slate-600" />
                                     </div>
-                                    <p className="text-slate-900 font-medium mb-1">Click to upload or drag and drop</p>
+                                    <p className="text-slate-900 font-medium mb-1">Click to upload</p>
                                     <p className="text-sm text-slate-500">PDF or TXT files (max 10MB)</p>
                                     <input
                                         type="file"
@@ -182,7 +186,7 @@ export default function ContentIngestion() {
                     <button
                         onClick={handleUpload}
                         disabled={!selectedFile || !courseId || uploading || courses.length === 0}
-                        className="w-full bg-gradient-to-r from-primary to-secondary text-white py-4 rounded-xl hover:shadow-lg hover:shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
+                        className="w-full bg-gradient-to-r from-primary to-secondary text-white py-3.5 sm:py-4 rounded-xl hover:shadow-lg hover:shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base sm:text-lg transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
                     >
                         {uploading ? (
                             <>
@@ -218,7 +222,7 @@ export default function ContentIngestion() {
                 </div>
 
                 {/* Info Box */}
-                <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
+                <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 sm:p-6">
                     <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
                         <Sparkles className="h-5 w-5" />
                         How AI Indexing Works
@@ -245,7 +249,7 @@ export default function ContentIngestion() {
 
                 {/* AI Indexing (Raw Text) */}
                 {!loadingCourses && courses.length > 0 && (
-                    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 mt-6">
+                    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-5 sm:p-8 mt-6">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
                             <FileText className="h-6 w-6 text-white" />
@@ -278,7 +282,7 @@ export default function ContentIngestion() {
                                 toast.error(errorMsg)
                             }
                         }}
-                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl hover:shadow-lg font-semibold flex items-center justify-center gap-2 transition"
+                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl hover:shadow-lg font-semibold flex items-center justify-center gap-2 transition text-sm sm:text-base"
                     >
                         <Sparkles className="h-5 w-5" />
                         Index Lesson to AI
