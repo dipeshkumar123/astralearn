@@ -9,7 +9,8 @@
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
     "test": "cross-env TEST_AUTH=1 jest --runInBand",
-    "test:integration": "cross-env TEST_AUTH=1 TEST_AUTH_CLERK_ID=user_teacher1 jest --runInBand --testPathPattern=tests/integration"
+    "test:integration": "cross-env TEST_AUTH=1 TEST_AUTH_CLERK_ID=user_teacher1 jest --runInBand --testPathPattern=tests/integration",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",

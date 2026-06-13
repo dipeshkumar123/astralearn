@@ -95,12 +95,12 @@ test.describe('Authenticated Student Journey', () => {
   test('student can open dashboard and switch between browse/my courses', async ({ page }) => {
     await page.goto('http://localhost:5173/dashboard', { waitUntil: 'networkidle' });
 
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
-    await expect(page.getByText(/day streak/i).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Ready to pick up/i })).toBeVisible();
+    await expect(page.getByText(/Streak/i).first()).toBeVisible();
     await expect(page.getByText(/points/i).first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'My Courses' }).click();
-    await expect(page.getByText(/No enrollments yet/i)).toBeVisible();
+    await page.getByRole('button', { name: 'Enrolled' }).click();
+    await expect(page.getByText(/Not enrolled in any courses/i)).toBeVisible();
 
     await page.getByRole('button', { name: 'Browse', exact: true }).click();
     await expect(page.getByText('JavaScript Foundations')).toBeVisible();

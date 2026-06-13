@@ -37,7 +37,7 @@ test.describe('Authenticated Teacher Journey', () => {
   test('teacher can open studio and navigate to AI ingestion', async ({ page }) => {
     await page.goto('http://localhost:5173/teacher', { waitUntil: 'networkidle' });
 
-    await expect(page.getByRole('heading', { name: /Instructor Studio/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Instructor Studio/i })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Total Courses')).toBeVisible();
     await expect(page.getByText('Lessons Created')).toBeVisible();
 

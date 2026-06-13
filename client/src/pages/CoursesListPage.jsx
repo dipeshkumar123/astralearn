@@ -212,7 +212,11 @@ export default function CoursesListPage() {
                     icon={Search}
                     title="No courses match these filters"
                     description="Try broadening your search or resetting filters to discover available courses."
-                    action={{ label: 'Clear filters', onClick: clearFilters }}
+                    action={
+                        <Button type="button" variant="secondary" onClick={clearFilters}>
+                            Clear filters
+                        </Button>
+                    }
                 />
             ) : (
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

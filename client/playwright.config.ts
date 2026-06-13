@@ -29,7 +29,7 @@ const config: PlaywrightTestConfig = {
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: false,
+    reuseExistingServer: true,
     timeout: 120_000,
     env: {
       VITE_CLERK_PUBLISHABLE_KEY: clerkPublishableKey,

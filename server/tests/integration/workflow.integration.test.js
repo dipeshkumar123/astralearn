@@ -30,8 +30,8 @@ describe('Integration workflow', () => {
   test('Courses list returns published courses', async () => {
     const res = await request(app).get('/api/courses');
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(res.body.courses)).toBe(true);
+    expect(res.body.courses.length).toBeGreaterThanOrEqual(1);
   });
 
   test('Fetch single course includes sections and lessons', async () => {

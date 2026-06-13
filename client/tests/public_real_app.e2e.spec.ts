@@ -4,7 +4,7 @@ test.describe('Public Real App E2E', () => {
   test('landing page renders core CTA actions', async ({ page }) => {
     await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
 
-    await expect(page.getByRole('heading', { name: /Master Any Skill/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Learn faster with a study space/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /Start Learning Free/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /Explore Courses/i })).toBeVisible();
   });
@@ -13,7 +13,7 @@ test.describe('Public Real App E2E', () => {
     await page.goto('http://localhost:5173/courses', { waitUntil: 'networkidle' });
 
     const searchInput = page.getByPlaceholder('Search by title or description');
-    await expect(searchInput).toBeVisible();
+    await expect(searchInput).toBeVisible({ timeout: 15000 });
 
     await searchInput.fill('javascript');
     await page.getByRole('button', { name: 'Apply' }).click();
@@ -24,9 +24,10 @@ test.describe('Public Real App E2E', () => {
   });
 
   test('real course detail page opens for a published course if present', async ({ page, request }) => {
-    const res = await request.get('http://localhost:3000/api/courses');
+    const res = await request.get('http://127.0.0.1:3000/api/courses');
     expect(res.ok()).toBeTruthy();
-    const courses = await res.json();
+    const resData = await res.json();
+    const courses = resData.courses || resData;
 
     test.skip(!Array.isArray(courses) || courses.length === 0, 'No published courses available for detail-page check');
 

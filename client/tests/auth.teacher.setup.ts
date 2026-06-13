@@ -21,7 +21,7 @@ test('authenticate teacher and store session', async ({ page }) => {
 
   test.skip(!token, 'Missing Clerk session token in browser context.');
 
-  const resp = await page.request.patch('http://localhost:3000/api/users/me/role', {
+  const resp = await page.request.patch('http://127.0.0.1:3000/api/users/me/role', {
     data: { role: 'TEACHER' },
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -29,7 +29,7 @@ test('authenticate teacher and store session', async ({ page }) => {
     throw new Error(`Failed to set teacher role: ${resp.status()} ${await resp.text()}`);
   }
 
-  const me = await page.request.get('http://localhost:3000/api/users/me', {
+  const me = await page.request.get('http://127.0.0.1:3000/api/users/me', {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!me.ok()) {

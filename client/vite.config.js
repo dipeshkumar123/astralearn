@@ -8,17 +8,20 @@ export default defineConfig({
         rollupOptions: {
             output: {
                 manualChunks(id) {
-                    if (!id.includes('node_modules')) return undefined
+                    const normalizedId = id.replace(/\\/g, '/')
 
-                    if (id.includes('@tiptap') || id.includes('prosemirror') || id.includes('linkifyjs') || id.includes('rope-sequence')) return 'vendor-tiptap'
-                    if (id.includes('@clerk')) return 'vendor-clerk'
-                    if (id.includes('react-dom') || id.includes('/react/') || id.includes('\\react\\') || id.includes('scheduler')) return 'vendor-react'
-                    if (id.includes('react-router')) return 'vendor-router'
-                    if (id.includes('lucide-react')) return 'vendor-icons'
-                    if (id.includes('@mux') || id.includes('mux-player')) return 'vendor-mux'
-                    if (id.includes('@stripe')) return 'vendor-stripe'
-                    if (id.includes('@hello-pangea')) return 'vendor-dnd'
-                    if (id.includes('axios')) return 'vendor-network'
+                    if (normalizedId.includes('commonjsHelpers')) return 'vendor-react'
+                    if (!normalizedId.includes('node_modules')) return undefined
+
+                    if (normalizedId.includes('@tiptap') || normalizedId.includes('prosemirror') || normalizedId.includes('linkifyjs') || normalizedId.includes('rope-sequence')) return 'vendor-tiptap'
+                    if (normalizedId.includes('@clerk')) return 'vendor-clerk'
+                    if (normalizedId.includes('/react-dom/') || normalizedId.includes('/react/') || normalizedId.includes('/scheduler/')) return 'vendor-react'
+                    if (normalizedId.includes('react-router')) return 'vendor-router'
+                    if (normalizedId.includes('lucide-react')) return 'vendor-icons'
+                    if (normalizedId.includes('@mux') || normalizedId.includes('mux-player')) return 'vendor-mux'
+                    if (normalizedId.includes('@stripe')) return 'vendor-stripe'
+                    if (normalizedId.includes('@hello-pangea')) return 'vendor-dnd'
+                    if (normalizedId.includes('axios')) return 'vendor-network'
 
                     return 'vendor'
                 }
@@ -30,7 +33,7 @@ export default defineConfig({
         allowedHosts: ["pagodalike-dannielle-stageably.ngrok-free.dev"],
         proxy: {
             '/api': {
-                target: 'http://localhost:3000',
+                target: 'http://127.0.0.1:3000',
                 changeOrigin: true
             }
         }

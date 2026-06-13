@@ -59,7 +59,7 @@ jest.mock('../src/lib/prisma', () => ({
 }));
 
 // Mock AI helpers
-jest.mock('../src/lib/gemini', () => ({
+jest.mock('../src/lib/llm', () => ({
   generateEmbedding: jest.fn(async () => [1,0,0]),
   generateResponse: jest.fn(async () => 'Mocked answer based on context'),
 }));
