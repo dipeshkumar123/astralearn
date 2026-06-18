@@ -1,0 +1,1 @@
+import{j as r}from"./vendor-react-CnXr6pFu.js";function l({value:t=0}){const a=Math.max(0,Math.min(100,Math.round(t)));return r.jsx("div",{className:"w-full h-2 bg-slate-200 rounded-full overflow-hidden",children:r.jsx("div",{className:"h-full bg-primary rounded-full transition-all duration-500 ease-out",style:{width:`${a}%`}})})}export{l as P};

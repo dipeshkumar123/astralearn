@@ -1,0 +1,1 @@
+import{j as o}from"./vendor-react-CnXr6pFu.js";const d=({children:r,className:s="",hover:a=!1,...e})=>o.jsx("div",{className:`card p-6 ${a?"hover:shadow-lg hover:-translate-y-1":""} ${s}`,...e,children:r});export{d as C};
