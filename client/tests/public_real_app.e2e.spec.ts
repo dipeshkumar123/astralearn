@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Public Real App E2E', () => {
   test('landing page renders core CTA actions', async ({ page }) => {
-    await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
+    await page.goto('/', { waitUntil: 'networkidle' });
 
     await expect(page.getByRole('heading', { name: /Learn faster with a study space/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /Start Learning Free/i })).toBeVisible();
@@ -10,7 +10,7 @@ test.describe('Public Real App E2E', () => {
   });
 
   test('courses page filter form works and updates URL params', async ({ page }) => {
-    await page.goto('http://localhost:5173/courses', { waitUntil: 'networkidle' });
+    await page.goto('/courses', { waitUntil: 'networkidle' });
 
     const searchInput = page.getByPlaceholder('Search by title or description');
     await expect(searchInput).toBeVisible({ timeout: 15000 });
@@ -24,7 +24,7 @@ test.describe('Public Real App E2E', () => {
   });
 
   test('real course detail page opens for a published course if present', async ({ page, request }) => {
-    const res = await request.get('http://127.0.0.1:3000/api/courses');
+    const res = await request.get('/api/courses');
     expect(res.ok()).toBeTruthy();
     const resData = await res.json();
     const courses = resData.courses || resData;
@@ -32,7 +32,7 @@ test.describe('Public Real App E2E', () => {
     test.skip(!Array.isArray(courses) || courses.length === 0, 'No published courses available for detail-page check');
 
     const firstCourse = courses[0];
-    await page.goto(`http://localhost:5173/courses/${firstCourse.id}`, { waitUntil: 'networkidle' });
+    await page.goto(`/courses/${firstCourse.id}`, { waitUntil: 'networkidle' });
     await expect(page).toHaveURL(new RegExp(`/courses/${firstCourse.id}$`));
 
     const bodyText = await page.locator('body').innerText();

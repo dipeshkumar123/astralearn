@@ -22,20 +22,20 @@ const config: PlaywrightTestConfig = {
   timeout: 30_000,
   retries: 0,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'https://astralearn-client.vercel.app',
     trace: 'on-first-retry',
     headless: true,
   },
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: true,
-    timeout: 120_000,
-    env: {
-      VITE_CLERK_PUBLISHABLE_KEY: clerkPublishableKey,
-      VITE_E2E_AUTH_BYPASS: '1',
-    },
-  },
+  // webServer: {
+  //   command: 'npm run dev',
+  //   url: 'http://localhost:5173',
+  //   reuseExistingServer: true,
+  //   timeout: 120_000,
+  //   env: {
+  //     VITE_CLERK_PUBLISHABLE_KEY: clerkPublishableKey,
+  //     VITE_E2E_AUTH_BYPASS: '1',
+  //   },
+  // },
 };
 
 export default config;
