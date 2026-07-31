@@ -57,3 +57,4 @@ test-results/
 # Misc framework caches
 .next/
 .turbo/
+.vercel

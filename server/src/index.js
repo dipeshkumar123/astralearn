@@ -45,31 +45,6 @@ app.get('/api/enrollments', requireAuth(), async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch enrollments' });
     }
 });
-                        instructor: {
-                            select: {
-                                id: true,
-                                firstName: true,
-                                lastName: true
-                            }
-                        },
-                        _count: {
-                            select: {
-                                enrollments: true,
-                                lessons: true
-                            }
-                        }
-                    }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        res.json(enrollments);
-    } catch (error) {
-        console.error('Error fetching enrollments:', error);
-        res.status(500).json({ error: 'Failed to fetch enrollments' });
-    }
-});
 
 const PORT = process.env.PORT || 5000;
 
